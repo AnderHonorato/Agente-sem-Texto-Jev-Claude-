@@ -1,20 +1,22 @@
-# Remote Control servers
+# Servidores de Remote Control
 
-This page describes a Claude Code adapter feature for macOS. Codex has no equivalent.
+Esta página descreve uma funcionalidade de adaptador do Claude Code para macOS. O Codex não tem
+equivalente.
 
-Claude Code's `/remote-control` shares one running session with the mobile app and
-claude.ai/code. Starting a *new* session from the phone needs `claude remote-control` running as
-a server in the folder, and one server serves one folder. `citizen remote-control` keeps one
-server per configured folder alive under launchd, so the folders are reachable after a reboot
-with no terminal open.
+O `/remote-control` do Claude Code compartilha uma sessão em execução com o aplicativo móvel e o
+claude.ai/code. Iniciar uma *nova* sessão pelo celular precisa do `claude remote-control` rodando
+como um servidor na pasta, e um servidor serve uma pasta. `citizen remote-control` mantém um
+servidor por pasta configurada vivo sob o launchd, então as pastas ficam alcançáveis depois de uma
+reinicialização sem nenhum terminal aberto.
 
-Serve each workspace root from its own entry. A host runs with its folder as the working
-directory, so every session it starts loads that folder's `CLAUDE.md`, skills and hooks; one host
-for a parent directory of several repositories loads none of theirs.
+Sirva cada raiz de workspace a partir de sua própria entrada. Um host roda com sua pasta como
+diretório de trabalho, então toda sessão que ele inicia carrega o `CLAUDE.md`, as skills e os
+hooks daquela pasta; um host para um diretório pai de vários repositórios não carrega nenhum
+deles.
 
-## Configure
+## Configurar
 
-Add the folders to the user configuration, then install:
+Adicione as pastas à configuração de usuário, depois instale:
 
 ```json
 "remote_control": {
@@ -29,157 +31,164 @@ Add the folders to the user configuration, then install:
 ```
 
 ```sh
-citizen remote-control install [--dry-run]   # one launchd agent per folder; drops agents for removed folders
-citizen remote-control status                # launchd state and log path per folder
-citizen remote-control uninstall             # unload and remove every agent
+citizen remote-control install [--dry-run]   # um agente launchd por pasta; retira agentes de pastas removidas
+citizen remote-control status                # estado do launchd e caminho de log por pasta
+citizen remote-control uninstall             # descarrega e remove todo agente
 ```
 
-- **`folders`** entries are a path, or an object with a `path` and optionally its own `spawn`,
-  which overrides the block's, and `env`, string names to string values added to that host's
-  launchd environment. The launchd label is derived from the path alone, so switching an entry
-  between the two forms keeps its agent.
-- **`spawn`** is passed to `--spawn`. `worktree` gives each phone-started session its own git
-  worktree, so two sessions never share a checkout; `same-dir` and `session` are Claude Code's
-  other modes. A folder that is not a git repository needs `same-dir`.
-- **`permission_mode`** is passed to `--permission-mode` and applies to every session the server
-  starts. The server is reachable from any device signed in to your account, so choose it as
-  you would for an unattended session.
-- **`keep_awake`** wraps the server in `caffeinate -is`. That holds idle sleep, and system sleep
-  on AC power. Nothing keeps a laptop awake with the lid closed.
+- As entradas de **`folders`** são um caminho, ou um objeto com um `path` e, opcionalmente, seu
+  próprio `spawn`, que sobrescreve o do bloco, e `env`, nomes de string para valores de string
+  adicionados ao ambiente launchd daquele host. O rótulo launchd é derivado só do caminho, então
+  trocar uma entrada entre as duas formas mantém seu agente.
+- **`spawn`** é passado para `--spawn`. `worktree` dá a cada sessão iniciada pelo celular sua
+  própria worktree git, então duas sessões nunca compartilham um checkout; `same-dir` e `session`
+  são os outros modos do Claude Code. Uma pasta que não é um repositório git precisa de
+  `same-dir`.
+- **`permission_mode`** é passado para `--permission-mode` e se aplica a toda sessão que o
+  servidor inicia. O servidor é alcançável a partir de qualquer dispositivo logado na sua conta,
+  então escolha-o como escolheria para uma sessão sem supervisão.
+- **`keep_awake`** envolve o servidor com `caffeinate -is`. Isso segura o sono ocioso, e o sono do
+  sistema com energia AC. Nada mantém um laptop acordado com a tampa fechada.
 
-Re-run `install` after changing the block. An agent whose definition is unchanged is left
-running, because reloading it would cut off the sessions its server is carrying.
+Rode `install` de novo depois de mudar o bloco. Um agente cuja definição não mudou é deixado em
+execução, porque recarregá-lo cortaria as sessões que seu servidor está carregando.
 
-The host runs without `--no-create-session-in-dir`. Claude Code 2.1.280 reads the folder's
-bridge pointer, and so reuses the environment on a relaunch, only while `createSessionInDir` is
-on; with the flag, every restart registered a new environment. The cost is the one session each
-host pre-creates in its folder, which is reused across restarts while the pointer is fresh.
+O host roda sem `--no-create-session-in-dir`. O Claude Code 2.1.280 lê o ponteiro de ponte da
+pasta, e assim reaproveita o ambiente em um relançamento, apenas enquanto `createSessionInDir`
+está ligado; com a flag, toda reinicialização registrava um ambiente novo. O custo é a única
+sessão que cada host pré-cria em sua pasta, que é reaproveitada entre reinicializações enquanto o
+ponteiro está fresco.
 
-A host that reused an environment at start keeps its sessions and its environment when it is
-stopped with `SIGTERM`. One that did not — the first host after an upgrade, or after a pointer
-expired — archives every session and deregisters its environment on `SIGTERM`. So a changed
-agent whose host is running is *adopted* rather than replaced: `install` reads the environment
-from the host's log, writes the folder's pointer for it with no pid, sends `SIGKILL` to the
-`claude` process, which skips the shutdown path, and then reloads the agent, whose new host
-reuses the environment. `--dry-run` names the environment it would adopt.
+Um host que reaproveitou um ambiente ao iniciar mantém suas sessões e seu ambiente quando é parado
+com `SIGTERM`. Um que não reaproveitou — o primeiro host depois de uma atualização, ou depois que
+um ponteiro expirou — arquiva toda sessão e desregistra seu ambiente ao `SIGTERM`. Então um agente
+alterado cujo host está em execução é *adotado* em vez de substituído: `install` lê o ambiente do
+log do host, escreve o ponteiro da pasta para ele sem nenhum pid, envia `SIGKILL` ao processo
+`claude`, que pula o caminho de encerramento, e depois recarrega o agente, cujo novo host
+reaproveita o ambiente. `--dry-run` nomeia o ambiente que adotaria.
 
-Restart a host only with `citizen remote-control install`, never `launchctl kickstart -k`: that
-sends `SIGTERM`, and a host that did not reuse its environment archives its sessions on it.
+Reinicie um host somente com `citizen remote-control install`, nunca com `launchctl kickstart -k`:
+isso envia `SIGTERM`, e um host que não reaproveitou seu ambiente arquiva suas sessões nisso.
 
-## Keeping sessions across a restart: `heal`
+## Mantendo sessões através de uma reinicialização: `heal`
 
-A server that loses the network for ten minutes gives up, archives every session it was
-carrying and deregisters its environment; launchd then starts it again as a *new* environment
-that adopts nothing, and the chats open on your phone are gone. Claude Code can re-adopt the old
-environment — it asks the server to reuse the id in the folder's
-`~/.claude/projects/<slug>/bridge-pointer.json` — but only while that file is younger than its
-four-hour TTL and names a pid that is no longer running, and a server that started without a
-pointer never writes one. `citizen remote-control heal` closes that gap: once a minute it reads
-each running agent's live environment id from its log and rewrites the folder's pointer with it,
-so a relaunch asks for the environment the sessions are actually on. `--dry-run` reports without
-writing, `--once` is the single pass the `com.agent-harness.remote-control-heal` agent runs, and
-`--preserve-worktrees` WIP-commits any dirty `bridge-cse_*` worktree first, so nothing unpushed
-can be deleted by a cleanup. Actions are appended to
-`~/.local/state/agent-harness/remote-control/heal.log`, and `status` reports the last one.
-Heal does not rescue an environment the give-up path already deregistered: reuse is refused once
-the environment is gone, and so is the bridge reconnect endpoint.
+Um servidor que perde a rede por dez minutos desiste, arquiva toda sessão que estava carregando e
+desregistra seu ambiente; o launchd então o inicia de novo como um ambiente *novo* que não adota
+nada, e os chats abertos no seu celular se vão. O Claude Code consegue readotar o ambiente antigo
+— ele pede ao servidor para reaproveitar o id no
+`~/.claude/projects/<slug>/bridge-pointer.json` da pasta — mas apenas enquanto esse arquivo é mais
+novo que seu TTL de quatro horas e nomeia um pid que não está mais rodando, e um servidor que
+iniciou sem um ponteiro nunca escreve um. `citizen remote-control heal` fecha essa lacuna: uma vez
+por minuto ele lê o id de ambiente ao vivo de cada agente em execução a partir do seu log e
+reescreve o ponteiro da pasta com ele, então um relançamento pede o ambiente em que as sessões de
+fato estão. `--dry-run` relata sem escrever, `--once` é a passagem única que o agente
+`com.agent-harness.remote-control-heal` roda, e `--preserve-worktrees` faz um commit WIP em toda
+worktree `bridge-cse_*` suja primeiro, para que nada não enviado (push) possa ser apagado por uma
+limpeza. Ações são anexadas a
+`~/.local/state/agent-harness/remote-control/heal.log`, e `status` relata a última.
+Heal não resgata um ambiente que o caminho de desistência já desregistrou: o reaproveitamento é
+recusado assim que o ambiente se foi, e o mesmo vale para o endpoint de reconexão de ponte.
 
-## Stopping a host before it gives up
+## Parando um host antes de ele desistir
 
-The ten-minute give-up is hardcoded in Claude Code and its path is destructive, so the fix is to
-never reach it. Each pass reads the host's log for the trailing run of
-`Connection error, retrying in 2m (541s elapsed)` lines — the host prints its own error-budget
-age, so it is read rather than timed — and at nine minutes sends one `SIGTERM` to the host's
-`claude` process, the child when `keep_awake` wraps it in `caffeinate`. launchd's `KeepAlive`
-starts it again within the throttle interval, and it registers asking to reuse the environment in
-the pointer heal has just refreshed. The stop fires once per host process: the relaunched host has
-a new pid and gets its own. A `Detected system sleep (Ns gap), resetting error budget` line, and a
-`Reconnected after Ns` line, both end the run, because the host restarts its budget there too.
+A desistência de dez minutos é fixa no código do Claude Code e seu caminho é destrutivo, então a
+correção é nunca chegar lá. Cada passagem lê o log do host em busca da sequência final de linhas
+`Connection error, retrying in 2m (541s elapsed)` — o host imprime sua própria idade de orçamento
+de erro, então é lida em vez de cronometrada — e aos nove minutos envia um único `SIGTERM` ao
+processo `claude` do host, o filho quando `keep_awake` o envolve em `caffeinate`. O `KeepAlive` do
+launchd o inicia de novo dentro do intervalo de estrangulamento, e ele se registra pedindo para
+reaproveitar o ambiente no ponteiro que o heal acabou de atualizar. A parada dispara uma vez por
+processo de host: o host relançado tem um novo pid e ganha a sua própria. Uma linha
+`Detected system sleep (Ns gap), resetting error budget`, e uma linha `Reconnected after Ns`, ambas
+encerram a execução, porque o host reinicia seu orçamento ali também.
 
-If the host gave up before the supervisor reached it, its log names the session worktrees the
-cleanup deleted. Heal recreates each at its path, attaching the branch when it survived and
-branching from the default branch when it did not, so a session picked up by a later lease has its
-directory. A worktree the host `kept … · uncommitted changes` is left alone, and every line is
-acted on once.
+Se o host desistiu antes de o supervisor chegar até ele, seu log nomeia as worktrees de sessão que
+a limpeza apagou. Heal recria cada uma no seu caminho, anexando a branch quando ela sobreviveu e
+ramificando da branch padrão quando não sobreviveu, então uma sessão retomada por um contrato
+posterior tem seu diretório. Uma worktree que o host `kept … · uncommitted changes` é deixada
+intacta, e toda linha é agida sobre uma vez.
 
-## Reconnecting sessions: `heal`
+## Reconectando sessões: `heal`
 
-After its per-folder pass, heal reads the account's sessions once and, for each one still
-`active` with a `disconnected` bridge on an environment this Mac holds — any environment a
-host's log names, plus the one in each configured folder's pointer — calls
-`POST /v1/environments/<env>/bridge/reconnect`, which puts the session back in its environment's
-queue for the host to pick up. Each attempt is one `reconnect <session> on <env>: <status>` line
-in the heal log, a session is tried at most once every ten minutes, `--dry-run` sends nothing,
-and a missing token or a failed call never stops the pass. An archived session is not touched:
-unarchiving needs more than the login token, so it stays a manual step.
+Depois de sua passagem por pasta, heal lê as sessões da conta uma vez e, para cada uma ainda
+`active` com uma ponte `disconnected` em um ambiente que este Mac guarda — qualquer ambiente que
+um log de host nomeie, mais o do ponteiro de cada pasta configurada — chama
+`POST /v1/environments/<env>/bridge/reconnect`, que devolve a sessão à fila do seu ambiente para o
+host retomar. Cada tentativa é uma linha `reconnect <session> on <env>: <status>` no log de heal,
+uma sessão é tentada no máximo uma vez a cada dez minutos, `--dry-run` não envia nada, e um token
+ausente ou uma chamada falha nunca interrompem a passagem. Uma sessão arquivada não é tocada:
+desarquivar exige mais do que o token de login, então continua sendo um passo manual.
 
-## Sessions that were lost anyway: `status`
+## Sessões que se perderam mesmo assim: `status`
 
-`citizen remote-control status` asks the account which sessions are still `active` with a
-`disconnected` bridge on an environment this Mac registered, and prints the reattach command for
-each, for any session heal could not reconnect. It does not run them. A
-`claude remote-control --session-id <id>` host registers the lost
-environment a *second* time, as a single-session environment, and the client then routes new chats
-to it — recovering five sessions that way leaves five stray environments competing for new work,
-and in 2.1.278 each host binds to the session the previous one was asked for rather than its own
-`--session-id`. So the recovery stays a deliberate, one-at-a-time act: run the command from an
-unused directory, let the session answer, and stop that host.
+`citizen remote-control status` pergunta à conta quais sessões ainda estão `active` com uma ponte
+`disconnected` em um ambiente que este Mac registrou, e imprime o comando de reconexão para cada
+uma, para qualquer sessão que o heal não conseguiu reconectar. Ele não as executa. Um host
+`claude remote-control --session-id <id>` registra o ambiente perdido uma *segunda* vez, como um
+ambiente de sessão única, e o cliente então roteia chats novos para ele — recuperar cinco sessões
+dessa forma deixa cinco ambientes soltos competindo por trabalho novo, e na 2.1.278 cada host se
+liga à sessão que o anterior foi solicitado, em vez do seu próprio `--session-id`. Então a
+recuperação continua sendo um ato deliberado, um de cada vez: rode o comando a partir de um
+diretório não usado, deixe a sessão responder, e pare esse host.
 
-The read is capped at fifty sessions and the endpoint takes no sort parameter, so the page is
-checked on arrival: it must be newest-first by `last_event_at`, the field the server orders by.
-A page that is not reads as `not checked (page order unknown)` rather than as an account with
-nothing lost, and when the account holds more sessions than one page the count says `in the
-newest 50`.
+A leitura tem um teto de cinquenta sessões e o endpoint não recebe parâmetro de ordenação, então a
+página é verificada na chegada: precisa estar da mais nova para a mais antiga por `last_event_at`,
+o campo pelo qual o servidor ordena. Uma página que não está assim é lida como
+`not checked (page order unknown)` em vez de como uma conta sem nada perdido, e quando a conta
+guarda mais sessões que uma página, a contagem diz `in the newest 50`.
 
-The claude.ai token is read from the login keychain for the duration of the call and is never
-printed, logged or written anywhere.
+O token do claude.ai é lido do chaveiro de login pela duração da chamada e nunca é impresso,
+registrado em log ou escrito em nenhum lugar.
 
-`citizen doctor` reports the same ground per configured folder: whether the host process is alive,
-which environment it registered, whether the pointer names that environment and that pid, how long
-it has been unreachable, and how many of its sessions are disconnected.
+`citizen doctor` relata o mesmo terreno por pasta configurada: se o processo de host está vivo,
+qual ambiente ele registrou, se o ponteiro nomeia esse ambiente e esse pid, há quanto tempo está
+inalcançável, e quantas de suas sessões estão desconectadas.
 
-## Files an agent sends you
+## Arquivos que um agente te envia
 
-In Claude Code 2.1.280 a session a host starts has no upload route of its own, so a file the agent
-sends with `SendUserFile` reaches the app as "not delivered: this session is not on a project
-thread", and the iOS app shows its card greyed out. Every host the harness installs therefore
-sets `CLAUDE_CODE_BRIEF_UPLOAD=1`, which its sessions inherit: with it set, the file is uploaded
-with the account the host is signed in to, and the card opens. The variable is undocumented, so a
-client update may drop it. Set it to `""` in a folder's `env` to turn uploads off for that host.
-A host picks up the change only when `install` next rewrites its agent.
+No Claude Code 2.1.280, uma sessão que um host inicia não tem rota de upload própria, então um
+arquivo que o agente envia com `SendUserFile` chega ao aplicativo como "not delivered: this session
+is not on a project thread", e o aplicativo iOS mostra seu cartão acinzentado. Todo host que o
+harness instala, portanto, define `CLAUDE_CODE_BRIEF_UPLOAD=1`, que suas sessões herdam: com isso
+definido, o arquivo é enviado com a conta em que o host está logado, e o cartão abre. A variável
+não é documentada, então uma atualização do cliente pode descartá-la. Defina-a como `""` no `env`
+de uma pasta para desligar uploads para esse host. Um host só assimila a mudança quando `install`
+reescreve seu agente da próxima vez.
 
-A file that is not uploaded is one the app may still ask the session for, and Claude Code serves
-it only from under the directory the session started in, which is the session's worktree under
-`spawn: worktree`, or a directory added to the session. Most other paths fail in the app with
-"Couldn't load this file". Reports, renders and screenshots are routinely written somewhere else:
-a temp or scratch directory, a task worktree, or the main checkout seen from a session's worktree.
+Um arquivo que não é enviado é um que o aplicativo ainda pode pedir à sessão, e o Claude Code o
+serve apenas de dentro do diretório em que a sessão começou, que é a worktree da sessão sob
+`spawn: worktree`, ou um diretório adicionado à sessão. A maioria dos outros caminhos falha no
+aplicativo com "Couldn't load this file". Relatórios, renderizações e capturas de tela são
+rotineiramente escritos em outro lugar: um diretório temporário ou de rascunho, a worktree de uma
+tarefa, ou o checkout principal visto a partir da worktree de uma sessão.
 
-The `stage-user-files` policy closes that gap in every Remote Control session the harness hooks
-run in, whether a host here started it or not. Before `SendUserFile` runs, each file from outside
-the session's current working directory is copied to `.agent-harness/outbox/<digest>/<name>`
-there, and the call sends the copy instead; a `stage-user-files: copied …` notice says when that
-happened. The outbox ignores itself in git, so in a repository a copy never reaches `git status`,
-a commit or the lint, and a copy untouched for two weeks is removed the next time a file is
-copied. One call copies at most 64 MiB in about four seconds; a file past either limit, or one
-that cannot be copied, is sent from where it is, with a notice.
+A política `stage-user-files` fecha essa lacuna em toda sessão de Remote Control em que os hooks
+do harness rodam, seja um host aqui que a tenha iniciado ou não. Antes de `SendUserFile` rodar,
+todo arquivo de fora do diretório de trabalho atual da sessão é copiado para
+`.agent-harness/outbox/<digest>/<name>` ali, e a chamada envia a cópia em vez disso; um aviso
+`stage-user-files: copied …` diz quando isso aconteceu. A outbox se ignora no git, então em um
+repositório uma cópia nunca chega ao `git status`, a um commit ou ao lint, e uma cópia intocada
+por duas semanas é removida na próxima vez que um arquivo é copiado. Uma chamada copia no máximo
+64 MiB em cerca de quatro segundos; um arquivo além de qualquer um dos limites, ou um que não pode
+ser copiado, é enviado de onde está, com um aviso.
 
-The app still reads the file from the session when you open it, so a file sent from a session
-whose worktree has since been removed cannot be opened afterwards.
+O aplicativo ainda lê o arquivo da sessão quando você o abre, então um arquivo enviado de uma
+sessão cuja worktree foi removida desde então não pode ser aberto depois.
 
-## What it will not do
+## O que ele não vai fazer
 
-- **Accept workspace trust for you.** The server refuses a folder whose trust dialog was never
-  accepted, and launchd would restart that refusal forever, so `install` refuses the folder and
-  exits non-zero with the fix. Trust is per exact directory: a trusted repository does not trust
-  its worktrees, and the failure is a host that exits with
-  `Error: Workspace not trusted. Please run \`claude\` in <path> first …` every minute. Run
-  `claude` in the folder once and accept the dialog. `citizen trust` is a different gate — it
-  lets the stop-gate hook run a repository's gate — and `install` names it alongside, because a
-  folder served unattended usually wants both.
-- **Take over a folder already served from a terminal.** Claude Code allows one server per
-  folder per device. Stop the terminal server; the agent retries every minute.
-- **Sign in.** The server uses the claude.ai login of the account that ran `install`. An API key
-  or a cloud-provider credential does not support Remote Control.
+- **Aceitar a confiança de workspace por você.** O servidor recusa uma pasta cuja caixa de diálogo
+  de confiança nunca foi aceita, e o launchd reiniciaria essa recusa para sempre, então `install`
+  recusa a pasta e sai com código não-zero com a correção. A confiança é por diretório exato: um
+  repositório confiável não confia em suas worktrees, e a falha é um host que sai com
+  `Error: Workspace not trusted. Please run \`claude\` in <path> first …` a cada minuto. Rode
+  `claude` na pasta uma vez e aceite a caixa de diálogo. `citizen trust` é um portão diferente —
+  ele permite que o hook stop-gate rode o gate de um repositório — e `install` o nomeia ao lado,
+  porque uma pasta servida sem supervisão geralmente quer os dois.
+- **Assumir uma pasta já servida a partir de um terminal.** O Claude Code permite um servidor por
+  pasta por dispositivo. Pare o servidor de terminal; o agente tenta de novo a cada minuto.
+- **Fazer login.** O servidor usa o login claude.ai da conta que rodou `install`. Uma chave de API
+  ou uma credencial de provedor de nuvem não suporta o Remote Control.
 
-Each agent logs to `~/.local/state/agent-harness/remote-control/`. Read the log first when
-`status` shows an agent that is loaded but not reachable from the phone.
+Cada agente registra logs em `~/.local/state/agent-harness/remote-control/`. Leia o log primeiro
+quando `status` mostrar um agente que está carregado mas inalcançável a partir do celular.

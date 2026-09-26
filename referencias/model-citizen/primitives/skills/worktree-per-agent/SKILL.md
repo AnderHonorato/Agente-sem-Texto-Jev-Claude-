@@ -3,13 +3,14 @@ name: worktree-per-agent
 description: Isolate an agent's work in its own git worktree branched off the default branch, so two agents never land conflicting changes on the shared checkout. Use at the start of any implementation task in a repo where others may also be working, and whenever a repo's instructions say "work in a worktree".
 ---
 
-# One worktree per agent
+# Uma worktree por agente
 
-The shared checkout belongs to the human. An agent that edits it directly races every other
-agent and every uncommitted human change. So: branch a worktree off the default branch, work
-there, land the result through the repo's normal path, remove the worktree.
+O checkout compartilhado pertence ao humano. Um agente que o edita diretamente entra em corrida
+com todo outro agente e toda mudança humana não commitada. Então: crie um branch numa worktree a
+partir do branch padrão, trabalhe ali, finalize o resultado pelo caminho normal do repositório,
+remova a worktree.
 
-## Create
+## Criar
 
 ```bash
 REPO=$(git rev-parse --show-toplevel)
@@ -18,45 +19,49 @@ DEST=$(citizen worktree create "$NAME" "$REPO")
 cd "$DEST"
 ```
 
-The dedicated root keeps temporary task checkouts separate from permanent clones. It defaults to
-`~/worktrees/<repo>/<task>`; `HARNESS_WORKTREE_ROOT` may replace `~/worktrees`. The helper fetches
-`origin` and branches from `origin/main`, so it starts from what is actually merged. If the repo's
-instructions name a different base, pass `--base`; if they name a different location, follow them.
-Never create a task worktree as a sibling under the directory holding permanent repositories.
+A raiz dedicada mantém checkouts de tarefa temporários separados de clones permanentes. Por
+padrão é `~/worktrees/<repo>/<task>`; `HARNESS_WORKTREE_ROOT` pode substituir `~/worktrees`. O
+helper faz fetch de `origin` e cria o branch a partir de `origin/main`, então começa a partir do
+que está realmente mesclado. Se as instruções do repositório nomeiam uma base diferente, passe
+`--base`; se nomeiam uma localização diferente, siga-as. Nunca crie uma worktree de tarefa como
+irmã sob o diretório que guarda os repositórios permanentes.
 
-## Work
+## Trabalhar
 
-- Install dependencies in the worktree if the repo needs them per checkout; do not assume the
-  shared checkout's `node_modules` or virtualenv is reachable.
-- Run the repo's quality gate in the worktree before pushing, per `verification.md`.
-- Never `cd` back into the shared checkout to run something "quickly".
+- Instale dependências na worktree se o repositório precisar delas por checkout; não presuma que
+  o `node_modules` ou virtualenv do checkout compartilhado é alcançável.
+- Rode o gate de qualidade do repositório na worktree antes de dar push, conforme
+  `verification.md`.
+- Nunca dê `cd` de volta para o checkout compartilhado para rodar algo "rapidinho".
 
-## Land
+## Finalizar
 
-Push the branch and open a PR, or push to `main` if the repo's instructions allow it. Then:
+Dê push no branch e abra um PR, ou dê push no `main` se as instruções do repositório permitirem.
+Depois:
 
 ```bash
 citizen worktree remove "$NAME" "$REPO" --merged
 ```
 
-`--merged` deletes the local branch as well, and only once `gh` reports a merged pull request
-whose head commit is the branch tip. A repository that squash-merges leaves the branch's own
-commits out of the default branch, so `git branch -d` refuses work that did land; that proof is
-the check instead. Drop `--merged` to keep the branch. Removal does not count regenerable caches
-such as `__pycache__` that a gate run wrote, and still refuses any other modified, untracked or
-ignored entry; `--also-clear <name>` adds a regenerable top-level directory the built-in list
-misses.
+`--merged` também apaga o branch local, e apenas uma vez que o `gh` relata um pull request
+mesclado cujo commit de topo é a ponta do branch. Um repositório que faz squash-merge deixa os
+commits próprios do branch fora do branch padrão, então `git branch -d` recusa trabalho que de
+fato foi mesclado; essa prova é o check em vez disso. Omita `--merged` para manter o branch. A
+remoção não conta caches regeneráveis como `__pycache__` que uma execução de gate escreveu, e
+ainda recusa qualquer outra entrada modificada, não rastreada ou ignorada; `--also-clear <name>`
+adiciona um diretório de nível superior regenerável que a lista embutida não cobre.
 
-## Things that bite
+## Coisas que mordem
 
-- **Tooling that resolves paths against the working directory** (planning frameworks, skill
-  projections) will not find its files in a worktree. If a tool halts with a missing-script
-  error, that is the guard working; run that tool from the shared checkout only.
-- **Shared append-only documents** (a decisions log, a changelog) are not worktree material:
-  two agents appending in two worktrees produce a conflict at merge. Append to those on the
-  default branch in one place.
-- **Generated index files** are rebuilt once at merge, never on both sides.
-- **Leftover worktrees** confuse `git status` and history rewrites. `git worktree list` before
-  any operation that touches every branch. `citizen worktree audit "$REPO"` reports dirty and
-  stale checkouts; a clean checkout can still contain unpublished commits, so audit branch history
-  before removal.
+- **Ferramental que resolve caminhos contra o diretório de trabalho** (frameworks de
+  planejamento, projeções de skill) não vai encontrar seus arquivos numa worktree. Se uma
+  ferramenta para com um erro de script faltando, essa é a proteção funcionando; rode aquela
+  ferramenta apenas a partir do checkout compartilhado.
+- **Documentos compartilhados de apenas-anexação** (um log de decisões, um changelog) não são
+  material de worktree: dois agentes anexando em duas worktrees produzem um conflito na
+  mesclagem. Anexe a esses no branch padrão, em um só lugar.
+- **Arquivos de índice gerados** são reconstruídos uma vez na mesclagem, nunca nos dois lados.
+- **Worktrees deixadas para trás** confundem `git status` e reescritas de histórico. `git
+  worktree list` antes de qualquer operação que toque todo branch. `citizen worktree audit
+  "$REPO"` relata checkouts sujos e obsoletos; um checkout limpo ainda pode conter commits não
+  publicados, então audite o histórico de branch antes da remoção.

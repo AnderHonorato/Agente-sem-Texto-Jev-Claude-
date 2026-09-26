@@ -3,58 +3,61 @@ name: workflow-status
 description: Show progress of background Workflow runs: who has returned, who is still working, how much output. Use when the user asks about workflow progress, says "/workflows doesn't work", asks "is the workflow done", "how's the workflow going", "check the workflow", or wants to inspect a multi-agent orchestration run.
 ---
 
-# Workflow status
+# Status do workflow
 
-For harness-owned isolated role workers, run `citizen role status` or
-`citizen role status <worker-id>`. Report status, runtime, role and result path from those records.
-They are separate CLI processes and do not appear as native subagent threads.
+Para workers de papel isolados pertencentes ao harness, rode `citizen role status` ou `citizen
+role status <worker-id>`. Relate status, runtime, papel e caminho do resultado a partir desses
+registros. Eles são processos de CLI separados e não aparecem como threads nativas de subagente.
 
-This reader inspects local Claude workflow journals from any client with filesystem access.
-It does not inspect Codex native agent threads or hosted runs. For those, use the client's native
-agent view; an empty local journal search does not mean no agents are running.
+Este leitor inspeciona diários de workflow do Claude locais a partir de qualquer cliente com
+acesso ao sistema de arquivos. Ele não inspeciona threads nativas de agente do Codex ou execuções
+hospedadas. Para essas, use a visão nativa de agente do cliente; uma busca vazia no diário local
+não significa que nenhum agente está rodando.
 
-## Run it
+## Rode
 
 ```bash
-python3 "{skill-root}/scripts/status.py"            # most recent run
-python3 "{skill-root}/scripts/status.py" --all      # every run, newest first
-python3 "{skill-root}/scripts/status.py" --limit 3  # the last three
-python3 "{skill-root}/scripts/status.py" --run wf_eed4141a   # one specific run
+python3 "{skill-root}/scripts/status.py"            # execução mais recente
+python3 "{skill-root}/scripts/status.py" --all      # toda execução, mais nova primeiro
+python3 "{skill-root}/scripts/status.py" --limit 3  # as últimas três
+python3 "{skill-root}/scripts/status.py" --run wf_eed4141a   # uma execução específica
 ```
 
-Report the output to the user in prose — the counts, what is still in flight, and roughly how
-far along the run is. Do not paste the raw table unless they ask for it.
+Relate a saída ao usuário em prosa — as contagens, o que ainda está em andamento, e mais ou menos
+quão longe a execução está. Não cole a tabela crua a menos que peçam.
 
-## What it reads, and what it must not
+## O que ele lê, e o que não deve
 
-The script reads:
+O script lê:
 
-- `~/.claude/projects/*/*/subagents/workflows/wf_*/journal.jsonl` — one line per agent start and
-  one per agent result. This is the authoritative record of what has returned.
-- the **first line only** of each `agent-*.jsonl`, to recover a human-readable identity (the
-  workflow's `label` option is not persisted, so the agent's opening prompt is the best available
-  name).
-- the persisted script under `workflows/scripts/`, for the declared phase titles.
+- `~/.claude/projects/*/*/subagents/workflows/wf_*/journal.jsonl` — uma linha por início de
+  agente e uma por resultado de agente. Este é o registro autoritativo do que já retornou.
+- **apenas a primeira linha** de cada `agent-*.jsonl`, para recuperar uma identidade legível por
+  humano (a opção `label` do workflow não é persistida, então o prompt de abertura do agente é o
+  melhor nome disponível).
+- o script persistido sob `workflows/scripts/`, para os títulos de fase declarados.
 
-🛑 **Never read a full `agent-*.jsonl` transcript.** They routinely run to megabytes and will
-overflow the context window. The journal plus first lines is always enough for status. If the user
-wants an agent's actual findings, wait for the workflow to complete and read its returned result,
-or read the file the workflow wrote — not the transcript.
+🛑 **Nunca leia a transcrição inteira de um `agent-*.jsonl`.** Elas rotineiramente chegam a
+megabytes e vão transbordar a janela de contexto. O diário mais as primeiras linhas é sempre
+suficiente para status. Se o usuário quer as descobertas reais de um agente, espere o workflow
+terminar e leia seu resultado retornado, ou leia o arquivo que o workflow escreveu — não a
+transcrição.
 
-## Interpreting it
+## Interpretando
 
-- **`✓` vs `•`** — an agent whose transcript has been quiet for more than ~45 seconds has almost
-  certainly returned; one still being written to is working. The journal's result count is the
-  authoritative figure, and the two can briefly disagree while a result is being flushed.
-- **`RUNNING` with no recent activity** across every agent usually means the run is between
-  phases (a barrier), or that the parent is synthesising.
-- **Growing transcript size** is a good sign for a research agent — it means real tool use
-  (fetching, searching) rather than answering from memory.
-- A run whose journal shows fewer `started` entries than there are `agent-*.jsonl` files is
-  mid-fan-out; more agents are still being spawned.
+- **`✓` vs `•`** — um agente cuja transcrição ficou quieta por mais de ~45 segundos quase
+  certamente retornou; um que ainda está sendo escrito está trabalhando. A contagem de resultados
+  do diário é o número autoritativo, e os dois podem brevemente discordar enquanto um resultado
+  está sendo gravado.
+- **`RUNNING` sem atividade recente** em todo agente geralmente significa que a execução está
+  entre fases (uma barreira), ou que o pai está sintetizando.
+- **Tamanho crescente de transcrição** é um bom sinal para um agente de pesquisa — significa uso
+  real de ferramenta (buscando, pesquisando) em vez de responder de memória.
+- Uma execução cujo diário mostra menos entradas `started` do que há arquivos `agent-*.jsonl`
+  está no meio de um fan-out; mais agentes ainda estão sendo gerados.
 
-## When a run has finished
+## Quando uma execução terminou
 
-The workflow's own completion notification carries the returned value, which is the thing to
-report. This skill is for the interval before that arrives — or for checking on a run from a
-different session, since the journal persists on disk.
+A própria notificação de conclusão do workflow carrega o valor retornado, que é a coisa a
+relatar. Esta skill é para o intervalo antes que isso chegue — ou para verificar uma execução de
+uma sessão diferente, já que o diário persiste em disco.

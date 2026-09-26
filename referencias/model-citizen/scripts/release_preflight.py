@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed before publishing a tag."""
+"""Falha de forma segura (fail closed) antes de publicar uma tag."""
 import argparse
 import json
 import re
@@ -21,10 +21,10 @@ def git(root, *args):
 
 
 def published_surfaces(root, runner):
-    """About drift and `on_the_way` entries whose issue has closed.
+    """Desvio do About e entradas de `on_the_way` cuja issue foi fechada.
 
-    Both read GitHub, so both run only behind a good `gh` probe; once the probe
-    passes, a failing call is a blocked release rather than a skip.
+    Os dois leem o GitHub, então os dois só rodam atrás de uma sonda `gh` bem-sucedida; uma vez
+    que a sonda passa, uma chamada que falha é um lançamento bloqueado, não um pulo.
     """
     errors = []
     wanted = sync_about.product(root)

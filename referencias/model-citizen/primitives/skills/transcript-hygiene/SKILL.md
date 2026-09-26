@@ -3,63 +3,71 @@ name: transcript-hygiene
 description: Bound what subagents return and what tool output enters the transcript; load when briefing a subagent or reading large output.
 ---
 
-# Transcript hygiene
+# Higiene de transcrição
 
-The operative lines live in the resident rule `primitives/rules/transcript-hygiene.md`. This skill
-carries the reasoning behind them, the numbers in context, and the examples.
+As linhas operacionais vivem na regra residente `primitives/rules/transcript-hygiene.md`. Esta
+skill carrega o raciocínio por trás delas, os números em contexto, e os exemplos.
 
-The user reads the transcript, not just the final message. **Thinking summaries are wanted and
-stay** — they are collapsed and opened deliberately. Everything else in the scroll is cost they
-did not ask for, and the worst offenders are tool output and relayed subagent reports, not prose.
+O usuário lê a transcrição, não só a mensagem final. **Resumos de raciocínio são desejados e
+ficam** — eles são recolhidos e abertos deliberadamente. Tudo mais na rolagem é custo que ele não
+pediu, e os piores ofensores são saída de ferramenta e relatórios de subagente retransmitidos, não
+prosa.
 
-## Read narrowly
+## Leia de forma restrita
 
-- **Never `cat` a whole file to answer a narrow question.** `sed -n '40,80p'`, `head -40`, or
-  `grep -n` with the pattern. Read the whole file only when you will actually use the whole file.
-- **Never chain `cat A && cat B && cat C`** to orient. Orient with `grep -n '^#'` for headings,
-  `wc -l` for size, then read the part that matters.
-- **Filter every `find` and `ls`.** A repo with a `renders/`, `data/` or `target/` directory will
-  print hundreds of generated filenames. Scope the glob or pipe to `head`.
-- **A command printing more than ~100 lines needs a reason** you could state out loud.
+- **Nunca dê `cat` num arquivo inteiro para responder a uma pergunta pontual.** `sed -n
+  '40,80p'`, `head -40`, ou `grep -n` com o padrão. Leia o arquivo inteiro apenas quando você vai
+  realmente usar o arquivo inteiro.
+- **Nunca encadeie `cat A && cat B && cat C`** para se orientar. Oriente-se com `grep -n '^#'`
+  para cabeçalhos, `wc -l` para tamanho, depois leia a parte que importa.
+- **Filtre todo `find` e `ls`.** Um repositório com um diretório `renders/`, `data/` ou `target/`
+  vai imprimir centenas de nomes de arquivo gerados. Delimite o glob ou canalize para `head`.
+- **Um comando imprimindo mais de ~100 linhas precisa de uma razão** que você poderia declarar em
+  voz alta.
 
-## Bound what a subagent hands back
+## Delimite o que um subagente devolve
 
-`delegation.md` says to cap the return. These are the numbers.
+`delegation.md` diz para limitar o retorno. Estes são os números.
 
-- **Gathering agent: 400 words.** Research digest: **600**. Adversarial review: findings only,
-  no restatement of what it read.
-- **Detail goes to a file, not into the return.** Brief it to write the long version into the
-  scratchpad and return the verdict, the findings that change a decision, and the path.
-  Same split as a plan: card in the message, addendum on disk.
-- **A word cap is not a budget to spend.** Ask for what changes the answer, and nothing else.
+- **Agente de coleta: 400 palavras.** Resumo de pesquisa: **600**. Revisão adversarial: apenas
+  achados, sem reafirmar o que leu.
+- **O detalhe vai para um arquivo, não para o retorno.** Instrua-o a escrever a versão longa no
+  scratchpad e retornar o veredito, os achados que mudam uma decisão, e o caminho. Mesma divisão
+  que um plano: card na mensagem, adendo no disco.
+- **Um limite de palavras não é um orçamento para gastar.** Peça o que muda a resposta, e nada
+  mais.
 
-## Never reprint a subagent's output
+## Nunca reimprima a saída de um subagente
 
-- **Synthesize, never relay.** A finding that matters belongs in your own answer, in your own
-  words, carrying the source. A finding that does not matter does not appear at all.
-- **Never paste the report** — not as a quote, not as a "here is what the research agent found"
-  block, not lightly edited. The harness already renders the agent's own row.
-- **Never echo the brief you sent.** The user has no reason to read a prompt they did not write.
-- **No arrival narration.** Not "both research threads are back", not "the agents have
-  returned". Shape the reply by the `voice` stance; the reader does not need the machinery.
+- **Sintetize, nunca retransmita.** Um achado que importa pertence à sua própria resposta, em
+  suas próprias palavras, carregando a fonte. Um achado que não importa não aparece de forma
+  alguma.
+- **Nunca cole o relatório** — nem como citação, nem como um bloco "aqui está o que o agente de
+  pesquisa encontrou", nem levemente editado. O harness já renderiza a linha própria do agente.
+- **Nunca ecoe o briefing que você enviou.** O usuário não tem razão para ler um prompt que não
+  escreveu.
+- **Sem narração de chegada.** Nem "ambas as threads de pesquisa voltaram", nem "os agentes
+  retornaram". Molde a resposta pela postura (stance) `voice`; o leitor não precisa da
+  maquinaria.
 
-## The tool description is the action log
+## A descrição da ferramenta é o registro de ação
 
-In a focus view, tool calls, results and thinking collapse into one-line expandable rows, and
-the line the user sees is the `description` you passed. It is the log, not a label for your own
-benefit.
+Numa visão de foco, chamadas de ferramenta, resultados e raciocínio se recolhem em linhas
+expansíveis de uma linha, e a linha que o usuário vê é a `description` que você passou. É o
+registro, não um rótulo para seu próprio benefício.
 
-- **Write it for a reader who never opens the row.** "Check whether the plan card fits the cap",
-  not "run awk on the plan file".
-- **No flags, no paths, no command text.** They are not reading the command; that is what
-  expanding is for.
-- **One clear action in plain words**, five to ten for routine commands, longer only when a
-  glance would not tell them what it does.
+- **Escreva-a para um leitor que nunca abre a linha.** "Verificar se o card do plano cabe no
+  teto", não "rodar awk no arquivo do plano".
+- **Sem flags, sem caminhos, sem texto de comando.** Eles não estão lendo o comando; é para isso
+  que serve expandir.
+- **Uma ação clara em palavras simples**, cinco a dez para comandos rotineiros, mais longa apenas
+  quando um relance não diria o que ela faz.
 
-Text you write between tool calls stays visible in a focus view. A one-line note before a batch
-is welcome; narrating each call is not.
+Texto que você escreve entre chamadas de ferramenta permanece visível numa visão de foco. Uma
+nota de uma linha antes de um lote é bem-vinda; narrar cada chamada não é.
 
-## The one exception
+## A única exceção
 
-Verbatim relay is correct when the exact text *is* the finding: an error message, a licence
-clause, a quoted decision row, a failing assertion. Quote the line, not the report around it.
+Retransmissão literal é correta quando o texto exato *é* o achado: uma mensagem de erro, uma
+cláusula de licença, uma linha de decisão citada, uma asserção falhando. Cite a linha, não o
+relatório ao redor dela.

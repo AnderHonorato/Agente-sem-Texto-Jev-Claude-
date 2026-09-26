@@ -269,8 +269,8 @@ def _skip_delimited(s, i, delim):
 
 
 def sed_script_ok(s):
-    """True when a sed script only prints, edits the pattern space, branches or
-    quits — never `w`, `W`, `e` or the `w`/`e` flags of `s`."""
+    """True quando um script sed só imprime, edita o pattern space, ramifica ou
+    sai — nunca `w`, `W`, `e` ou as flags `w`/`e` de `s`."""
     n = len(s)
     i = 0
     while i < n:
@@ -282,7 +282,7 @@ def sed_script_ok(s):
             while i < n and s[i] != "\n":
                 i += 1
             continue
-        # Addresses: N, $, /re/, \cREc, optional ~step, I/M flags, a comma and a second one.
+        # Endereços: N, $, /re/, \cREc, ~step opcional, flags I/M, uma vírgula e um segundo endereço.
         while i < n:
             c = s[i]
             if c.isdigit() or c in "$+~":
@@ -338,14 +338,14 @@ def sed_script_ok(s):
                 while i < n and s[i] in "gpImM0123456789":
                     i += 1
                 if i < n and s[i] not in " \t\n;}":
-                    return False  # `e`, `w file`, or a flag this parser does not know
+                    return False  # `e`, `w file`, ou uma flag que este parser não conhece
             continue
         return False
     return True
 
 
 def sed_ok(args):
-    """`sed -n` with inline scripts that never write or execute: no -i, no -f, no w/e."""
+    """`sed -n` com scripts inline que nunca escrevem ou executam: sem -i, sem -f, sem w/e."""
     scripts, files, i, saw_n = [], [], 0, False
     while i < len(args):
         a = args[i]
@@ -392,7 +392,7 @@ def sed_ok(args):
                         i += 1
                     break
                 else:
-                    return False  # -i, -f, and anything unknown
+                    return False  # -i, -f, e qualquer coisa desconhecida
         else:
             (files if scripts else scripts).append(a)
         i += 1
@@ -400,7 +400,7 @@ def sed_ok(args):
 
 
 def git_ok(args):
-    """args: list of tokens after `git`. Strips -C <dir>, --no-pager, -P."""
+    """args: lista de tokens depois de `git`. Remove -C <dir>, --no-pager, -P."""
     i = 0
     while i < len(args):
         a = args[i]
@@ -411,7 +411,7 @@ def git_ok(args):
             i += 1
             continue
         if a.startswith("-"):
-            return False  # -c key=val and unknown globals are not approved
+            return False  # -c key=val e globais desconhecidos não são aprovados
         break
     rest = args[i:]
     if not rest:

@@ -763,12 +763,13 @@ def _dispatch(runtime, payload):
             if forged is not None:
                 results.append(forged)
             if forged is None:
-                # A governance policy file is edited only with the user's yes, each time: the
-                # provider reads it, so the agent it governs must not grant itself a level.
+                # Um arquivo de política de governança só é editado com o sim do usuário, toda
+                # vez: o provedor o lê, então o agente que ele governa não pode conceder a si
+                # mesmo um nível.
                 guarded = policy_file_result(runtime, event)
                 if guarded is not None:
                     results.append(guarded)
-        # Only a rewrite: the plan-mode approval below still answers for this tool.
+        # Só uma reescrita: a aprovação de modo plano abaixo ainda responde por esta ferramenta.
         if tool == "SendUserFile" and runtime == "claude-code":
             results.append(invoke("stage-user-files", event))
         if tool == "Bash":
@@ -776,7 +777,7 @@ def _dispatch(runtime, payload):
             grader = load("grade-bash") if grading or readonly else None
             if grader is not None and grader.ro is None:
                 raise RuntimeError("command classifier unavailable")
-            # Shared stance resolution includes explicit project and session selections.
+            # A resolução de stance compartilhada inclui seleções explícitas de projeto e de sessão.
             variant = selected("autonomy", "execute")
             raw = command = event["tool_input"]["command"]
             confirmed = False
@@ -785,8 +786,8 @@ def _dispatch(runtime, payload):
                 command, confirmed = grader.strip_marker(command)
                 grade, verb, target, family = grader.grade_text(command, event.get("cwd", ""))
             asked = grading and bool(grade) and not confirmed and grade >= grader.THRESHOLDS.get(variant, 1)
-            # The decision provider, when one is configured, is asked only about what the stance
-            # lets through, so it can add a prompt and never remove one.
+            # O provedor de decisão, quando um está configurado, só é consultado sobre o que a
+            # stance deixa passar, para que possa adicionar um prompt e nunca remover um.
             governed = None
             if grading and bool(grade) and not confirmed and not asked:
                 governed = grader.govern(command, event.get("cwd", ""), grade, variant, event, runtime)
@@ -798,8 +799,9 @@ def _dispatch(runtime, payload):
             elif asked:
                 mode, session = event.get("permission_mode"), event.get("session_id")
                 decision = "deny" if runtime == "codex" or mode in grader.DENY_MODES else "ask"
-                # Codex raises no UserPromptSubmit, so only Claude Code's auto mode can carry an
-                # approval the user typed; `grade-bash.py` owns the channel and its wording.
+                # O Codex não dispara UserPromptSubmit, então só o modo auto do Claude Code pode
+                # carregar uma aprovação que o usuário digitou; `grade-bash.py` é dono do canal e
+                # da sua redação.
                 channel = runtime == "claude-code" and decision == "deny"
                 if channel and grader.approved(mode, session, raw):
                     asked, confirmed = False, True
@@ -810,10 +812,11 @@ def _dispatch(runtime, payload):
                     code = grader.approval_code(mode, session, raw) if channel else None
                     results.append({"hookSpecificOutput": {"permissionDecision": decision,
                         "permissionDecisionReason": why + (grader.APPROVAL_TAIL % code if code else "")}})
-            # Grade 0 is proved read-only, so it is approved in every mode. Grades 1 and 2 are the
-            # ones native plan mode prompts on: a script the grammar cannot read through, a
-            # scratch redirect, a test run. Under an open posture the first is investigation and
-            # the second is not, and the autonomy stance still outranks both when it already asked.
+            # A nota 0 é provadamente somente leitura, então é aprovada em todo modo. As notas 1 e
+            # 2 são aquelas sobre as quais o modo plano nativo pergunta: um script que a gramática
+            # não consegue interpretar por completo, um redirecionamento para scratch, uma
+            # execução de teste. Sob uma postura aberta, a primeira é investigação e a segunda
+            # não é, e a stance de autonomia ainda tem prioridade sobre ambas quando já perguntou.
             plan = readonly and investigating(runtime, event)
             if readonly and grade == 0:
                 results.append({"hookSpecificOutput": {"permissionDecision": "allow"}})
@@ -837,14 +840,14 @@ def _dispatch(runtime, payload):
             if fields is not None:
                 results.append(confinement_deny(runtime, session, role_name, fields, prompt,
                                                 "subagent_type"))
-            # Refusing the named spawn only moves the work: the same brief comes back with the role
-            # name dropped, and nothing sees it. So a spawn is classified by what it carries as well
-            # as by what it called itself — a `harness-role:` line, then a declared framework
-            # integration's own mapping. A refusal the spawn declared, by role name or marker, is
-            # remembered for the session so the next rewording is refused too; a refusal the
-            # classifier inferred is not, because a wrong inference remembered is a session that
-            # cannot get the corrected brief through. None of this runs where the stance already
-            # denies every spawn.
+            # Recusar o disparo nomeado só desloca o trabalho: o mesmo brief volta com o nome do
+            # papel removido, e nada percebe. Então um disparo é classificado tanto pelo que
+            # carrega quanto pelo que se autodenominou — uma linha `harness-role:`, depois o
+            # próprio mapeamento de uma integração de framework declarada. Uma recusa que o
+            # disparo declarou, por nome de papel ou marcador, é lembrada pela sessão para que a
+            # próxima reformulação também seja recusada; uma recusa que o classificador inferiu
+            # não é, porque uma inferência errada lembrada é uma sessão que não consegue passar o
+            # brief corrigido. Nada disso roda onde a stance já nega todo disparo.
             if delegation != "off":
                 if fields is not None:
                     remember_denial(session, role_name, prompt)

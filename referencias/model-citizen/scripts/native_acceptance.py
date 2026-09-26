@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Run native client acceptance probes in disposable configuration homes.
+"""Roda sondas de aceitação de cliente nativo em homes de configuração descartáveis.
 
-Every case sets state up in a throwaway home, runs the real client headlessly, and asserts on
-what the client did — its answer, the files it wrote, the subagent transcript it kept. A case
-whose assertion holds is `passed`; anything this runner did not observe is `unverified` with a
-reason. Nothing here infers a pass from harness configuration.
+Todo caso monta o estado num home descartável, roda o cliente real sem interface, e verifica o que
+o cliente fez — sua resposta, os arquivos que escreveu, a transcrição de subagente que guardou. Um
+caso cuja verificação se sustenta é `passed`; qualquer coisa que este runner não observou é
+`unverified` com um motivo. Nada aqui infere uma aprovação a partir da configuração do harness.
 
-Credentials are never copied or printed: the probe inherits the authentication variables the
-client already uses on this machine (see docs/qualification-runbook.md) and nothing else.
+Credenciais nunca são copiadas ou impressas: a sonda herda as variáveis de autenticação que o
+cliente já usa nesta máquina (veja docs/qualification-runbook.md) e mais nada.
 
     python3 scripts/native_acceptance.py --client claude-code-cli-macos --dry-plan
     python3 scripts/native_acceptance.py --client claude-code-cli-macos --cases installation \
         --model haiku --out /tmp/native.json
     python3 scripts/native_acceptance.py --client claude-code-cli-macos --from-progress
 
-Each case is appended to a durable log as it finishes, so a killed round costs the case it was
-running and not the round; `--from-progress` rebuilds a record from what survived. Run again at
-the same commit, a round skips every case the log already holds a verdict for, passed or failed,
-and reruns only the unverified and the unfinished.
+Cada caso é anexado a um log durável assim que termina, então uma rodada morta custa o caso que
+estava rodando e não a rodada; `--from-progress` reconstrói um registro a partir do que
+sobreviveu. Rodando de novo no mesmo commit, uma rodada pula todo caso para o qual o log já guarda
+um veredito, aprovado ou reprovado, e roda de novo só os não verificados e os inacabados.
 """
 import argparse
 import hashlib

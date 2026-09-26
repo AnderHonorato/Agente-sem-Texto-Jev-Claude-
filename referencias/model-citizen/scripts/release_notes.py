@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Render release notes from the same product and compatibility authorities as the site.
+"""Renderiza as notas de lançamento a partir das mesmas autoridades de produto e compatibilidade do site.
 
-With `--changelog VERSION`, assemble `changelog.d/` fragments into CHANGELOG.md instead; the
-fragment format and ordering are `harness_core.changelog`'s.
+Com `--changelog VERSION`, monta os fragmentos de `changelog.d/` no CHANGELOG.md em vez disso; o
+formato e a ordenação dos fragmentos são de `harness_core.changelog`.
 """
 import argparse
 import datetime
@@ -25,7 +25,7 @@ def notes(root=ROOT):
             any(not isinstance(item, str) or not item for item in migration["actions"]) or
             not isinstance(migration.get("recovery"), list) or not migration["recovery"] or
             any(not isinstance(item, str) or not item for item in migration["recovery"])):
-        raise ValueError("migration metadata must match VERSION and contain actions and recovery")
+        raise ValueError("os metadados de migração precisam combinar com VERSION e conter actions e recovery")
     policy = "https://github.com/JakeSelby/agent-harness/blob/v%s/docs/compatibility-policy.md" % version
     lines = ["# " + product["headline"], "", product["description"], "", product["stances"], "", "## Compatibility", ""]
     lines += ["- " + row["id"] + ": " + row["status"] for row in data["clients"]]
@@ -39,7 +39,7 @@ def notes(root=ROOT):
 
 
 def write_changelog(version, date, root=ROOT, dry_run=False):
-    """Fold every fragment into CHANGELOG.md under `version` and delete the fragments."""
+    """Dobra cada fragmento no CHANGELOG.md sob `version` e apaga os fragmentos."""
     entries = changelog.fragments(root)
     path = root / "CHANGELOG.md"
     text = changelog.assemble(path.read_text(encoding="utf-8"), version, date, entries)
@@ -55,11 +55,11 @@ def write_changelog(version, date, root=ROOT, dry_run=False):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--changelog", metavar="VERSION",
-                        help="assemble changelog.d/ fragments into CHANGELOG.md under VERSION")
+                        help="monta os fragmentos de changelog.d/ no CHANGELOG.md sob VERSION")
     parser.add_argument("--date", default=datetime.date.today().isoformat(),
-                        help="with --changelog, the release date (default today)")
+                        help="com --changelog, a data do lançamento (padrão hoje)")
     parser.add_argument("--dry-run", action="store_true",
-                        help="with --changelog, print the result and change nothing")
+                        help="com --changelog, imprime o resultado e não muda nada")
     args = parser.parse_args(argv)
     if not args.changelog:
         print(notes(), end="")
@@ -67,7 +67,7 @@ def main(argv=None):
     try:
         text = write_changelog(args.changelog, args.date, dry_run=args.dry_run)
     except ValueError as error:
-        print("release notes: %s" % error, file=sys.stderr)
+        print("notas de lançamento: %s" % error, file=sys.stderr)
         return 1
     if args.dry_run:
         print(text, end="")

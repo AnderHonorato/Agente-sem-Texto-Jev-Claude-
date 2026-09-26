@@ -1,30 +1,31 @@
-"""The Jev decision provider: question packs, typed answers, and a client that fails open.
+"""O provedor de decisão Jev: pacotes de perguntas, respostas tipadas, e um cliente que falha aberto.
 
-Four pieces, in the order a call goes through them:
+Quatro peças, na ordem em que uma chamada passa por elas:
 
-* a **question pack** — named questions of type `choice`, `boolean` or `score`, validated
-  before anything is sent;
-* a **request** — `{model, state, questions}` under the API's size limits, hashed so a result
-  can name exactly what was asked;
-* a **client** — `JevClient` over `urllib` for the live service and `ReplayClient` over a
-  recorded fixture for everything else, each raising `Unavailable` with a local error code and
-  never an upstream body;
-* a **budget** — a request and token ceiling checked before the call and charged as it
-  is sent, so a call that fails costs what a call that worked costs.
+* um **pacote de perguntas** — perguntas nomeadas do tipo `choice`, `boolean` ou `score`,
+  validadas antes de qualquer coisa ser enviada;
+* uma **requisição** — `{model, state, questions}` dentro dos limites de tamanho da API,
+  hasheada para que um resultado possa nomear exatamente o que foi perguntado;
+* um **cliente** — `JevClient` sobre `urllib` para o serviço real e `ReplayClient` sobre um
+  fixture gravado para tudo o mais, cada um levantando `Unavailable` com um código de erro local
+  e nunca um corpo vindo do serviço;
+* um **orçamento** — um teto de requisições e de tokens checado antes da chamada e cobrado
+  assim que é enviada, então uma chamada que falha custa o mesmo que uma que funcionou.
 
-Three properties hold whatever happens above. The service has no abstention outcome, so every
-`choice` question must offer an explicit `unknown` option and pack validation refuses one that
-does not; `unknown` and an answer below the confidence threshold both mean "use the
-deterministic answer". Answers are not deterministic across identical requests, so nothing here
-promises a repeated request returns the same thing — only that the same request hashes the
-same. And `JevProvider.decide` fails open: a missing key, a timeout, an exhausted budget, a
-malformed response or an unexpected exception all return the deterministic provider's decision
-unchanged, annotated with why the judgment was not available.
+Três propriedades valem seja o que for que aconteça acima. O serviço não tem resultado de
+abstenção, então toda pergunta `choice` precisa oferecer uma opção `unknown` explícita e a
+validação do pacote recusa uma que não a ofereça; `unknown` e uma resposta abaixo do limiar de
+confiança significam ambos "use a resposta determinística". As respostas não são determinísticas
+entre requisições idênticas, então nada aqui promete que uma requisição repetida retorna a mesma
+coisa — só que a mesma requisição hasheia igual. E `JevProvider.decide` falha aberto: uma chave
+ausente, um timeout, um orçamento esgotado, uma resposta malformada ou uma exceção inesperada
+retornam todos a decisão do provedor determinístico inalterada, anotada com o motivo de o
+julgamento não estar disponível.
 
-`JevProvider` may tighten a deterministic `allow` into an `ask` and may never widen anything,
-and only where `harness_core.decisions.controls` says it may: that module holds the
-per-decision-point modes, the sentinel file that disables every call and the allowlist for
-outbound state, and a configuration that names none of them leaves every point `off`.
+`JevProvider` pode apertar um `allow` determinístico em um `ask` e nunca pode alargar nada, e só
+onde `harness_core.decisions.controls` diz que pode: aquele módulo guarda os modos por ponto de
+decisão, o arquivo sentinela que desativa toda chamada e a allowlist para o estado que sai. Uma
+configuração que não nomeia nenhum deles deixa todo ponto `off`.
 """
 import hashlib
 import json
@@ -42,17 +43,17 @@ from . import controls
 from . import ledger
 from .controls import Controls, SessionSpend
 
-# Everything in this block — the endpoint, the default model id, the token ceilings, the
-# response shape and the HTTP status mapping below — is taken from the vendor's documentation
-# and has never been checked against the live service from this repository: no key is
-# configured here and no test may make a request. Treat them as this module's current belief,
-# not as verified fact, until the one opt-in live request in #136's acceptance is made.
+# Tudo neste bloco — o endpoint, o id de modelo padrão, os tetos de token, a forma da resposta e
+# o mapa de status HTTP abaixo — vem da documentação do fornecedor e nunca foi conferido contra o
+# serviço real a partir deste repositório: nenhuma chave é configurada aqui e nenhum teste pode
+# fazer uma requisição. Trate-os como a crença atual deste módulo, não como fato verificado, até
+# que a única requisição real de opt-in da aceitação da #136 seja feita.
 ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 DEFAULT_MODEL = "jev-1.13.0"
 DEFAULT_TIMEOUT = 15
-# The service's published ceilings: 64k tokens for the whole request, and 32k for the state
-# plus the longest single question. Tokens are estimated at four bytes each, which over-counts
-# ordinary English, because refusing a request that would have fit is the cheap failure.
+# Os tetos publicados do serviço: 64k tokens para a requisição inteira, e 32k para o estado mais
+# a maior pergunta isolada. Os tokens são estimados a quatro bytes cada, o que superestima o
+# inglês comum, porque recusar uma requisição que teria cabido é a falha mais barata.
 MAX_REQUEST_TOKENS = 64000
 MAX_STATE_TOKENS = 32000
 BYTES_PER_TOKEN = 4
@@ -63,24 +64,24 @@ MAX_INSTRUCTIONS = 4096
 MAX_TOKENS_REPORTED = 10000000
 
 ANSWER_TYPES = ("choice", "boolean", "score")
-# The option every `choice` question must offer. There is no abstention in the API, so a pack
-# without it leaves a model that cannot answer no way to say so but to guess.
+# A opção que toda pergunta `choice` precisa oferecer. Não há abstenção na API, então um pacote
+# sem ela deixa um modelo que não consegue responder sem nenhuma forma de dizer isso a não ser chutar.
 UNKNOWN = "unknown"
 STATUSES = ("ok", "unknown", "unavailable", "error")
 DEFAULT_THRESHOLD = 0.8
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 MODEL_NAME = re.compile(r"[A-Za-z0-9_.-]{1,80}")
-# Read from the environment only. The harness never reads a key file. The names live with
-# the rest of the opt-in controls, because a report has to name them without loading this.
+# Lido apenas do ambiente. O harness nunca lê um arquivo de chave. Os nomes vivem junto com o
+# resto dos controles de opt-in, porque um relatório precisa nomeá-los sem carregar isto.
 KEY_VARIABLES = controls.KEY_VARIABLES
 
 
 class PackError(ValueError):
-    """A pack, state or response this module will not send or will not believe."""
+    """Um pacote, estado ou resposta que este módulo não vai enviar ou não vai acreditar."""
 
 
 class Unavailable(Exception):
-    """No judgment, for a reason with a local code. Never carries an upstream body."""
+    """Nenhum julgamento, por um motivo com um código local. Nunca carrega um corpo vindo do serviço."""
 
     def __init__(self, code):
         Exception.__init__(self, code)
@@ -103,7 +104,7 @@ def estimate_tokens(value: Any) -> int:
     return (len(canonical(value)) + BYTES_PER_TOKEN - 1) // BYTES_PER_TOKEN
 
 
-# ------------------------------------------------------------------ question packs
+# ------------------------------------------------------------------ pacotes de perguntas
 
 
 def _text(value: Any, limit: int, where: str) -> str:
@@ -115,7 +116,7 @@ def _text(value: Any, limit: int, where: str) -> str:
 
 
 def _labels(block: Any, where: str, require_unknown: bool) -> None:
-    """An ordered or named set of 2 to 10 labels, each with a non-empty description."""
+    """Um conjunto ordenado ou nomeado de 2 a 10 rótulos, cada um com uma descrição não vazia."""
     names = list(block) if isinstance(block, (dict, list)) else None
     if names is None or not 2 <= len(names) <= MAX_OPTIONS:
         raise PackError(where + " must hold 2 to " + str(MAX_OPTIONS) + " labels")
@@ -132,7 +133,7 @@ def _labels(block: Any, where: str, require_unknown: bool) -> None:
 
 
 def validate_pack(pack: Any) -> Dict[str, Any]:
-    """The pack, or a `PackError` naming the first question that cannot be asked."""
+    """O pacote, ou um `PackError` nomeando a primeira pergunta que não pode ser feita."""
     if not isinstance(pack, dict) or not 1 <= len(pack) <= MAX_QUESTIONS:
         raise PackError("a pack holds 1 to " + str(MAX_QUESTIONS) + " named questions")
     for name in sorted(pack):
@@ -168,7 +169,7 @@ def pack_hash(pack: Dict[str, Any]) -> str:
 
 def build_request(pack: Dict[str, Any], state: Any,
                   model: str = DEFAULT_MODEL) -> Dict[str, Any]:
-    """`{model, state, questions}`, refused here rather than by the service when it is too big."""
+    """`{model, state, questions}`, recusado aqui em vez de pelo serviço quando é grande demais."""
     validate_pack(pack)
     if not isinstance(state, dict) or not state:
         raise PackError("state must be a non-empty object")
@@ -185,7 +186,7 @@ def build_request(pack: Dict[str, Any], state: Any,
     return request
 
 
-# ------------------------------------------------------------------ clients
+# ------------------------------------------------------------------ clientes
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -194,11 +195,11 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class JevClient:
-    """The live service over `urllib`. Stdlib only; the vendor SDK needs a newer Python.
+    """O serviço real sobre `urllib`. Só stdlib; o SDK do fornecedor precisa de um Python mais novo.
 
-    Not live unless a caller says so: `live=False` raises `live_not_enabled` before anything
-    touches the environment or a socket, so the provider is inert until the opt-in
-    configuration of #137 exists to turn it on.
+    Não é real a menos que um chamador diga: `live=False` levanta `live_not_enabled` antes que
+    qualquer coisa toque o ambiente ou um socket, então o provedor é inerte até que a
+    configuração de opt-in da #137 exista para ligá-lo.
     """
 
     name = "jev"
@@ -218,11 +219,12 @@ class JevClient:
         self.endpoint = endpoint
 
     def opener(self) -> urllib.request.OpenerDirector:
-        """An opener that can reach `https` and nothing else.
+        """Um opener que consegue alcançar `https` e nada mais.
 
-        `build_opener` installs handlers for `file`, `ftp` and `data` as well, which turns a
-        redirect or a mangled endpoint into a local file read. Only the handlers a POST over
-        TLS needs are added, so no other scheme has an implementation to dispatch to.
+        `build_opener` instala manipuladores para `file`, `ftp` e `data` também, o que
+        transformaria um redirecionamento ou um endpoint corrompido numa leitura de arquivo
+        local. Só os manipuladores que um POST sobre TLS precisa são adicionados, então nenhum
+        outro esquema tem implementação para despachar.
         """
         director = urllib.request.OpenerDirector()
         for handler in (urllib.request.HTTPSHandler(), urllib.request.HTTPErrorProcessor(),
@@ -256,8 +258,8 @@ class JevClient:
         except (socket.timeout, TimeoutError):
             raise Unavailable("timeout") from None
         except urllib.error.URLError as exc:
-            # A timeout during the connect phase arrives wrapped, not raised: on Python 3.9
-            # `socket.timeout` is its own class and reaches here as `URLError.reason`.
+            # Um timeout durante a fase de conexão chega embrulhado, não levantado: no Python
+            # 3.9 `socket.timeout` é sua própria classe e chega aqui como `URLError.reason`.
             if isinstance(exc.reason, (socket.timeout, TimeoutError)):
                 raise Unavailable("timeout") from None
             raise Unavailable("network") from None
@@ -268,7 +270,7 @@ class JevClient:
 
 
 class ReplayClient:
-    """Recorded responses keyed by request hash. What the tests use; no socket exists here."""
+    """Respostas gravadas chaveadas pelo hash da requisição. O que os testes usam; nenhum socket existe aqui."""
 
     name = "replay"
 
@@ -279,7 +281,7 @@ class ReplayClient:
 
     @classmethod
     def from_file(cls, path) -> "ReplayClient":
-        """A fixture of `{"entries": [{"request_hash": ..., "response": ...}, ...]}`."""
+        """Um fixture de `{"entries": [{"request_hash": ..., "response": ...}, ...]}`."""
         with open(str(path), "r", encoding="utf-8") as handle:
             data = json.load(handle)
         entries = data.get("entries") if isinstance(data, dict) else None
@@ -295,14 +297,14 @@ class ReplayClient:
 
 
 class Budget:
-    """A ceiling on requests and on tokens, checked before a call and charged as it is sent.
+    """Um teto de requisições e de tokens, checado antes de uma chamada e cobrado assim que é enviada.
 
-    Conservative at every point. The check refuses once either ceiling is reached rather than
-    once it is exceeded. The request is charged before it leaves, so a call that times out, is
-    refused or comes back unreadable costs exactly as much budget as one that worked — the
-    alternative lets a failing endpoint be retried without limit. Tokens are charged at the
-    request's own estimate on the way out and replaced by the reported usage when a response
-    arrives that can be read.
+    Conservador em todo ponto. A checagem recusa assim que qualquer teto é alcançado, não só
+    quando é ultrapassado. A requisição é cobrada antes de sair, então uma chamada que dá timeout,
+    é recusada ou volta ilegível custa exatamente tanto orçamento quanto uma que funcionou — a
+    alternativa deixaria um endpoint com falha ser tentado de novo sem limite. Os tokens são
+    cobrados pela própria estimativa da requisição na saída e substituídos pelo uso reportado
+    quando uma resposta legível chega.
     """
 
     def __init__(self, max_requests: Optional[int] = None, max_tokens: Optional[int] = None):
@@ -322,12 +324,12 @@ class Budget:
             raise Unavailable("over_budget")
 
     def charge(self, estimate: int) -> None:
-        """Count one request and its estimated tokens, before it is sent."""
+        """Conta uma requisição e seus tokens estimados, antes de ser enviada."""
         self.requests += 1
         self.tokens += estimate
 
     def settle(self, usage: Dict[str, int], estimate: int) -> None:
-        """Replace the estimate with the usage a readable response reported."""
+        """Substitui a estimativa pelo uso que uma resposta legível reportou."""
         self.tokens += usage["input_tokens"] + usage["output_tokens"] - estimate
 
     def as_dict(self) -> Dict[str, Any]:
@@ -336,13 +338,13 @@ class Budget:
 
 
 class SharedBudget(Budget):
-    """A budget whose counters survive the process, because a hook is a process per event.
+    """Um orçamento cujos contadores sobrevivem ao processo, porque um hook é um processo por evento.
 
-    The ceilings are a session's, not a call's: the counters are re-read from the session's
-    spend file before every check and added to as every request is charged, so two hooks
-    answering in the same session cannot each spend the whole allowance. A spend file that
-    cannot be read or written leaves the in-memory count standing rather than failing the
-    decision — the same direction everything else here fails in.
+    Os tetos são de uma sessão, não de uma chamada: os contadores são relidos do arquivo de gasto
+    da sessão antes de cada checagem e somados a cada requisição cobrada, então dois hooks
+    respondendo na mesma sessão não podem gastar cada um a permissão inteira. Um arquivo de gasto
+    que não pode ser lido ou escrito deixa a contagem em memória como estava em vez de falhar a
+    decisão — a mesma direção em que tudo mais aqui falha.
     """
 
     def __init__(self, max_requests: Optional[int] = None, max_tokens: Optional[int] = None,
@@ -364,7 +366,7 @@ class SharedBudget(Budget):
         self.spend.add(0, usage["input_tokens"] + usage["output_tokens"] - estimate)
 
 
-# ------------------------------------------------------------------ answers
+# ------------------------------------------------------------------ respostas
 
 
 def _probability(value: Any, where: str) -> float:
@@ -388,8 +390,8 @@ def _answer(question: Dict[str, Any], value: Any, where: str) -> Dict[str, Any]:
         raise PackError(where + " is not an answer of type " + repr(question["type"]))
     kind = question["type"]
     if kind == "boolean":
-        # A yes/no answer carries a probability and no confidence field; the distance from an
-        # even split is the confidence there is.
+        # Uma resposta sim/não carrega uma probabilidade e nenhum campo de confiança; a
+        # distância de uma divisão igual é a confiança que existe.
         if set(value) != set(["type", "probability"]):
             raise PackError(where + " must carry exactly probability, type")
         probability = _probability(value["probability"], where + ".probability")
@@ -417,11 +419,11 @@ def _answer(question: Dict[str, Any], value: Any, where: str) -> Dict[str, Any]:
 
 
 def parse_response(pack: Dict[str, Any], response: Any):
-    """`(answers, usage)` for a response that matches the pack, or a `PackError`.
+    """`(answers, usage)` para uma resposta que combina com o pacote, ou um `PackError`.
 
-    Strict on purpose, per the acceptance criterion this module was written to: a response that
-    is malformed, incomplete or carries a field nobody asked for is an error and never a
-    judgment with the bad parts dropped.
+    Estrito de propósito, seguindo o critério de aceitação para o qual este módulo foi escrito:
+    uma resposta malformada, incompleta ou que carrega um campo que ninguém pediu é um erro e
+    nunca um julgamento com as partes ruins descartadas.
     """
     if not isinstance(response, dict) or set(response) != set(["model", "answers", "usage"]):
         raise PackError("a response carries exactly answers, model, usage")
@@ -443,9 +445,9 @@ def parse_response(pack: Dict[str, Any], response: Any):
 
 
 def uncertain(answers: Dict[str, Any], threshold: float = DEFAULT_THRESHOLD) -> bool:
-    """Whether any answer says `unknown` or says anything below the threshold.
+    """Se alguma resposta diz `unknown` ou diz qualquer coisa abaixo do limiar.
 
-    Both mean the same thing to a caller: use the deterministic answer.
+    Ambas significam a mesma coisa para um chamador: use a resposta determinística.
     """
     for answer in answers.values():
         if answer["confidence"] < threshold:
@@ -464,13 +466,13 @@ def blank_result(model: str = DEFAULT_MODEL, provider: str = "none") -> Dict[str
 def ask(pack: Dict[str, Any], state: Any, client, model: str = DEFAULT_MODEL,
         budget: Optional[Budget] = None,
         threshold: float = DEFAULT_THRESHOLD) -> Dict[str, Any]:
-    """One judgment, as a result dict. Never raises.
+    """Um julgamento, como um dict de resultado. Nunca levanta exceção.
 
-    `status` is `ok` (an answer above the threshold), `unknown` (answered, but abstaining or
-    below it), `unavailable` (no answer: transport, credentials or budget) or `error` (a pack,
-    state or response this module will not believe). The requested and returned model ids, the
-    pack hash and the request hash are on every result, whichever it is, so a row in the ledger
-    names what was asked even when nothing came back.
+    `status` é `ok` (uma resposta acima do limiar), `unknown` (respondeu, mas abstendo-se ou
+    abaixo dele), `unavailable` (nenhuma resposta: transporte, credenciais ou orçamento) ou
+    `error` (um pacote, estado ou resposta que este módulo não vai acreditar). Os ids de modelo
+    pedido e retornado, o hash do pacote e o hash da requisição estão em todo resultado, seja ele
+    qual for, então uma linha no ledger nomeia o que foi pedido mesmo quando nada voltou.
     """
     result = blank_result(model, getattr(client, "name", "none"))
     started = time.monotonic()
@@ -500,21 +502,21 @@ def ask(pack: Dict[str, Any], state: Any, client, model: str = DEFAULT_MODEL,
         result["status"] = "unavailable"
         result["error"] = exc.code
     except Exception:
-        # A client is third-party code by design; its exception body must not reach a ledger
-        # row or an agent's screen.
+        # Um cliente é código de terceiros por design; o corpo de sua exceção não deve alcançar
+        # uma linha de ledger nem a tela de um agente.
         result["status"] = "unavailable"
         result["error"] = "provider_error"
     result["latency_ms"] = round((time.monotonic() - started) * 1000, 3)
     return result
 
 
-# ------------------------------------------------------------------ the decision pack
+# ------------------------------------------------------------------ o pacote de decisão
 
 
 JUDGMENT = "judgment"
 SEVERITY = "severity"
-# The two questions `JevProvider.decide` reads. A caller may supply its own pack, but not one
-# that leaves the code below reading a question nobody asked.
+# As duas perguntas que `JevProvider.decide` lê. Um chamador pode fornecer seu próprio pacote,
+# mas não um que deixe o código abaixo lendo uma pergunta que ninguém fez.
 REQUIRED_QUESTIONS = {JUDGMENT: "choice", SEVERITY: "score"}
 
 DECISION_PACK = {
@@ -542,18 +544,19 @@ DECISION_PACK = {
     },
 }
 
-# The state fields a caller's context may contribute, and the ceiling on each. The list is
-# the allowlist's whole vocabulary: `controls.Controls` decides which of them a configuration
-# actually lets out, and no other key of a context is ever built into a request.
+# Os campos de estado que o contexto de um chamador pode contribuir, e o teto de cada um. A
+# lista é o vocabulário inteiro da allowlist: `controls.Controls` decide quais deles uma
+# configuração de fato deixa sair, e nenhuma outra chave de um contexto jamais é construída
+# dentro de uma requisição.
 STATE_FIELDS = controls.STATE_FIELDS
 MAX_STATE_FIELD = 4096
 
 
 def _default_pack():
-    """`DECISION_PACK` as its registered version, or the bare dict if that module is absent.
+    """`DECISION_PACK` como sua versão registrada, ou o dict puro se aquele módulo estiver ausente.
 
-    Imported here rather than at the top because `packs` is built on this module; the fallback
-    keeps a provider working in a checkout where only this file was vendored.
+    Importado aqui em vez de no topo porque `packs` é construído sobre este módulo; o fallback
+    mantém um provedor funcionando num checkout onde só este arquivo foi vendorizado.
     """
     try:
         from . import packs
@@ -563,18 +566,18 @@ def _default_pack():
 
 
 def _session_id(context: Optional[Dict[str, Any]]) -> str:
-    """The parent session named in a context, for the usage row alone.
+    """A sessão pai nomeada num contexto, só para a linha de uso.
 
-    Read by name here and nowhere else: `decision_state` builds a request from the base fields
-    and the allowlist, and `session_id` is in neither, so the session a row is attributed to has
-    no way to the wire.
+    Lido pelo nome aqui e em nenhum outro lugar: `decision_state` constrói uma requisição a
+    partir dos campos base e da allowlist, e `session_id` não está em nenhum dos dois, então a
+    sessão a que uma linha é atribuída não tem caminho até a rede.
     """
     value = (context or {}).get("session_id") if isinstance(context, dict) else None
     return value if isinstance(value, str) else ""
 
 
 def require_decision_questions(pack: Dict[str, Any]) -> Dict[str, Any]:
-    """`pack`, or a `PackError` naming a question `JevProvider.decide` would have read blind."""
+    """`pack`, ou um `PackError` nomeando uma pergunta que `JevProvider.decide` teria lido às cegas."""
     validate_pack(pack)
     for name in sorted(REQUIRED_QUESTIONS):
         if name not in pack:
@@ -588,10 +591,11 @@ def require_decision_questions(pack: Dict[str, Any]) -> Dict[str, Any]:
 
 def decision_state(action, counterparty: str, context: Optional[Dict[str, Any]] = None,
                    allowlist: Optional["controls.Controls"] = None) -> Dict[str, Any]:
-    """The state for one governance question: the action, the counterparty, and what is allowed.
+    """O estado para uma pergunta de governança: a ação, a contraparte, e o que é permitido.
 
-    Everything past the four base fields comes from `allowlist.outbound`, so a context key no
-    configuration listed has no way into the request — not trimmed on the way out, never built.
+    Tudo além dos quatro campos base vem de `allowlist.outbound`, então uma chave de contexto que
+    nenhuma configuração listou não tem caminho para dentro da requisição — não recortada na
+    saída, nunca construída.
     """
     allowlist = controls.Controls.acting() if allowlist is None else allowlist
     state = {"action_class": action.action_class, "counterparty": str(counterparty),
@@ -603,33 +607,34 @@ def decision_state(action, counterparty: str, context: Optional[Dict[str, Any]] 
 
 
 class JevProvider(decision.DecisionProvider):
-    """A deterministic provider underneath, and a judgment that may only tighten it.
+    """Um provedor determinístico por baixo, e um julgamento que só pode apertá-lo.
 
-    `decide` answers with the base provider — `local` unless a caller supplies another — and
-    then asks the pack. An `ok` judgment of `confirm` turns an `allow` into an `ask`; nothing
-    else changes the outcome, and no judgment ever widens one or produces a `deny`. Every other
-    status leaves the base decision exactly as it was and says why in `rule_matches`.
+    `decide` responde primeiro com o provedor base — `local` a menos que um chamador forneça
+    outro — e então pergunta ao pacote. Um julgamento `ok` de `confirm` transforma um `allow` em
+    `ask`; nada mais muda o resultado, e nenhum julgamento jamais alarga um ou produz um `deny`.
+    Todo outro status deixa a decisão base exatamente como estava e diz o porquê em `rule_matches`.
 
-    Once the base decision exists, nothing below it may raise. Everything after it runs inside
-    one guard, so a state a caller mangled, a pack that answered something this code did not
-    expect or a client that raised where the contract says it returns all come back as the
-    deterministic decision unchanged. A failure of the advisory half must never become a
-    failure of the permission answer.
+    Uma vez que a decisão base existe, nada abaixo dela pode levantar exceção. Tudo depois dela
+    roda dentro de uma única proteção, então um estado que um chamador corrompeu, um pacote que
+    respondeu algo que este código não esperava ou um cliente que levantou exceção onde o
+    contrato diz que retorna, tudo volta como a decisão determinística inalterada. Uma falha da
+    metade consultiva nunca deve virar uma falha da resposta de permissão.
 
-    What happens at all is the `controls.Controls` this provider was built with, resolved per
-    decision from `context["point"]`: `off` calls nothing and says so, `shadow` calls and
-    writes the ledger row alone, `advise` adds the judgment to `rule_matches` and leaves the
-    outcome where the deterministic provider put it, and `act` is the tightening above. A
-    provider built from a configuration is `off` everywhere until one says otherwise, and the
-    sentinel file is read on every decision, so the kill switch needs no restart.
+    O que de fato acontece é o `controls.Controls` com o qual este provedor foi construído,
+    resolvido por decisão a partir de `context["point"]`: `off` não chama nada e diz isso,
+    `shadow` chama e escreve só a linha do ledger, `advise` acrescenta o julgamento a
+    `rule_matches` e deixa o resultado onde o provedor determinístico o colocou, e `act` é o
+    aperto acima. Um provedor construído a partir de uma configuração é `off` em todo lugar até
+    que alguma diga o contrário, e o arquivo sentinela é lido a cada decisão, então o
+    interruptor de emergência não precisa de reinício.
 
-    Each call writes two rows and no third: an `event` row to the decision ledger, beside the
-    hook decisions it sits among, and a `kind: "decision"` row to the usage ledger, where
-    `harness usage --by provider` prices its tokens and reports its latency. Both carry the
-    decision point, the mode, the status, the error code where there is one, the requested and
-    returned model ids, the pack and request hashes, the usage and the latency — never the
-    state and never an answer's prose. A caller that is only reporting suppresses both with
-    `decision.events_suppressed`, which `harness decide` does.
+    Toda chamada escreve duas linhas e nenhuma terceira: uma linha `event` no ledger de decisão,
+    ao lado das decisões de hook entre as quais fica, e uma linha `kind: "decision"` no ledger de
+    uso, onde `harness usage --by provider` precifica seus tokens e reporta sua latência. Ambas
+    carregam o ponto de decisão, o modo, o status, o código de erro onde há um, os ids de modelo
+    pedido e retornado, os hashes do pacote e da requisição, o uso e a latência — nunca o estado
+    e nunca a prosa de uma resposta. Um chamador que está só relatando suprime ambas com
+    `decision.events_suppressed`, o que `harness decide` faz.
     """
 
     name = "jev"
@@ -647,8 +652,9 @@ class JevProvider(decision.DecisionProvider):
         self.controls = (controls if controls is not None
                          else Controls.from_config(config) if config is not None
                          else Controls.acting())
-        # `enabled`, not `live`: the kill switch is answered per decision, so a client built
-        # while the sentinel existed still works the moment the file is removed.
+        # `enabled`, não `live`: o interruptor de emergência é respondido por decisão, então um
+        # cliente construído enquanto o sentinela existia ainda funciona no momento em que o
+        # arquivo é removido.
         self.client = client if client is not None else JevClient(
             live=self.controls.enabled(), timeout=self.controls.timeout)
         self.model = model
@@ -656,15 +662,15 @@ class JevProvider(decision.DecisionProvider):
             self.controls.max_requests, self.controls.max_tokens,
             spend=SessionSpend(session))
         self.threshold = threshold
-        # A `packs.Pack` or a bare dict. The Pack carries a name and a version the ledger row
-        # can be read back through; a dict is the older shape and names only its hash.
+        # Um `packs.Pack` ou um dict puro. O Pack carrega um nome e uma versão pelos quais a
+        # linha do ledger pode ser lida de volta; um dict é a forma mais antiga e nomeia só seu hash.
         supplied = pack if pack is not None else _default_pack()
         self.pack_identity = supplied.identity() if hasattr(supplied, "identity") else {}
         self.pack = require_decision_questions(
             supplied.questions if hasattr(supplied, "questions") else supplied)
         self.target = target
-        # The two ledgers are separate files with separate writers; a test points each one at a
-        # temporary path of its own.
+        # Os dois ledgers são arquivos separados com escritores separados; um teste aponta cada
+        # um para um caminho temporário próprio.
         self.usage_target = usage_target
 
     def decide(self, action, counterparty, context=None):
@@ -686,8 +692,8 @@ class JevProvider(decision.DecisionProvider):
                      model=self.model, budget=self.budget, threshold=self.threshold)
         self._log(action, counterparty, result, base, mode, point, context)
         if mode == "shadow":
-            # Called, logged, and nothing more: a shadow answer reaches the ledger and neither
-            # the model nor the user, which is what makes it measurable before it is trusted.
+            # Chamado, registrado, e nada mais: uma resposta em shadow chega ao ledger e nem ao
+            # modelo nem ao usuário, o que é o que a torna mensurável antes de ser confiada.
             return base
         if result["status"] != "ok":
             return self._unchanged(base, result["status"], result["error"])
@@ -707,9 +713,9 @@ class JevProvider(decision.DecisionProvider):
                     "(severity " + severity + "): state the exact command and wait for an "
                     "explicit yes.")
             else:
-                # `advise`: the judgment is on screen and the deterministic answer still
-                # decides. What it would have done is said plainly, so a reader can see what
-                # `act` would have cost before selecting it.
+                # `advise`: o julgamento está na tela e a resposta determinística ainda decide.
+                # O que teria feito é dito claramente, para que um leitor veja o que `act`
+                # teria custado antes de selecioná-lo.
                 cognition["rule_matches"].append(
                     "jev: advise only; `act` would have asked before this " +
                     action.action_class)
@@ -723,7 +729,7 @@ class JevProvider(decision.DecisionProvider):
         return cognition
 
     def _unchanged(self, base, status, error):
-        """The base decision, byte for byte, with one line saying why no judgment applied."""
+        """A decisão base, byte a byte, com uma linha dizendo por que nenhum julgamento se aplicou."""
         cognition = self._cognition(base)
         cognition["rule_matches"].append(
             "jev: no judgment (" + status + (": " + str(error) if error else "")
@@ -740,15 +746,14 @@ class JevProvider(decision.DecisionProvider):
 
     def _log(self, action, counterparty, result, base=None, mode=None, point=None,
              context=None):
-        """Two ledgers, one result: what was asked and what it would have changed, and what it
-        cost.
+        """Dois ledgers, um resultado: o que foi perguntado e o que teria mudado, e o que custou.
 
-        The decision log keeps the pack's id and version, the judgment label, the severity
-        level, the deterministic outcome and the outcome an `act` mode would have reached,
-        because a `shadow` answer nobody can compare against the decision it did not change
-        measures nothing. The usage ledger keeps the tokens and the latency beside the session
-        spend, where `harness usage --by provider` prices them. Labels and counts on both: never
-        the state, never an answer's prose.
+        O log de decisão guarda o id e a versão do pacote, o rótulo do julgamento, o nível de
+        severidade, o resultado determinístico e o resultado que um modo `act` teria alcançado,
+        porque uma resposta `shadow` que ninguém pode comparar contra a decisão que não mudou
+        não mede nada. O ledger de uso guarda os tokens e a latência ao lado do gasto da sessão,
+        onde `harness usage --by provider` os precifica. Rótulos e contagens em ambos: nunca o
+        estado, nunca a prosa de uma resposta.
         """
         judgment = severity = advised = None
         if result["status"] == "ok":
@@ -766,8 +771,9 @@ class JevProvider(decision.DecisionProvider):
             "judgment": judgment, "severity": severity,
             "base_outcome": base.outcome if base is not None else None,
             "advised_outcome": advised}
-        # The pack's name and version where it has them, so a row resolves to the words that
-        # were asked and not only to a hash. Absent for a caller that supplied a bare dict.
+        # O nome e a versão do pacote onde ele os tiver, para que uma linha resolva para as
+        # palavras que foram perguntadas e não só para um hash. Ausente para um chamador que
+        # forneceu um dict puro.
         row.update(dict((name, value) for name, value in self.pack_identity.items()
                         if name != "pack_hash"))
         decision.append_event("jev", row, self.target)

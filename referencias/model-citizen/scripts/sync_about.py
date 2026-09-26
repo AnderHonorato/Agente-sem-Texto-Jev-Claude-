@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Keep the GitHub About panel equal to the landing copy in `product.json`.
+"""Mantém o painel About do GitHub igual ao texto de vitrine (landing copy) em `product.json`.
 
-`--check` names every field that differs and exits non-zero; `--apply` writes the
-repository's public metadata through `gh repo edit`, so it needs the owner's
-approval each run. Topics are compared as a set, because GitHub returns them in
-its own order.
+`--check` nomeia todo campo que difere e sai com código diferente de zero; `--apply` escreve os
+metadados públicos do repositório através de `gh repo edit`, então precisa da aprovação do dono a
+cada execução. Os topics são comparados como um conjunto, porque o GitHub os retorna em sua
+própria ordem.
 """
 import argparse
 import json

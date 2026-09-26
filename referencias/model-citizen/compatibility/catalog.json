@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "harness_version": "0.13.1",
+  "release_state": "released",
+  "required_cases": [
+    "installation",
+    "stance-switch",
+    "custom-stance",
+    "permission-controls",
+    "hook-composition",
+    "role-confinement",
+    "cost-posture",
+    "gate-invalidation",
+    "framework-spawn-routing",
+    "bidirectional-handoff",
+    "migration-uninstall",
+    "spawn-confinement"
+  ],
+  "evidence_invalidation": {
+    "version": 1,
+    "runtime_paths": {
+      "claude-code": "adapters/claude-code",
+      "codex": "adapters/codex"
+    },
+    "shared_files": [
+      "bindings.json",
+      "capabilities.json",
+      "worker.py"
+    ],
+    "runtime_files": [
+      "hook.py",
+      "observe.py"
+    ],
+    "case_paths": {
+      "version": 1,
+      "cases": {
+        "installation": [],
+        "stance-switch": [],
+        "custom-stance": [],
+        "permission-controls": [],
+        "hook-composition": [],
+        "role-confinement": [
+          "adapters/claude-code/worker.py",
+          "adapters/codex/worker.py"
+        ],
+        "cost-posture": [
+          "adapters/claude-code/worker.py",
+          "adapters/codex/worker.py"
+        ],
+        "gate-invalidation": [],
+        "framework-spawn-routing": [
+          "adapters/claude-code/worker.py",
+          "adapters/codex/worker.py"
+        ],
+        "bidirectional-handoff": [],
+        "migration-uninstall": [],
+        "spawn-confinement": [
+          "adapters/claude-code/worker.py",
+          "adapters/codex/worker.py"
+        ]
+      }
+    }
+  },
+  "clients": [
+    {
+      "id": "claude-code-cli-macos",
+      "runtime": "claude-code",
+      "provider": "anthropic",
+      "client": "cli",
+      "platform": "macos",
+      "status": "qualified",
+      "required_for_release": true,
+      "evidence": [
+        {
+          "path": "compatibility/evidence/claude-code-cli-macos-0.13.1.json",
+          "sha256": "4efd04635420695abf659001557f825b5e1f2668473f334858e4d32f9bce48af"
+        }
+      ],
+      "runtime_version": "2.1.280",
+      "client_version": "2.1.280"
+    },
+    {
+      "id": "claude-code-vscode-macos",
+      "runtime": "claude-code",
+      "provider": "anthropic",
+      "client": "vscode",
+      "platform": "macos",
+      "status": "unqualified",
+      "required_for_release": false,
+      "evidence": []
+    },
+    {
+      "id": "claude-code-cli-linux",
+      "runtime": "claude-code",
+      "provider": "anthropic",
+      "client": "cli",
+      "platform": "linux",
+      "status": "qualified",
+      "required_for_release": true,
+      "evidence": [
+        {
+          "path": "compatibility/evidence/claude-code-cli-linux-0.13.1.json",
+          "sha256": "f8beef165eabc4232a3829a5d94ce28730953db6273840686dc9da85319f75ba"
+        }
+      ],
+      "runtime_version": "2.1.278",
+      "client_version": "2.1.278"
+    },
+    {
+      "id": "claude-code-plugin-marketplace",
+      "runtime": "claude-code",
+      "provider": "anthropic",
+      "client": "plugin-marketplace",
+      "platform": "unspecified",
+      "installs_hooks": false,
+      "status": "unqualified",
+      "required_for_release": false,
+      "evidence": []
+    },
+    {
+      "id": "codex-cli-macos",
+      "runtime": "codex",
+      "provider": "openai",
+      "client": "cli",
+      "platform": "macos",
+      "status": "unqualified",
+      "required_for_release": false,
+      "evidence": []
+    },
+    {
+      "id": "codex-vscode-macos",
+      "runtime": "codex",
+      "provider": "openai",
+      "client": "vscode",
+      "platform": "macos",
+      "status": "unqualified",
+      "required_for_release": false,
+      "evidence": []
+    },
+    {
+      "id": "codex-desktop-macos",
+      "runtime": "codex",
+      "provider": "openai",
+      "client": "desktop",
+      "platform": "macos",
+      "status": "unqualified",
+      "required_for_release": false,
+      "evidence": []
+    },
+    {
+      "id": "codex-cli-linux",
+      "runtime": "codex",
+      "provider": "openai",
+      "client": "cli",
+      "platform": "linux",
+      "status": "unqualified",
+      "required_for_release": false,
+      "evidence": []
+    },
+    {
+      "id": "cursor",
+      "runtime": "cursor",
+      "provider": "multiple",
+      "client": "editor",
+      "platform": "unspecified",
+      "status": "planned",
+      "required_for_release": false,
+      "evidence": []
+    },
+    {
+      "id": "grok",
+      "runtime": "undecided",
+      "provider": "xai",
+      "client": "undecided",
+      "platform": "unspecified",
+      "status": "planned",
+      "required_for_release": false,
+      "evidence": []
+    }
+  ],
+  "limitations": [
+    "Claude Code Auto Mode depends on native runtime and provider access; model unavailability is a visible limitation, not a passing qualification result.",
+    "Direct native Codex role defaults can inherit parent permissions; constrained harness roles use isolated CLI workers instead.",
+    "Planner publication is mediated by the harness after constrained workers return result data.",
+    "The architecture-viewer integration is a preview for a separately installed implementation. A local protocol 1 candidate passed process-level harness acceptance; no viewer is bundled, and native viewer interaction and distribution/license clearance remain unverified.",
+    "The usage feed is a Claude Code capability: Codex raises none of UserPromptSubmit, SubagentStart or SubagentStop, so turn spend, the fresh-session nudge, in-flight width and finished-subagent spend are not fed back there and no such event is registered.",
+    "Cursor and Grok integration, hosted agents and native memory merging are planned or deferred.",
+    "BMad review confinement is requested in the routed layer text rather than enforced at the spawn hook: a client can run a review layer as an unnamed native subagent, unconfined, and still report a result. Observed on Claude Code; a confined run writes isolated-worker state. Tracked in #291.",
+    "On Codex, output-filter rewrites are never applied: a rewrite travels only with an allow, and the filtered commands are not auto-allowed. Tracked in #292.",
+    "Under Codex auto permissions an isolated role worker launched from inside a sandboxed turn has no network access and stalls until its deadline; it completes under an acknowledged bypass. Tracked in #293.",
+    "harness sync links user-level stance selections only; a HARNESS_STANCE_ variable or a project selection changes what harness stances and the hooks resolve, not the linked stance text, and harness diff does not report it as drift. From 0.14.0 the session-start hook injects a differing selected variant's text, within the always-loaded budget (#276); the sync scope is by design (#294).",
+    "The 0.11.1 spawn guards refuse a constrained role's brief re-issued verbatim under another name, or carrying a `harness-role:` line; a client that paraphrases the brief and names no role is not caught, so BMad review confinement still depends on the client following the routed instructions. Tracked in #291 and #300.",
+    "No third-party framework's own workflow is exercised natively in a release qualification round. Framework layering is qualified through a synthetic recipe driven at the spawn hook; that a given framework's workflow completes on a given client is not claimed by a release. The BMad Method integration is exercised by an optional suite whose last result is recorded separately, at the harness version, framework version and client stated there.",
+    "Constrained-role confinement is enforced at the spawn hook only for a framework a declared descriptor covers. From 0.13.0 the hook classifies a spawn against the descriptors in policy/integrations/, so a covered recipe layer is refused whatever the client named it, and the two entries above describe 0.11.1 through 0.12.0 and stop applying at that release. What remains: recognition needs one of the framework's own layer names as the spawn type, or two sentences of its prompt text, or one of those sentences beside a path out of its routed text, or a sentence directing the subagent to follow or apply one of those paths, so a brief with none of that, or a framework or a release no descriptor covers, still runs as an unnamed native subagent, unconfined, and can still report a result. Observed on the Claude Code CLI on Linux, where one confined run required five attempts; a confined run writes isolated-worker state. Tracked in #291.",
+    "Codex CLI is not in the 0.13.0 or 0.13.1 stable contract: FR-12 admits it only once a scripted qualification round agrees with a hand-driven one, and the acceptance runner cannot drive Codex until #612; codex-cli-macos carries hand evidence only (#700).",
+    "gate-invalidation, in the 0.13.0 and 0.13.1 qualifications of both Claude Code CLI targets, delivered its Stop events to the harness coordinator directly, not through client turns: no client turn ran the trusted gate's pass, reuse, rerun or block-then-release loop. The only Stop event observed from a client turn is hook-composition's untrusted skip.",
+    "No Codex client ran in the 0.13.0 and 0.13.1 qualifications of the two Claude Code CLI targets. The Claude to Codex continuation was not observed, because a Claude session read a Claude save, and the Codex to Claude record was written by `harness task save --runtime codex`; step 7's re-established permissions were observed in neither direction. The Codex targets are not required for this release, so no round covers these.",
+    "In the 0.13.0 and 0.13.1 qualifications the eleven scripted cases other than permission-controls were judged only by the case driver and the assessment of its observation text; the hand comparison owed on each case's first live round (0.13.0's) was not made and is still owed. Tracked in #741.",
+    "In the 0.13.0 and 0.13.1 qualifications a band worker's effort was read from the installed worker definition, not from the subagent's transcript; its model, the budget sentence in its brief, the usage feed and the usage row were observed from the run.",
+    "With a token-only login (`CLAUDE_CODE_OAUTH_TOKEN`, as in CI and containers, including the Linux target image), an isolated role worker that a Claude Code session launches cannot authenticate: the client strips the token from its tool subprocesses, and the worker reports that it is not logged in. A client whose confined layers cannot run may then do their work in its own context, unconfined, as the 0.13.0 BMad integration suite observed. Qualification rounds launch their workers from the runner rather than from a client session, so they do not exercise this path. Tracked in #759.",
+    "In the 0.13.0 and 0.13.1 qualifications cost-posture compared each role the cost variant does not change by its content, byte for byte, rather than by its link, so a role replaced by an identical copy would also pass; step 8 asks that every other role keeps its link. Tracked in #742."
+  ],
+  "qualification_source_commit": "52bdee3c3b310375ef62b63ead1a6cc899e5bce5"
+}

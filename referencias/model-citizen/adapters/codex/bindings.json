@@ -1,0 +1,44 @@
+{
+  "schema_version": 2,
+  "tiers": {
+    "frontier": "gpt-6-astra",
+    "strong": "gpt-5.6-sol",
+    "standard": "gpt-5.6-terra",
+    "light": "gpt-5.6-luna"
+  },
+  "roles": {
+    "builder": {
+      "model_reasoning_effort": "medium"
+    },
+    "design-judge": {
+      "model_reasoning_effort": "high"
+    },
+    "designer": {
+      "model_reasoning_effort": "high"
+    },
+    "gatherer": {
+      "model_reasoning_effort": "low"
+    },
+    "log-compressor": {
+      "model_reasoning_effort": "low"
+    },
+    "planner": {
+      "model_reasoning_effort": "high"
+    },
+    "reviewer": {
+      "model_reasoning_effort": "high"
+    },
+    "spec-reviewer": {
+      "model_reasoning_effort": "high"
+    },
+    "worker-a": {
+      "model_reasoning_effort": "low"
+    },
+    "worker-b": {
+      "model_reasoning_effort": "low"
+    },
+    "worker-c": {
+      "model_reasoning_effort": "high"
+    }
+  }
+}

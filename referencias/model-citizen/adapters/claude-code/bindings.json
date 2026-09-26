@@ -1,0 +1,55 @@
+{
+  "schema_version": 2,
+  "tiers": {
+    "frontier": "fable",
+    "strong": "opus",
+    "standard": "sonnet",
+    "light": "haiku"
+  },
+  "roles": {
+    "builder": {
+      "tools": "Read, Edit, Write, Grep, Glob, Bash, WebFetch, WebSearch",
+      "effort": "medium"
+    },
+    "design-judge": {
+      "tools": "Read, Grep, Glob",
+      "effort": "high"
+    },
+    "designer": {
+      "tools": "Read, Edit, Write, Grep, Glob, Bash, WebFetch, WebSearch",
+      "effort": "high"
+    },
+    "gatherer": {
+      "tools": "Read, Grep, Glob",
+      "effort": "low"
+    },
+    "log-compressor": {
+      "tools": "Read, Grep",
+      "effort": "low"
+    },
+    "planner": {
+      "tools": "Read, Grep, Glob",
+      "effort": "high"
+    },
+    "reviewer": {
+      "tools": "Read, Grep, Glob",
+      "effort": "high"
+    },
+    "spec-reviewer": {
+      "tools": "Read, Grep, Glob",
+      "effort": "high"
+    },
+    "worker-a": {
+      "disallowed_tools": "Agent",
+      "effort": "low"
+    },
+    "worker-b": {
+      "disallowed_tools": "Agent",
+      "effort": "low"
+    },
+    "worker-c": {
+      "disallowed_tools": "Agent",
+      "effort": "high"
+    }
+  }
+}

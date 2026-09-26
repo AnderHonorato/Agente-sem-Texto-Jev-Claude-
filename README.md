@@ -16,7 +16,11 @@ Serve tanto para projetos pessoais de front-end (sites, SPAs) quanto para automa
 │   ├── agents/               → debatedores, especialistas e críticos (prontos para usar)
 │   └── commands/jev.md       → o comando /jev que dispara o ciclo inteiro
 ├── docs/fluxo-jev.md         → explicação detalhada do ciclo, com diagrama
-└── perfis/                   → ajustes de escopo por tipo de projeto (site pessoal vs. automação)
+├── perfis/                   → ajustes de escopo por tipo de projeto (site pessoal vs. automação)
+└── referencias/               → os dois projetos que inspiraram o Jev, trazidos para o repositório
+    ├── model-citizen/         → cópia funcional traduzida para PT-BR (código intacto, textos traduzidos)
+    ├── keel-explicado.md      → resumo em português da arquitetura do Keel (sem código, é app só de Mac)
+    └── README.md              → créditos e licenças dos dois projetos originais
 ```
 
 Nada aqui roda sozinho — é configuração e prompts para o **Claude Code**, que você já usa (CLI, app desktop ou app web).

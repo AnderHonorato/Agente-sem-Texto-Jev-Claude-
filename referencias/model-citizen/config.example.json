@@ -1,0 +1,57 @@
+{
+  "identity": {
+    "name": "Your Name",
+    "pronouns": "they/them",
+    "role": "One line about what you do, so the agent pitches its answers right.",
+    "github": "your-github-handle",
+    "timezone": "UTC",
+    "expertise": "expert"
+  },
+  "stances": {
+    "licensing": "permissive-commercial",
+    "build-vs-buy": "capability-ceiling",
+    "commits": "conventional-attributed",
+    "plan-ceremony": "review-card",
+    "delegation": "tiered",
+    "testing": "required",
+    "autonomy": "execute",
+    "cost": "balanced",
+    "voice": "scannable"
+  },
+  "permissions": "inherit",
+  "permissions_bypass_acknowledged": false,
+  "plan_allow_tools": [],
+  "vscode": {
+    "manage": true
+  },
+  "codex": {
+    "manage": true
+  },
+  "claude": {
+    "manage": true
+  },
+  "telemetry": {
+    "export": "off"
+  },
+  "governance": {
+    "provider": "none",
+    "jev": {
+      "mode": "off",
+      "modes": {},
+      "state_fields": []
+    }
+  },
+  "primitive_roots": [],
+  "remote_control": {
+    "folders": [],
+    "spawn": "worktree",
+    "permission_mode": "default",
+    "keep_awake": false
+  },
+  "integrations": {
+    "architecture-viewer": {
+      "implementation": "builtin"
+    }
+  },
+  "integration_adapters": {}
+}

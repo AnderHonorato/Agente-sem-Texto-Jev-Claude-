@@ -1,17 +1,19 @@
-# Exporting the ledger
+# Exportando o ledger
 
-The usage ledger is a local JSONL file and that is deliberate: it is written before anything is
-sent anywhere, it survives a backend being down, and it can be re-read. Export is a copy of it,
-for dashboards, SQL and a team view. It is **off by default**; with it off no network code runs
-and the hook behaves exactly as it did before this existed.
+O ledger de uso é um arquivo JSONL local e isso é deliberado: é escrito antes de qualquer coisa
+ser enviada a qualquer lugar, sobrevive a um backend estar fora do ar, e pode ser relido. A
+exportação é uma cópia dele, para dashboards, SQL e uma visão de equipe. Está **desligada por
+padrão**; com ela desligada, nenhum código de rede roda e o hook se comporta exatamente como se
+comportava antes de isso existir.
 
-**The model, in one line: the ledger is the record, a backend is a rebuildable copy of it.** Most
-backends expire data by default — the reference endpoint this was tested against ships a 30-day
-TTL — so history outside the retention window lives in the ledger and is put back by replay.
+**O modelo, em uma linha: o ledger é o registro, um backend é uma cópia reconstruível dele.** A
+maioria dos backends expira dados por padrão — o endpoint de referência contra o qual isso foi
+testado distribui um TTL de 30 dias — então o histórico fora da janela de retenção vive no ledger
+e é devolvido por reprodução.
 
-What is recorded, and where it comes from, is [usage.md](usage.md).
+O que é registrado, e de onde vem, está em [usage.md](usage.md).
 
-## Turning it on
+## Ligando
 
 ```json
 {
@@ -25,204 +27,215 @@ What is recorded, and where it comes from, is [usage.md](usage.md).
 }
 ```
 
-- `export` is `off` or `otlp`. Any other value stops `citizen sync` rather than silently
-  exporting nothing.
-- `endpoint` is the base URL of **any OTLP/HTTP endpoint**; `/v1/logs` is appended. No vendor is
-  required and none is named in the code.
-- `labels` are attributes added to every record — the place for an environment or a host name.
-- `native` asks a runtime to export **its own** telemetry to the same endpoint. `true` is every
-  runtime, `false` is none, and a list — `["claude-code"]`, `["codex"]` — names the ones it
-  applies to; any other runtime name stops `citizen sync` with the names it knows. Off by
-  default, and a separate decision from `export`: see [Native pass-through](#native-pass-through)
-  before turning it on, because the runtimes attach identifiers the ledger does not, and because
-  only Claude Code can reach an endpoint that requires a header.
+- `export` é `off` ou `otlp`. Qualquer outro valor para `citizen sync` em vez de silenciosamente
+  não exportar nada.
+- `endpoint` é a URL base de **qualquer endpoint OTLP/HTTP**; `/v1/logs` é anexado. Nenhum
+  fornecedor é exigido e nenhum é nomeado no código.
+- `labels` são atributos adicionados a todo registro — o lugar para um ambiente ou um nome de
+  host.
+- `native` pede a um runtime para exportar **sua própria** telemetria para o mesmo endpoint.
+  `true` é todo runtime, `false` é nenhum, e uma lista — `["claude-code"]`, `["codex"]` — nomeia
+  aqueles aos quais se aplica; qualquer outro nome de runtime para `citizen sync` com os nomes que
+  conhece. Desligado por padrão, e uma decisão separada de `export`: veja
+  [Repasse nativo](#native-pass-through) antes de ligá-lo, porque os runtimes anexam
+  identificadores que o ledger não anexa, e porque só o Claude Code consegue alcançar um endpoint
+  que exige um cabeçalho.
 
-`citizen doctor` prints one line for this: the mode, the endpoint's scheme and host, and the
-**names** of the headers it resolved.
+`citizen doctor` imprime uma linha para isso: o modo, o esquema e o host do endpoint, e os
+**nomes** dos cabeçalhos que resolveu.
 
-## The decision log switch
+## O switch do log de decisões
 
-One more key lives in the same block and sends nothing anywhere:
+Mais uma chave vive no mesmo bloco e não envia nada a lugar nenhum:
 
 ```json
 { "telemetry": { "decisions": false } }
 ```
 
-`decisions` governs `~/.local/state/agent-harness/decisions.jsonl`, the local record of what
-each hook decided and how it turned out — [usage.md](usage.md#the-decision-log) describes the
-rows and the report. It defaults to **on**, like the usage ledger beside it, because a label
-is only worth having from the day the hook starts writing it; set it to `false` and no row, no
-file and no directory is written. It is no part of `export`: decision rows are never sent to an
-endpoint, whatever `export` is set to, and turning export on does not turn this on or off.
+`decisions` governa `~/.local/state/agent-harness/decisions.jsonl`, o registro local do que cada
+hook decidiu e como se resolveu — [usage.md](usage.md#the-decision-log) descreve as linhas e o
+relatório. O padrão é **ligado**, como o ledger de uso ao lado, porque um rótulo só vale a pena
+ter a partir do dia em que o hook começa a escrevê-lo; defina como `false` e nenhuma linha, nenhum
+arquivo e nenhum diretório é escrito. Não faz parte de `export`: linhas de decisão nunca são
+enviadas a um endpoint, seja qual for o valor de `export`, e ligar a exportação não liga nem
+desliga isto.
 
-Unlike a ledger row, a decision row holds the text the hook judged — a command, or the head of
-a brief — capped at 2 KiB, which is the one reason to turn it off on a shared machine.
+Ao contrário de uma linha de ledger, uma linha de decisão guarda o texto que o hook julgou — um
+comando, ou o início de um brief — limitado a 2 KiB, que é a única razão para desligá-lo em uma
+máquina compartilhada.
 
-## The allowed-command sample
+## A amostra de comando permitido
 
 ```json
 { "telemetry": { "allow_sample_rate": 0 } }
 ```
 
-`allow_sample_rate` is the one-in-how-many: **20 by default**, so one distinct command in twenty
-of those the harness allows is written to the decision log as an ungraded negative, and `0`
-writes none of them. [usage.md](usage.md#sampled-allows) describes the row, and why the sample
-is of distinct commands rather than of invocations.
+`allow_sample_rate` é o um-em-quantos: **20 por padrão**, então um comando distinto em vinte
+daqueles que o harness permite é escrito no log de decisões como um negativo não classificado, e
+`0` não escreve nenhum deles. [usage.md](usage.md#sampled-allows) descreve a linha, e por que a
+amostra é de comandos distintos em vez de invocações.
 
-It is on because the graded rows are all prompts, and a check that may only turn an allow into
-an ask cannot be measured for false alarms against prompts alone. The sample is drawn from each
-command's own hash rather than from a random draw, so the same commands are sampled on every
-machine and a measurement over these rows is reproducible. Only an allow the harness itself
-gave is sampled, never a command it left to the runtime to answer. The text of a sampled row is redacted first —
-assignment values, credential flags, every secret shape the rule detectors match and the home
-directory as `~` — because it is text nobody was prompted about, and the row's hash is over the
-redacted text so nothing removed from it can be recovered; a graded row still holds the command
-as the user saw it.
+Está ligada porque as linhas classificadas são todas prompts, e uma verificação que só pode
+transformar um allow em um ask não pode ser medida quanto a falsos alarmes contra prompts
+sozinhos. A amostra é tirada do próprio hash de cada comando em vez de um sorteio aleatório, então
+os mesmos comandos são amostrados em toda máquina e uma medição sobre essas linhas é reproduzível.
+Só um allow que o próprio harness deu é amostrado, nunca um comando que deixou para o runtime
+responder. O texto de uma linha amostrada é redigido primeiro — valores de atribuição, flags de
+credencial, todo formato de segredo que os detectores de regra combinam e o diretório home como
+`~` — porque é texto sobre o qual ninguém foi perguntado, e o hash da linha é sobre o texto
+redigido para que nada removido dele possa ser recuperado; uma linha classificada ainda guarda o
+comando como o usuário o viu.
 
-Set it to `0` on a machine where a log of commands nobody approved is unwelcome.
-`decisions: false` turns it off along with the rest of the log, and nothing here is exported:
-a decision row reaches no endpoint whatever `export` is set to.
+Defina como `0` em uma máquina onde um log de comandos que ninguém aprovou é indesejável.
+`decisions: false` o desliga junto com o resto do log, e nada aqui é exportado: uma linha de
+decisão não alcança nenhum endpoint, seja qual for o valor de `export`.
 
-## The completion claim switch
+## O switch de alegação de conclusão
 
 ```json
 { "telemetry": { "completion_claim": true } }
 ```
 
-This one defaults to **off**. It adds `completion_claim` to a `stop-gate` decision row: the last
-2 KiB of the turn's final assistant message, read from the transcript at Stop, with the hash
-over the uncapped message — or a null claim beside the reason there is none.
-[usage.md](usage.md#the-completion-claim) describes the fields and the reasons. It is what lets
-a stop claim be read against the gate result sitting on the same row.
+Este tem **desligado** como padrão. Ele adiciona `completion_claim` a uma linha de decisão de
+`stop-gate`: os últimos 2 KiB da mensagem final de assistente do turno, lidos da transcrição no
+Stop, com o hash sobre a mensagem sem limite — ou uma alegação nula ao lado do motivo de não haver
+nenhuma. [usage.md](usage.md#the-completion-claim) descreve os campos e as razões. É o que permite
+que uma alegação de parada seja lida contra o resultado do gate sentado na mesma linha.
 
-It is off because it is the only place the decision log holds assistant prose, and that is a
-different thing to keep on a shared machine from a log of commands. `decisions: false` turns it
-off too, since there is no row to put it on. Nothing here is exported either: a decision row
-reaches no endpoint whatever `export` is set to.
+Está desligado porque é o único lugar onde o log de decisões guarda prosa de assistente, e isso é
+algo diferente de manter em uma máquina compartilhada de um log de comandos. `decisions: false`
+também o desliga, já que não há linha para colocá-lo. Nada aqui também é exportado: uma linha de
+decisão não alcança nenhum endpoint, seja qual for o valor de `export`.
 
-## Credentials
+## Credenciais
 
-Headers are read from the named environment variable or the named file and from nowhere else. A
-header value written into `config.json` is refused by name, because a configuration file is
-backed up, synced and read by every tool that reads the config.
+Cabeçalhos são lidos da variável de ambiente nomeada ou do arquivo nomeado e de nenhum outro
+lugar. Um valor de cabeçalho escrito em `config.json` é recusado pelo nome, porque um arquivo de
+configuração é feito backup, sincronizado e lido por toda ferramenta que lê a configuração.
 
 ```sh
 export HARNESS_OTLP_HEADERS='authorization=<token>,x-scope-orgid=<tenant>'
 ```
 
-Both forms are accepted, in the variable and in the file: `name=value` per line, or the
-comma-separated `name=value` list that `OTEL_EXPORTER_OTLP_HEADERS` uses.
+As duas formas são aceitas, na variável e no arquivo: `name=value` por linha, ou a lista
+separada por vírgula `name=value` que `OTEL_EXPORTER_OTLP_HEADERS` usa.
 
-A `headers_file` is refused, with the reason, when it is **inside a git work tree** — one
-`git add -A` from being published — or when it is **readable by other users**. Create it at mode
-600 outside every repository:
+Um `headers_file` é recusado, com o motivo, quando está **dentro de uma work tree do git** — um
+`git add -A` de distância de ser publicado — ou quando é **legível por outros usuários**. Crie-o
+no modo 600 fora de todo repositório:
 
 ```sh
 install -m 600 /dev/null ~/.config/agent-harness/otlp-headers
 ```
 
-No header value is ever printed, logged or written to an error record. A failure record names
-only the endpoint's scheme and host, since a path or a query string can itself carry a token.
+Nenhum valor de cabeçalho é jamais impresso, registrado em log ou escrito em um registro de erro.
+Um registro de falha nomeia só o esquema e o host do endpoint, já que um caminho ou uma string de
+consulta podem por si só carregar um token.
 
-## What is sent
+## O que é enviado
 
-One OTLP log record per ledger row, `POST <endpoint>/v1/logs`, `Content-Type: application/json`,
-using the standard library only. Logs rather than metrics: a row is an after-the-fact summary
-that carries its own timestamps.
+Um registro de log OTLP por linha de ledger, `POST <endpoint>/v1/logs`,
+`Content-Type: application/json`, usando só a biblioteca padrão. Logs em vez de métricas: uma
+linha é um resumo posterior ao fato que carrega seus próprios timestamps.
 
-- `timeUnixNano` is the row's `ended`, `observedTimeUnixNano` is the moment it was sent. Both are
-  decimal **strings**, as the OTLP/JSON mapping requires of a 64-bit integer — so an integer
-  attribute travels as `{"intValue": "200"}`, not as a JSON number.
-- The **body** is the row as a JSON string, so nothing is lost in translation — everything the
-  ledger holds except the `stances` map, which travels as attributes instead. A backend that
-  parses a JSON body flattens a nested map into dotted keys of its own, and a body carrying
-  `stances` landed a second copy of every stance beside the attributes below.
-- **Attributes** are the row's flat scalar fields — a null is omitted rather than sent as empty —
-  plus `harness.row_key`, `harness.exported_at`, `harness.version`, `harness.usd` and
-  `harness.price_as_of` on a priced
-  row, one `harness.<dimension>` per recorded stance, and any configured labels. A stance is
-  exported **once**. A nested map (`days`, `by_model`, `rules`, `counts`) stays in the body:
-  attribute sets are flat, and a hundred per-day slices would be a hundred columns.
-- A **`kind: "decision"` row** — one decision-provider call, see [usage](usage.md) — carries its
-  own fields under `harness.decision.*`, its price included as `harness.decision.usd`. It
-  measures what the harness spent asking a question rather than what a session spent, and
-  exported bare its `input`, `output` and `usd` would land in the same columns a session's do,
-  where anything summing them would count the question as session spend.
-- Resource attributes are `service.name=agent-harness` and the harness version.
+- `timeUnixNano` é o `ended` da linha, `observedTimeUnixNano` é o momento em que foi enviada.
+  Ambos são **strings** decimais, como o mapeamento OTLP/JSON exige de um inteiro de 64 bits —
+  então um atributo inteiro viaja como `{"intValue": "200"}`, não como um número JSON.
+- O **corpo (body)** é a linha como uma string JSON, então nada se perde na tradução — tudo que o
+  ledger guarda exceto o mapa `stances`, que viaja como atributos em vez disso. Um backend que
+  analisa um corpo JSON achata um mapa aninhado em chaves com pontos próprias; um corpo carregando
+  `stances` aterrissaria uma segunda cópia de toda postura ao lado dos atributos abaixo.
+- **Atributos** são os campos escalares planos da linha — um nulo é omitido em vez de enviado como
+  vazio — mais `harness.row_key`, `harness.exported_at`, `harness.version`, `harness.usd` e
+  `harness.price_as_of` em uma linha precificada, um `harness.<dimension>` por postura registrada,
+  e quaisquer labels configurados. Uma postura é exportada **uma vez**. Um mapa aninhado (`days`,
+  `by_model`, `rules`, `counts`) fica no corpo: conjuntos de atributos são planos, e cem fatias
+  por dia seriam cem colunas.
+- Uma **linha `kind: "decision"`** — uma chamada de provedor de decisão, veja [usage](usage.md) —
+  carrega seus próprios campos sob `harness.decision.*`, seu preço incluído como
+  `harness.decision.usd`. Ela mede o que o harness gastou perguntando uma pergunta em vez do que
+  uma sessão gastou, e exportada crua seu `input`, `output` e `usd` cairiam nas mesmas colunas que
+  os de uma sessão, onde qualquer coisa que os some contaria a pergunta como gasto de sessão.
+- Atributos de recurso são `service.name=agent-harness` e a versão do harness.
 
-`harness.row_key` is the row's identity — session id, runtime, kind, agent id — and is stable
-across replays. It is what a reader de-duplicates on. `harness.exported_at` is the moment the
-record was sent, as a fixed-width RFC 3339 UTC string — six fractional digits, always `Z` — so
-that a backend holding attributes as strings still orders two records for one key correctly.
-It is the only difference between a record and its replay, and the rows of one batch may share
-one stamp.
+`harness.row_key` é a identidade da linha — id de sessão, runtime, tipo, id de agente — e é
+estável através de reproduções. É o que um leitor usa para deduplicar. `harness.exported_at` é o
+momento em que o registro foi enviado, como uma string RFC 3339 UTC de largura fixa — seis dígitos
+fracionários, sempre `Z` — para que um backend que guarda atributos como strings ainda ordene dois
+registros para uma chave corretamente. É a única diferença entre um registro e sua reprodução, e
+as linhas de um lote podem compartilhar um carimbo.
 
-### The dollar figure
+### O número em dólar
 
-`harness.usd` is a double and `harness.price_as_of` is the newest `as_of` date among the price
-entries that row was priced through. Both come from `policy/prices.json` and your own `prices`
-overrides, through the same code `citizen usage` prices with — `policy/hooks/pricing.py`, which
-the CLI and the hook each load rather than either one reimplementing it.
+`harness.usd` é um double e `harness.price_as_of` é a data `as_of` mais nova entre as entradas de
+preço com que essa linha foi precificada. Ambos vêm de `policy/prices.json` e das suas próprias
+sobrescritas de `prices`, através do mesmo código com que `citizen usage` precifica —
+`policy/hooks/pricing.py`, que a CLI e o hook cada um carrega em vez de um dos dois reimplementá-lo.
 
-- **A list-price API equivalent, fixed at export time.** It is what the tokens would cost at the
-  published rates on the date stamped beside them — not an invoice, and not what a subscription
-  charged. A replay after a price change re-stamps both attributes at the new rates, so read the
-  newest record per key rather than an average across replays.
-- **An unpriced row carries neither attribute** — never a zero. A row with an unknown model, a
-  session that switched models with no `by_model` breakdown, or a `partial` row is priced by
-  nobody, and a zero would say it was free.
-- **A Claude Code session's figure already includes its subagents**, exactly as `citizen usage`
-  reports it: the subagents' tokens are priced at their own models and added to the parent's.
-  Their rows are exported priced too, for per-role reporting, so **never sum a session row and
-  its subagent rows** — filter on `kind` first. A Codex subagent row and a role-run worker row
-  are each priced alone, because no session row holds their tokens.
-- Pricing never costs the export anything: a missing price file or a malformed override leaves
-  the row exported without dollars and changes neither the hook's exit status nor the session's.
+- **Um equivalente de preço de tabela de API, fixado no momento da exportação.** É o que os tokens
+  custariam nas taxas publicadas na data carimbada ao lado deles — não uma fatura, e não o que uma
+  assinatura cobrou. Uma reprodução depois de uma mudança de preço recarimba os dois atributos nas
+  novas taxas, então leia o registro mais novo por chave em vez de uma média entre reproduções.
+- **Uma linha não precificada não carrega nenhum dos dois atributos** — nunca um zero. Uma linha
+  com um modelo desconhecido, uma sessão que trocou de modelo sem detalhamento `by_model`, ou uma
+  linha `partial` não é precificada por ninguém, e um zero diria que foi de graça.
+- **O número de uma sessão do Claude Code já inclui seus subagentes**, exatamente como
+  `citizen usage` a relata: os tokens dos subagentes são precificados em seus próprios modelos e
+  somados aos da sessão pai. Suas linhas também são exportadas precificadas, para relatório por
+  papel, então **nunca some uma linha de sessão e suas linhas de subagente** — filtre por `kind`
+  primeiro. Uma linha de subagente do Codex e uma linha de worker de role-run são cada uma
+  precificada sozinha, porque nenhuma linha de sessão guarda seus tokens.
+- Precificação nunca custa nada à exportação: um arquivo de preço ausente ou uma sobrescrita
+  malformada deixa a linha exportada sem dólares e não muda nem o status de saída do hook nem o
+  da sessão.
 
-## Where it runs, and what a dead endpoint costs
+## Onde roda, e o que um endpoint morto custa
 
-Export happens in the **detached worker** the `SessionEnd` hook spawns, after the row is already
-in the ledger. One attempt, a two-second timeout, no retry. A collector that is down, slow or
-misconfigured costs one line in `~/.local/state/agent-harness/usage.errors.jsonl` — the time, the
-error class, the row count and the endpoint's host — and changes neither the hook's exit status
-nor the session's.
+A exportação acontece no **worker desacoplado** que o hook `SessionEnd` gera, depois que a linha
+já está no ledger. Uma tentativa, um timeout de dois segundos, sem nova tentativa. Um coletor que
+está fora do ar, lento ou mal configurado custa uma linha em
+`~/.local/state/agent-harness/usage.errors.jsonl` — o horário, a classe de erro, a contagem de
+linhas e o host do endpoint — e não muda nem o status de saída do hook nem o da sessão.
 
-## Replay
+## Reprodução
 
 ```sh
-bin/harness usage export --since 2026-09-01                    # everything since that day
-bin/harness usage export --since 2026-09-01 --until 2026-09-07 # one week
-bin/harness usage export --since 2026-09-01 --dry-run          # count it, connect to nothing
+bin/harness usage export --since 2026-09-01                    # tudo desde esse dia
+bin/harness usage export --since 2026-09-01 --until 2026-09-07 # uma semana
+bin/harness usage export --since 2026-09-01 --dry-run          # conta, não conecta a nada
 ```
 
-Rows are re-sent in batches; the command prints how many were sent and how many failed, and
-exits non-zero if any batch failed. Failures stay in the errors file and the same window can be
-re-run. This is how a backend is backfilled after it is created, rebuilt after it is lost, and
-repaired after an outage — the capability a live runtime telemetry stream does not have.
+Linhas são reenviadas em lotes; o comando imprime quantas foram enviadas e quantas falharam, e
+sai com código não-zero se qualquer lote falhar. Falhas ficam no arquivo de erros e a mesma janela
+pode ser rodada de novo. É assim que um backend é preenchido retroativamente depois de criado,
+reconstruído depois de perdido, e reparado depois de uma queda — a capacidade que um fluxo de
+telemetria de runtime ao vivo não tem.
 
-## Native pass-through
+## Repasse nativo
 
-The ledger is one row per session, written after the fact. Each runtime can also export its own
-live telemetry — Claude Code counts tokens by type and reports a dollar figure per API call;
-Codex counts tokens, turn cost, tool calls and API calls. `"native": true` makes `citizen sync`
-write that configuration, pointing both runtimes at the same `endpoint`. It is off by default
-and turning it on is a decision to read the two warnings below first.
+O ledger é uma linha por sessão, escrita depois do fato. Cada runtime também pode exportar sua
+própria telemetria ao vivo — o Claude Code conta tokens por tipo e relata um número em dólar por
+chamada de API; o Codex conta tokens, custo de turno, chamadas de ferramenta e chamadas de API.
+`"native": true` faz `citizen sync` escrever essa configuração, apontando os dois runtimes para o
+mesmo `endpoint`. Está desligado por padrão e ligá-lo é uma decisão que exige ler os dois avisos
+abaixo primeiro.
 
 ```json
 { "telemetry": { "export": "otlp", "endpoint": "http://localhost:4318",
                  "headers_file": "~/.config/agent-harness/otlp-headers", "native": true } }
 ```
 
-### Which runtimes can reach an authenticated endpoint
+### Quais runtimes conseguem alcançar um endpoint autenticado
 
-**Claude Code can; Codex cannot.** Claude Code resolves its headers by running the
-`otelHeadersHelper` script at run time, so a collector that requires an `authorization` header —
-ClickStack takes a bare one — is reachable with no credential in any file. Codex takes header
-values in `config.toml` only as literals and offers no environment or command indirection for
-them, so the harness writes none; its native export needs an endpoint that accepts this machine
-unauthenticated, and against an authenticating collector every Codex session is rejected.
+**O Claude Code consegue; o Codex não consegue.** O Claude Code resolve seus cabeçalhos rodando o
+script `otelHeadersHelper` em tempo de execução, então um coletor que exige um cabeçalho
+`authorization` — o ClickStack recebe um sem prefixo — é alcançável sem nenhuma credencial em
+nenhum arquivo. O Codex recebe valores de cabeçalho em `config.toml` só como literais e não
+oferece indireção de ambiente ou comando para eles, então o harness não escreve nenhum; sua
+exportação nativa precisa de um endpoint que aceite esta máquina sem autenticação, e contra um
+coletor que autentica, toda sessão do Codex é rejeitada.
 
-Name the runtimes the endpoint can actually serve:
+Nomeie os runtimes que o endpoint de fato consegue servir:
 
 ```json
 { "telemetry": { "export": "otlp", "endpoint": "https://collector.example:4318",
@@ -230,81 +243,86 @@ Name the runtimes the endpoint can actually serve:
                  "native": ["claude-code"] } }
 ```
 
-`sync` then leaves the Codex `[otel]` table exactly as it found it — restoring what was there
-before if a previous sync wrote one — and `["codex"]` likewise leaves `~/.claude/settings.json`
-untouched. `true` still means both, which is what an unauthenticated local collector wants.
+`sync` então deixa a tabela `[otel]` do Codex exatamente como a encontrou — restaurando o que
+havia antes se uma sincronização anterior escreveu uma — e `["codex"]` da mesma forma deixa
+`~/.claude/settings.json` intocado. `true` ainda significa ambos, que é o que um coletor local não
+autenticado quer.
 
-**Read this before pointing it at a hosted endpoint.** Both runtimes attach identifiers the
-ledger export never sends. Claude Code puts `user.email`, `user.account_uuid`, `user.account_id`,
-`user.id`, `organization.id` and `session.id` on its datapoints; its own switches trim some of
-them — `OTEL_METRICS_INCLUDE_ACCOUNT_UUID` and `OTEL_METRICS_INCLUDE_SESSION_ID` both default to
-`true`, `OTEL_METRICS_INCLUDE_VERSION`, `OTEL_METRICS_INCLUDE_ENTRYPOINT` and
-`OTEL_METRICS_INCLUDE_REPOSITORY` to `false`. The harness sets none of them, so adding one to
-`env` yourself is yours to keep: `sync` owns the six variables below and no others. Prompt and
-response logging stays at each runtime's default, which is off.
+**Leia isto antes de apontá-lo para um endpoint hospedado.** Os dois runtimes anexam
+identificadores que a exportação do ledger nunca envia. O Claude Code coloca `user.email`,
+`user.account_uuid`, `user.account_id`, `user.id`, `organization.id` e `session.id` em seus
+datapoints; seus próprios switches removem alguns deles —
+`OTEL_METRICS_INCLUDE_ACCOUNT_UUID` e `OTEL_METRICS_INCLUDE_SESSION_ID` têm ambos `true` como
+padrão, `OTEL_METRICS_INCLUDE_VERSION`, `OTEL_METRICS_INCLUDE_ENTRYPOINT` e
+`OTEL_METRICS_INCLUDE_REPOSITORY` têm `false`. O harness não define nenhum deles, então adicionar
+um a `env` você mesmo é seu para manter: `sync` possui as seis variáveis abaixo e nenhuma outra. O
+registro de prompt e resposta fica no padrão de cada runtime, que é desligado.
 
-### What `sync` writes
+### O que `sync` escreve
 
-**Claude Code**, in `env` in `~/.claude/settings.json`: `CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+**Claude Code**, em `env` em `~/.claude/settings.json`: `CLAUDE_CODE_ENABLE_TELEMETRY=1`,
 `OTEL_METRICS_EXPORTER=otlp`, `OTEL_LOGS_EXPORTER=otlp`,
-`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, `OTEL_EXPORTER_OTLP_ENDPOINT` set to the base URL,
-and `OTEL_RESOURCE_ATTRIBUTES` carrying `harness.version` and one `harness.<dimension>` per
-resolved stance, plus the configured `labels`. With a header source configured it also sets
-`otelHeadersHelper` to `~/.claude/hooks/harness/otel-headers.py`, which reads the same file or
-variable the exporter reads and prints a JSON object of headers; the runtime re-runs it about
-every 29 minutes. No header value is written into the settings file. A variable reaches the
-helper only if it reached the runtime that spawned it, so `headers_file` is the source that
-works for a desktop-launched client.
+`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, `OTEL_EXPORTER_OTLP_ENDPOINT` definido para a URL
+base, e `OTEL_RESOURCE_ATTRIBUTES` carregando `harness.version` e um `harness.<dimension>` por
+postura resolvida, mais os `labels` configurados. Com uma fonte de cabeçalho configurada, também
+define `otelHeadersHelper` para `~/.claude/hooks/harness/otel-headers.py`, que lê o mesmo arquivo
+ou variável que o exportador lê e imprime um objeto JSON de cabeçalhos; o runtime o roda de novo
+a cada 29 minutos aproximadamente. Nenhum valor de cabeçalho é escrito no arquivo de
+configurações. Uma variável só alcança o helper se alcançou o runtime que o gerou, então
+`headers_file` é a fonte que funciona para um cliente lançado a partir do desktop.
 
-**Codex**, in `[otel]` in `~/.codex/config.toml`: `exporter` and `metrics_exporter`, both
-`otlp-http` with `protocol = "binary"` and the signal-specific URLs `<endpoint>/v1/logs` and
-`<endpoint>/v1/metrics`. Both are set on purpose. `metrics_exporter` defaults to Codex's own
-first-party sink, and its source keeps an exact-name list of metrics that sink drops
-client-side — token usage, turn cost, tool calls, API calls — under the comment *"Metrics
-intentionally not sent through Codex's built-in Statsig route. Keep this as an exact-name list
-so custom OTLP exporters still receive them."* Setting only `exporter` therefore sends no token
-metrics anywhere.
+**Codex**, em `[otel]` em `~/.codex/config.toml`: `exporter` e `metrics_exporter`, ambos
+`otlp-http` com `protocol = "binary"` e as URLs específicas de sinal `<endpoint>/v1/logs` e
+`<endpoint>/v1/metrics`. Os dois são definidos de propósito. `metrics_exporter` tem como padrão o
+próprio destino nativo do Codex, e sua fonte mantém uma lista exata de nomes de métricas que esse
+destino descarta do lado do cliente — uso de token, custo de turno, chamadas de ferramenta,
+chamadas de API — sob o comentário *"Métricas intencionalmente não enviadas através da rota
+Statsig embutida do Codex. Mantenha isto como uma lista exata de nomes para que exportadores OTLP
+personalizados ainda as recebam."* Definir só `exporter`, portanto, não envia nenhuma métrica de
+token a lugar nenhum.
 
-**Codex gets no headers and no labels, and this is a real gap.** `[otel]` takes a literal header
-map in `config.toml` and offers no environment or command indirection for it, so writing one
-would put a credential in a configuration file — exactly what the rules above refuse. Native
-Codex export needs an endpoint that accepts unauthenticated traffic from this machine, or one
-fronted by something the user authenticates. There is also no config key for metric labels:
-Codex builds its resource with the SDK's default builder, so `OTEL_RESOURCE_ATTRIBUTES` from the
-process environment is honoured, but `sync` cannot put it there, and a Codex launched from a
-desktop or an editor may inherit no shell environment at all. *Unverified:* both statements come
-from the configuration reference and a source read, not from a run.
+**O Codex não recebe cabeçalhos nem labels, e isso é uma lacuna real.** `[otel]` recebe um mapa de
+cabeçalho literal em `config.toml` e não oferece indireção de ambiente ou comando para ele, então
+escrever um colocaria uma credencial em um arquivo de configuração — exatamente o que as regras
+acima recusam. A exportação nativa do Codex precisa de um endpoint que aceite tráfego não
+autenticado desta máquina, ou um por trás de algo em que o usuário se autentique. Também não há
+nenhuma chave de configuração para labels de métrica: o Codex constrói seu recurso com o
+construtor padrão do SDK, então `OTEL_RESOURCE_ATTRIBUTES` do ambiente de processo é honrado, mas
+`sync` não consegue colocá-lo ali, e um Codex lançado de um desktop ou editor pode não herdar
+nenhum ambiente de shell. *Não verificado:* as duas afirmações vêm da referência de configuração e
+de uma leitura de fonte, não de uma execução.
 
-### Labels are frozen at sync time
+### Labels são congelados no momento da sincronização
 
-They are computed when `sync` runs, not per session. Switch a stance without re-syncing and the
-native stream is labelled with the old variant until the next `sync` — **the ledger row is still
-right**, because it records the stances the session actually ran under. `citizen doctor` says
-whether the written labels match the current version and stances. A label whose name or value
-carries a comma, an equals sign or whitespace cannot travel in `OTEL_RESOURCE_ATTRIBUTES`, which
-has no escape the runtimes agree on: it is left off the native labels, named in the output of
-`sync` and `doctor`, and still sent with the ledger export.
+Eles são calculados quando `sync` roda, não por sessão. Troque uma postura sem sincronizar de novo
+e o fluxo nativo fica rotulado com a variante antiga até a próxima `sync` — **a linha do ledger
+continua certa**, porque ela registra as posturas sob as quais a sessão de fato rodou.
+`citizen doctor` diz se os labels escritos combinam com a versão e posturas atuais. Um label cujo
+nome ou valor carrega uma vírgula, um sinal de igual ou espaço em branco não consegue viajar em
+`OTEL_RESOURCE_ATTRIBUTES`, que não tem nenhum escape em que os runtimes concordem: fica de fora
+dos labels nativos, nomeado na saída de `sync` e `doctor`, e ainda enviado com a exportação do
+ledger.
 
-### What ownership means here
+### O que posse significa aqui
 
-`sync` records every key it writes, so it can update it and take it back out.
+`sync` registra toda chave que escreve, para poder atualizá-la e retirá-la.
 
-- **A variable you set is never touched.** Ownership is per variable, not over `env`.
-- **A managed key already holding something the harness did not write is left alone and
-  reported**, in `sync` and in `doctor`. Remove it to let `sync` manage it. A key already holding
-  exactly what the harness would write is taken over, since there is nothing to lose.
-- **`"native": false` puts back what each key held before**, and removes the rest. An empty
-  `"env": {}` can remain where the harness created the map; it is inert. Dropping one runtime
-  from the list is the same operation for that runtime alone and leaves the other in place.
-- `citizen sync --dry-run` prints the pass-through lines only when the key is on.
+- **Uma variável que você define nunca é tocada.** A posse é por variável, não sobre `env`.
+- **Uma chave gerenciada que já guarda algo que o harness não escreveu é deixada intacta e
+  relatada**, em `sync` e em `doctor`. Remova-a para deixar `sync` gerenciá-la. Uma chave que já
+  guarda exatamente o que o harness escreveria é assumida, já que não há nada a perder.
+- **`"native": false` devolve o que cada chave guardava antes**, e remove o resto. Um `"env": {}`
+  vazio pode permanecer onde o harness criou o mapa; é inerte. Retirar um runtime da lista é a
+  mesma operação só para esse runtime e deixa o outro no lugar.
+- `citizen sync --dry-run` imprime as linhas de repasse só quando a chave está ligada.
 
-## De-duplicating an at-least-once stream
+## Deduplicando um fluxo de pelo menos uma vez
 
-A replay re-sends rows the backend may already hold, so read the newest record per key rather
-than counting rows. Order on `harness.exported_at` and on nothing else: the OTLP observed time
-is **dropped on ingest** by the ClickHouse exporter, and `Timestamp` is the row's own `ended`,
-which is identical across replays. In a ClickHouse-style schema, where OTLP log attributes land
-in a `LogAttributes` map:
+Uma reprodução reenvia linhas que o backend já pode conter, então leia o registro mais novo por
+chave em vez de contar linhas. Ordene por `harness.exported_at` e nada mais: o tempo observado do
+OTLP é **descartado na ingestão** pelo exportador do ClickHouse, e `Timestamp` é o próprio `ended`
+da linha, que é idêntico entre reproduções. Em um schema estilo ClickHouse, onde atributos de log
+OTLP caem em um mapa `LogAttributes`:
 
 ```sql
 SELECT
@@ -319,165 +337,169 @@ WHERE ServiceName = 'agent-harness'
 GROUP BY row_key
 ```
 
-`LogAttributes` is a `Map(String, String)`, so every attribute read out of it is text: the
-`argMax` above compares the export stamps lexically, which is exactly why they are fixed width,
-and `harness.usd` needs `toFloat64OrNull` before it can be summed — an unpriced row has no such
-key, and the empty string it yields becomes a null rather than a zero.
+`LogAttributes` é um `Map(String, String)`, então todo atributo lido dele é texto: o `argMax`
+acima compara os carimbos de exportação lexicalmente, o que é exatamente por que são de largura
+fixa, e `harness.usd` precisa de `toFloat64OrNull` antes de poder ser somado — uma linha não
+precificada não tem essa chave, e a string vazia que ela produz vira um nulo em vez de um zero.
 
-The same shape works anywhere: group by `harness.row_key`, keep the record with the greatest
-export time. Because a replay carries the row as it stands in the ledger **now**, the newest
-copy is also the corrected one when a `--rescan` has since improved it — and the newest
-`harness.usd` is the one priced at the rates in force when it was last sent.
+A mesma forma funciona em qualquer lugar: agrupe por `harness.row_key`, mantenha o registro com o
+maior tempo de exportação. Como uma reprodução carrega a linha como ela está no ledger **agora**,
+a cópia mais nova também é a corrigida quando um `--rescan` a melhorou desde então — e o
+`harness.usd` mais novo é o precificado nas taxas em vigor quando foi enviado pela última vez.
 
-The `kind` filter is the other half of not double counting: a Claude Code session's dollars
-already contain its subagents', so a total over every row would bill them twice. A Codex
-subagent is the other way round — its tokens are in no row but its own — which is why the filter
-names the runtime too. This is the rule `citizen usage` applies; [usage.md](usage.md) says why.
-Spend by role is the same query kept to the subagent and worker rows instead.
+O filtro `kind` é a outra metade de não contar em dobro: os dólares de uma sessão do Claude Code
+já contêm os de seus subagentes, então um total sobre toda linha os cobraria duas vezes. Um
+subagente do Codex é ao contrário — seus tokens não estão em nenhuma linha além da própria — que
+é por que o filtro também nomeia o runtime. Esta é a regra que `citizen usage` aplica;
+[usage.md](usage.md) diz por quê. Gasto por papel é a mesma consulta restrita às linhas de
+subagente e worker em vez disso.
 
-## Reference recipe: ClickStack
+## Receita de referência: ClickStack
 
-`endpoint` takes **any** OTLP/HTTP endpoint. This is one backend that was set up and measured
-end to end, written down so the first person to point the exporter somewhere real does not have
-to rediscover the setup steps. It is an example, not a requirement and not an endorsement:
-anything that speaks OTLP/HTTP works, and nothing in the harness names a vendor.
+`endpoint` recebe **qualquer** endpoint OTLP/HTTP. Este é um backend que foi configurado e medido
+de ponta a ponta, escrito para que a primeira pessoa a apontar o exportador para algo real não
+tenha que redescobrir os passos de configuração. É um exemplo, não um requisito e não um endosso:
+qualquer coisa que fale OTLP/HTTP funciona, e nada no harness nomeia um fornecedor.
 
-ClickStack is the ClickHouse observability stack — a HyperDX UI over ClickHouse, fed by an
-OpenTelemetry Collector. The all-in-one image runs the three of them in one container, which is
-why it suits a laptop.
+ClickStack é o stack de observabilidade do ClickHouse — uma interface HyperDX sobre o ClickHouse,
+alimentada por um OpenTelemetry Collector. A imagem tudo-em-um roda os três em um container, que
+é por que serve bem para um laptop.
 
-### Run it
+### Rode-o
 
 ```bash
 docker run -d --name clickstack -p 8080:8080 -p 4317:4317 -p 4318:4318 -v clickstack-db:/data/db -v clickstack-ch:/var/lib/clickhouse -v clickstack-chlogs:/var/log/clickhouse-server clickhouse/clickstack-all-in-one
 ```
 
-8080 is the UI and the HTTP API, 4317 is OTLP/gRPC and 4318 is OTLP/HTTP — the port the
-`endpoint` above points at. The three volumes are the whole of the state: `/data/db` is the
-MongoDB that holds the user, the team and the ingestion key, and the other two are ClickHouse's
-data and logs. **The volumes are what persists**, not the container: after a `docker restart`,
-and again after the container was removed and a fresh one run on the same three volumes, the
-data was intact and the same ingestion key was still accepted, because the account and the key
-live in `/data/db`. Without them a recreated container starts empty and the key is regenerated.
-Measured idle on one laptop: about 795 MiB resident, about 1.5 GiB shortly after ingest.
+8080 é a interface e a API HTTP, 4317 é OTLP/gRPC e 4318 é OTLP/HTTP — a porta para a qual o
+`endpoint` acima aponta. Os três volumes são todo o estado: `/data/db` é o MongoDB que guarda o
+usuário, a equipe e a chave de ingestão, e os outros dois são os dados e logs do ClickHouse. **Os
+volumes são o que persiste**, não o container: depois de um `docker restart`, e de novo depois
+que o container foi removido e um novo foi rodado nos mesmos três volumes, os dados continuavam
+intactos e a mesma chave de ingestão ainda era aceita, porque a conta e a chave vivem em
+`/data/db`. Sem eles, um container recriado começa vazio e a chave é regenerada. Medido ocioso em
+um laptop: cerca de 795 MiB residentes, cerca de 1,5 GiB pouco depois da ingestão.
 
-This recipe deliberately contains no command that creates an account, writes down a password, or
-removes a container or a volume. The first is a browser step, the second belongs in a file only
-you can read, and the third is destructive and yours to type.
+Esta receita deliberadamente não contém nenhum comando que crie uma conta, escreva uma senha, ou
+remova um container ou volume. O primeiro é um passo de navegador, o segundo pertence a um arquivo
+que só você consegue ler, e o terceiro é destrutivo e seu para digitar.
 
-### Two manual steps before any data is accepted
+### Dois passos manuais antes de qualquer dado ser aceito
 
-**First, create the first user** in the UI at `http://localhost:8080`. The OTLP receivers on
-4317 and 4318 stay closed until that account exists, because the collector is waiting on its
-configuration from the app. Until then an exporter sees a connection that refuses to talk, and
-nothing in the harness's error record will explain why.
+**Primeiro, crie o primeiro usuário** na interface em `http://localhost:8080`. Os receptores OTLP
+em 4317 e 4318 ficam fechados até que essa conta exista, porque o coletor está esperando sua
+configuração vinda do aplicativo. Até então, um exportador vê uma conexão que se recusa a falar, e
+nada no registro de erro do harness vai explicar o porquê.
 
-**Second, send the team's ingestion key** — shown in the UI under the team settings — as a bare
-`authorization` header on every request. It is the key on its own, with no `Bearer` prefix.
-Without it the receiver answers:
+**Segundo, envie a chave de ingestão da equipe** — mostrada na interface sob as configurações de
+equipe — como um cabeçalho `authorization` simples em toda requisição. É a chave sozinha, sem
+prefixo `Bearer`. Sem ela, o receptor responde:
 
 ```text
 401 missing or empty authorization header: Authorization
 ```
 
-So `headers_file` is not optional for this backend. One mode-600 file outside every repository
-serves both directions of the integration: the ledger exporter reads it as `headers_file`, and
-with `"native": true` the `otelHeadersHelper` script reads the same file for Claude Code.
+Então `headers_file` não é opcional para este backend. Um arquivo em modo 600 fora de todo
+repositório serve as duas direções da integração: o exportador do ledger o lê como
+`headers_file`, e com `"native": true` o script `otelHeadersHelper` lê o mesmo arquivo para o
+Claude Code.
 
 ```bash
 printf 'authorization=%s\n' '<ingestion-key>' > ~/.config/agent-harness/otlp-headers
 ```
 
-Create the file at mode 600 first, as under [Credentials](#credentials); the shell redirect above
-does not change an existing file's mode.
+Crie o arquivo em modo 600 primeiro, como em [Credenciais](#credentials); o redirecionamento de
+shell acima não muda o modo de um arquivo existente.
 
-**Codex cannot use this backend through `sync`.** `[otel]` takes header values only as literals
-in `config.toml`, so there is no way to give Codex the key without writing it into a
-configuration file — see [Native pass-through](#native-pass-through), which states that gap and
-what it costs. Set `"native": ["claude-code"]` so `sync` writes no Codex `[otel]` table against
-a backend that would reject every request it makes. Claude Code's native export is unaffected,
-and so is the ledger exporter.
+**O Codex não consegue usar este backend através de `sync`.** `[otel]` recebe valores de
+cabeçalho só como literais em `config.toml`, então não há forma de dar ao Codex a chave sem
+escrevê-la em um arquivo de configuração — veja [Repasse nativo](#native-pass-through), que
+declara essa lacuna e o que ela custa. Defina `"native": ["claude-code"]` para que `sync` não
+escreva nenhuma tabela `[otel]` do Codex contra um backend que rejeitaria toda requisição que ele
+faz. A exportação nativa do Claude Code não é afetada, e o exportador do ledger também não.
 
-Native Claude Code export also carries `user.email`, the account and organization ids and the
-session id on every datapoint. On a container bound to localhost that is your own machine
-talking to itself; read the warning under [Native pass-through](#native-pass-through) before
-pointing the same configuration at anything hosted.
+A exportação nativa do Claude Code também carrega `user.email`, os ids de conta e organização e o
+id de sessão em todo datapoint. Em um container vinculado ao localhost, isso é sua própria máquina
+falando consigo mesma; leia o aviso sob [Repasse nativo](#native-pass-through) antes de apontar a
+mesma configuração para algo hospedado.
 
-### Retention is 30 days by default
+### A retenção é de 30 dias por padrão
 
-Every OpenTelemetry table the collector creates ships with its own 30-day TTL. Ten tables
-carried one on the image measured: the logs and traces tables, the five metrics tables, the two
-`*_kv_rollup_15m` rollups and `hyperdx_sessions`. This is the ledger-as-record argument made
-concrete: the backend forgets, and `citizen usage export --since <date>` puts the window back.
+Toda tabela do OpenTelemetry que o coletor cria vem com seu próprio TTL de 30 dias. Dez tabelas
+carregavam um na imagem medida: as tabelas de logs e traces, as cinco tabelas de métricas, os dois
+rollups `*_kv_rollup_15m` e `hyperdx_sessions`. Isso é o argumento de ledger-como-registro
+concretizado: o backend esquece, e `citizen usage export --since <date>` devolve a janela.
 
-List what is actually there, with the TTL each table carries, rather than trusting a list in a
-document:
+Liste o que de fato está lá, com o TTL que cada tabela carrega, em vez de confiar em uma lista em
+um documento:
 
 ```sql
 SELECT name, engine FROM system.tables WHERE database = 'default' AND create_table_query LIKE '%TTL%' ORDER BY name
 ```
 
-Then raise each one you care about. The TTL expression names that table's own time column — the
-log and trace tables use `Timestamp`, the metric tables use `TimeUnix` — so copy the expression
-out of the table's own `create_table_query` and change only the interval:
+Depois eleve cada uma com que se importa. A expressão de TTL nomeia a própria coluna de tempo
+daquela tabela — as tabelas de log e trace usam `Timestamp`, as tabelas de métrica usam
+`TimeUnix` — então copie a expressão do próprio `create_table_query` da tabela e mude só o
+intervalo:
 
 ```sql
 ALTER TABLE default.otel_logs MODIFY TTL toDateTime(Timestamp) + toIntervalDay(365)
 ```
 
-A `MODIFY TTL` on a table that already holds data schedules a materialization; it does not
-resurrect parts that have already expired.
+Um `MODIFY TTL` em uma tabela que já guarda dados agenda uma materialização; não ressuscita
+partes que já expiraram.
 
-### The dashboard
+### O painel
 
 [`telemetry/clickstack-dashboard-native-cost.json`](telemetry/clickstack-dashboard-native-cost.json)
-is ten tiles of raw SQL over `otel_metrics_sum`, reading the native Claude Code cost and token
-metrics: spend, sessions, the subagent share of spend, cache hit rate, spend over time by model
-and by harness version, spend by agent × model × effort, spend by cost variant and delegation
-stance, tokens by type, and the most expensive sessions. The SQL is this repository's own, over
-the standard OpenTelemetry tables; no dashboard, query or documentation is copied from the
-upstream project.
+é dez tiles de SQL bruto sobre `otel_metrics_sum`, lendo as métricas nativas de custo e token do
+Claude Code: gasto, sessões, a fração de gasto de subagente, taxa de acerto de cache, gasto ao
+longo do tempo por modelo e por versão do harness, gasto por agente × modelo × esforço, gasto por
+variante de custo e postura de delegação, tokens por tipo, e as sessões mais caras. O SQL é
+próprio deste repositório, sobre as tabelas padrão do OpenTelemetry; nenhum painel, consulta ou
+documentação é copiado do projeto upstream.
 
-The HTTP API answers under `/api/api/v2/` on the **UI** port, not the OTLP port — the doubled
-`api` is not a typo. Send `/api/v2/...` instead and the proxy strips one `/api`, leaving the
-backend to answer `404 Cannot GET /v2/dashboards`.
+A API HTTP responde sob `/api/api/v2/` na porta da **interface**, não na porta OTLP — o `api`
+duplicado não é um erro de digitação. Envie `/api/v2/...` em vez disso e o proxy remove um `/api`,
+deixando o backend responder `404 Cannot GET /v2/dashboards`.
 
-**The API key and the ingestion key are two different secrets.** The ingestion key is sent as a
-bare `authorization` header to the OTLP ports; the HTTP API takes a *personal API key*, created
-separately in the UI, as `Authorization: Bearer <key>` on the UI port. Neither works in the
-other's place. Keep the API key in its own mode-600 file outside every repository and read it
-inside the header argument rather than exporting it into the environment.
+**A chave de API e a chave de ingestão são dois segredos diferentes.** A chave de ingestão é
+enviada como um cabeçalho `authorization` simples para as portas OTLP; a API HTTP recebe uma
+*chave de API pessoal*, criada separadamente na interface, como
+`Authorization: Bearer <key>` na porta da interface. Nenhuma funciona no lugar da outra. Mantenha
+a chave de API em seu próprio arquivo modo 600 fora de todo repositório e a leia dentro do
+argumento de cabeçalho em vez de exportá-la para o ambiente.
 
-Each tile carries a `connectionId`, which is instance-specific and ships as the placeholder
-`REPLACE_WITH_CONNECTION_ID`. Look yours up:
+Cada tile carrega um `connectionId`, que é específico da instância e vem como o placeholder
+`REPLACE_WITH_CONNECTION_ID`. Procure o seu:
 
 ```bash
 curl -s http://localhost:8080/api/api/v2/connections -H "Authorization: Bearer $(cat ~/.config/agent-harness/clickstack-api-key)"
 ```
 
-Substitute it, keeping the original file intact:
+Substitua-o, mantendo o arquivo original intacto:
 
 ```bash
 sed 's/REPLACE_WITH_CONNECTION_ID/<connection-id>/g' docs/telemetry/clickstack-dashboard-native-cost.json > "$HOME/clickstack-dashboard.json"
 ```
 
-Dry-run it before creating anything; a good definition comes back as
+Faça um dry-run antes de criar qualquer coisa; uma definição boa volta como
 `{"valid": true, "errors": [], "normalized": …}`:
 
 ```bash
 curl -s -X POST http://localhost:8080/api/api/v2/dashboards/validate -H "Authorization: Bearer $(cat ~/.config/agent-harness/clickstack-api-key)" -H 'content-type: application/json' --data-binary "@$HOME/clickstack-dashboard.json"
 ```
 
-Then create it:
+Depois crie-o:
 
 ```bash
 curl -s -X POST http://localhost:8080/api/api/v2/dashboards -H "Authorization: Bearer $(cat ~/.config/agent-harness/clickstack-api-key)" -H 'content-type: application/json' --data-binary "@$HOME/clickstack-dashboard.json"
 ```
 
-### Licences, and what this repository ships
+### Licenças, e o que este repositório distribui
 
-The HyperDX app is MIT. ClickHouse and the OpenTelemetry Collector are Apache-2.0. The all-in-one
-image also contains MongoDB, which is under the SSPL — a licence this project would not ship
-under, and does not need to, because you download the image from its publisher. This repository
-distributes none of it, vendors none of it, and copies none of its dashboards or documentation.
-Read the image's own terms before running it anywhere but your own machine.
+O aplicativo HyperDX é MIT. O ClickHouse e o OpenTelemetry Collector são Apache-2.0. A imagem
+tudo-em-um também contém o MongoDB, que está sob a SSPL — uma licença sob a qual este projeto não
+distribuiria nada, e não precisa, porque você baixa a imagem do seu publicador. Este repositório
+não distribui nada dela, não a empacota, e não copia nenhum de seus painéis ou documentação. Leia
+os próprios termos da imagem antes de rodá-la em qualquer lugar além da sua própria máquina.

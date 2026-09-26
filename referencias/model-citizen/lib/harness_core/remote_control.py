@@ -457,19 +457,20 @@ def worktree_add_argv(root, path, branch, base, branch_exists):
     return argv + ([str(path), branch] if branch_exists else [str(path), "-b", branch, str(base)])
 
 
-# --------------------------------------------------------------------------- lost sessions
+# --------------------------------------------------------------------------- sessões perdidas
 
-# The cap is a budget, so the page has to be spent on the newest sessions: a lost session is
-# recovered within minutes or not at all. The endpoint takes no sort parameter — `sort` and
-# `order` were measured on 2026-09-22 to return the identical page — so the order is checked on
-# arrival by `descending_by_event` and never requested.
+# O teto é um orçamento, então a página tem que ser gasta nas sessões mais novas: uma sessão
+# perdida é recuperada em minutos ou nunca mais. O endpoint não aceita parâmetro de ordenação —
+# `sort` e `order` foram medidos em 2026-09-22 e retornam a mesma página idêntica — então a ordem
+# é checada na chegada por `descending_by_event` e nunca solicitada.
 PAGE_LIMIT = 50
 SESSIONS_URL = "https://api.anthropic.com/v1/code/sessions?limit=%d" % PAGE_LIMIT
 KEYCHAIN_SERVICE = "Claude Code-credentials"
 API_HEADERS = {"anthropic-version": "2023-06-01", "anthropic-beta": "oauth-2025-04-20"}
-# Heal re-queues these through `bridge/reconnect`. A `--session-id` reattach host registers the
-# lost environment a second time, as a single-session environment that then takes new chats from
-# the client, so that command is printed for the sessions heal cannot reconnect and never run.
+# heal recoloca estas na fila através de `bridge/reconnect`. Um host de reanexação
+# `--session-id` registra o ambiente perdido uma segunda vez, como um ambiente de sessão única
+# que então recebe novos chats do cliente, então esse comando é impresso para as sessões que
+# heal não consegue reconectar e nunca é executado sozinho.
 REATTACH_WARNING = ("heal reconnects these automatically each minute; the command below is for a "
                     "session it cannot reconnect. Reattaching registers a second environment for "
                     "this Mac and new chats may land on it; stop the host as soon as the session "
@@ -480,7 +481,7 @@ RECONNECT_EVERY_SECONDS = 600
 
 
 def oauth_token(keychain_payload):
-    """The claude.ai access token out of the keychain item's JSON. Never logged or stored."""
+    """O token de acesso do claude.ai a partir do JSON do item do keychain. Nunca registrado ou armazenado."""
     try:
         value = json.loads(keychain_payload or "")
     except ValueError:
@@ -494,7 +495,7 @@ def sessions_request(token):
 
 
 def reconnect_request(token, environment, session_id):
-    """`POST bridge/reconnect`, which puts a disconnected session back in its environment's queue."""
+    """`POST bridge/reconnect`, que coloca uma sessão desconectada de volta na fila do seu ambiente."""
     headers = dict(API_HEADERS, Authorization="Bearer " + token)
     headers["anthropic-beta"] = ",".join([API_HEADERS["anthropic-beta"], ENVIRONMENTS_BETA])
     headers["Content-Type"] = "application/json"
@@ -503,19 +504,19 @@ def reconnect_request(token, environment, session_id):
 
 
 def reconnect(token, environment, session_id, opener=None):
-    """Re-queue one session; the HTTP status as text, or `failed: <reason>`. Never raises."""
+    """Recoloca uma sessão na fila; o status HTTP como texto, ou `failed: <reason>`. Nunca levanta exceção."""
     try:
         with (opener or urlopen)(reconnect_request(token, environment, session_id),
                                  timeout=20) as response:
             return str(getattr(response, "status", None) or response.getcode())
     except HTTPError as exc:
         return str(exc.code)
-    except Exception as exc:  # noqa: BLE001 - a network failure is a log line, not a crash
+    except Exception as exc:  # noqa: BLE001 - uma falha de rede é uma linha de log, não uma travada
         return "failed: " + (type(exc).__name__ + (f" {exc}" if str(exc) else ""))
 
 
 def owned_environments(host_ids, pointers):
-    """Every environment this Mac's hosts hold: those their logs name plus those their pointers name."""
+    """Cada ambiente que os hosts deste Mac possuem: os que seus logs nomeiam mais os que seus ponteiros nomeiam."""
     out = []
     for env in list(host_ids or []) + [p.get("environmentId") for p in pointers or []
                                        if isinstance(p, dict)]:
@@ -525,10 +526,11 @@ def owned_environments(host_ids, pointers):
 
 
 def session_rows(payload):
-    """The rows of one sessions page, or None when the payload is not a page of session objects.
+    """As linhas de uma página de sessões, ou None quando o payload não é uma página de objetos de sessão.
 
-    An entry that is not an object refuses the whole page rather than being dropped: what is left
-    would pass the order check trivially, and a page this malformed says nothing about the rest.
+    Uma entrada que não é um objeto recusa a página inteira em vez de ser descartada: o que
+    sobrasse passaria a checagem de ordem trivialmente, e uma página tão malformada não diz nada
+    sobre o resto.
     """
     data = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(data, list) or any(not isinstance(row, dict) for row in data):
@@ -537,9 +539,9 @@ def session_rows(payload):
 
 
 def event_time(row):
-    """One row's `last_event_at` as a datetime, or None when it carries no readable one.
+    """O `last_event_at` de uma linha como um datetime, ou None quando não carrega um legível.
 
-    The field is ISO-8601 with microseconds and a `Z`, which 3.9's parser does not take.
+    O campo é ISO-8601 com microssegundos e um `Z`, que o parser da 3.9 não aceita.
     """
     stamp = row.get("last_event_at")
     if not isinstance(stamp, str) or not stamp:

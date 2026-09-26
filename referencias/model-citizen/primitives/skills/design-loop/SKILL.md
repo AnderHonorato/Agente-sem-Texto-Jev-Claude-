@@ -5,134 +5,146 @@ description: Raise the visual quality of something that already renders: build, 
 
 # Design loop
 
-A closed loop that raises visual quality by measurement rather than taste. The agent that built
-the thing cannot grade it, so an **independent judge with a clean context** scores each round
-against a **locked target** until it clears the bar or stalls.
+Um loop fechado que eleva a qualidade visual por medição em vez de gosto pessoal. O agente que
+construiu a coisa não pode avaliá-la, então um **juiz independente com contexto limpo** pontua cada
+rodada contra um **alvo travado** até que ela supere a barra ou estagne.
 
-Derived from [dream-loop](https://github.com/achimala/dream-loop) (MIT) — see `ATTRIBUTION.md`.
+Derivado de [dream-loop](https://github.com/achimala/dream-loop) (MIT) — veja `ATTRIBUTION.md`.
 
-**Two standing rules that apply even outside the loop.** Visual work is verified by a capture the
-agent reads before anything is shown to the user; a claim about how something looks without a
-capture behind it is unverified. And the look is designed in cheap loops — a mock, a sketch, a
-throwaway render — before it is engineered into the real pipeline.
-The loop mechanics are its contribution. The rubrics, hard gates, escalation and asset policy
-here are ours and differ deliberately; do not reintroduce its asset-sourcing chapter.
+**Duas regras permanentes que se aplicam mesmo fora do loop.** Trabalho visual é verificado por uma
+captura que o agente lê antes de qualquer coisa ser mostrada ao usuário; uma alegação sobre como
+algo parece sem uma captura por trás não é verificada. E o visual é projetado em loops baratos —
+uma maquete, um esboço, um render descartável — antes de ser incorporado ao pipeline real.
+A mecânica do loop é a contribuição dele. As rubricas, os gates obrigatórios, o escalonamento e a
+política de assets aqui são nossos e diferem deliberadamente; não reintroduza o capítulo de
+obtenção de assets dele.
 
-## When this is the wrong skill
+## Quando esta é a skill errada
 
-This skill **refines something that already renders**. It needs a running artifact to screenshot.
-It does not decide what screens exist, what the flows are, or how anything behaves.
+Esta skill **refina algo que já renderiza**. Ela precisa de um artefato rodando para tirar
+screenshot. Ela não decide quais telas existem, quais são os fluxos, ou como qualquer coisa se
+comporta.
 
-| If the ask is | Use |
+| Se o pedido é | Use |
 | --- | --- |
-| What screens exist, what the flows are, how it behaves | your planning framework's UX specification workflow |
-| A mockup, wireframe or screen design from scratch | `design` — canvas, no running artifact needed |
-| Styling a published Artifact page | `artifact-design` |
-| Make the thing that exists look far better | **this skill** |
+| Quais telas existem, quais são os fluxos, como se comporta | o workflow de especificação de UX do seu framework de planejamento |
+| Uma maquete, wireframe ou design de tela do zero | `design` — canvas, sem necessidade de artefato rodando |
+| Estilizar uma página de Artifact publicada | `artifact-design` |
+| Fazer a coisa que existe parecer muito melhor | **esta skill** |
 
-A UX spec produces the brief. This produces the finish. If a surface has been specified but not
-built, build it first — there is nothing to capture until then.
+Uma especificação de UX produz o briefing. Isto produz o acabamento. Se uma superfície foi
+especificada mas não construída, construa-a primeiro — não há nada para capturar até então.
 
-## Pick a mode first
+## Escolha um modo primeiro
 
-| Mode | Surface | Rubric |
+| Modo | Superfície | Rubrica |
 | --- | --- | --- |
-| **ui** | Web app, iOS/Mac app, landing page, standalone HTML doc, dashboard | [references/rubric-ui.md](references/rubric-ui.md) |
-| **scene** | 3D scene, game view, rendered asset, Blender output | [references/rubric-scene.md](references/rubric-scene.md) |
+| **ui** | App web, app iOS/Mac, landing page, doc HTML autônomo, dashboard | [references/rubric-ui.md](references/rubric-ui.md) |
+| **scene** | Cena 3D, visão de jogo, asset renderizado, saída do Blender | [references/rubric-scene.md](references/rubric-scene.md) |
 
-Read only the rubric for your mode. If the request spans both, run two loops with separate
-targets — never average one rubric across both.
+Leia apenas a rubrica do seu modo. Se o pedido abrange os dois, rode dois loops com alvos
+separados — nunca faça a média de uma rubrica entre os dois.
 
-## The loop
+## O loop
 
-Prerequisites: a locked target and a working capture command. Get both before round 1.
+Pré-requisitos: um alvo travado e um comando de captura funcionando. Obtenha os dois antes da
+rodada 1.
 
-1. **Establish and lock the target** — [references/targets.md](references/targets.md). Write it
-   to `.design-loop/target.<ext>` and do not regenerate it mid-loop.
-2. **Establish the capture command** — [references/capture.md](references/capture.md). Verify it
-   produces a real screenshot before you start, not after.
-3. **Implement a pass** at the target. When the session runs below the strongest class, hand
-   steps 3 to 5 and 7 to the `designer` agent, which declares that class; give it the workspace,
-   the target, the capture command and the last verdict. It never judges; step 6 stays yours.
-4. **Validate it yourself.** It must actually run, load and work. Fix breakage, wrong
-   orientation, missing assets and failed loads here. Do not use this step to tune visuals.
-5. **Capture** the current state to `.design-loop/round-<n>.png`.
-6. **Judge** — spawn the `design-judge` agent with the image paths, the surface type and the
-   target path, per [references/judge.md](references/judge.md). Never judge your own work inline.
-7. **Address every gap** the judge named, hardest first. Do not cherry-pick the easy ones.
-8. **Evaluate exit criteria** below. Exit, escalate, or return to step 4.
+1. **Estabeleça e trave o alvo** — [references/targets.md](references/targets.md). Escreva-o em
+   `.design-loop/target.<ext>` e não o regenere no meio do loop.
+2. **Estabeleça o comando de captura** — [references/capture.md](references/capture.md). Verifique
+   que ele produz um screenshot real antes de começar, não depois.
+3. **Implemente uma passada** no alvo. Quando a sessão roda abaixo da classe mais forte, passe os
+   passos 3 a 5 e 7 para o agente `designer`, que declara essa classe; dê a ele o workspace, o
+   alvo, o comando de captura e o último veredito. Ele nunca julga; o passo 6 continua seu.
+4. **Valide você mesmo.** Precisa realmente rodar, carregar e funcionar. Corrija quebras,
+   orientação errada, assets faltando e falhas de carregamento aqui. Não use este passo para
+   ajustar visuais.
+5. **Capture** o estado atual em `.design-loop/round-<n>.png`.
+6. **Julgue** — gere o agente `design-judge` com os caminhos de imagem, o tipo de superfície e o
+   caminho do alvo, conforme [references/judge.md](references/judge.md). Nunca julgue seu próprio
+   trabalho inline.
+7. **Resolva cada lacuna** que o juiz nomeou, as mais difíceis primeiro. Não escolha só as fáceis.
+8. **Avalie os critérios de saída** abaixo. Saia, escalone, ou volte ao passo 4.
 
-## Hard gates
+## Gates obrigatórios
 
-Each rubric defines gates that are **pass/fail, not scored**. A failing gate blocks exit at any
-score. Accessibility, design-token adherence, runtime budget and asset licensing are gates
-precisely because a loop optimizing for "looks good" will trade them away otherwise.
+Cada rubrica define gates que são **pass/fail, não pontuados**. Um gate falho bloqueia a saída em
+qualquer pontuação. Acessibilidade, aderência a tokens de design, orçamento de runtime e
+licenciamento de assets são gates precisamente porque um loop otimizando para "parece bom" vai
+trocá-los de outra forma.
 
-Never lower a gate to exit the loop. Report it unmet instead.
+Nunca abaixe um gate para sair do loop. Relate-o como não cumprido em vez disso.
 
-## Exit criteria
+## Critérios de saída
 
-- **Score ≥ 8/10 and all gates pass** — done. Show the latest capture, state the score and the
-  remaining known gaps, and ask whether to keep going.
-- **Score ≥ 8/10 but a gate fails** — fix the gate. Re-judge afterward to confirm the fix did not
-  cost visual quality. A gate fix that regresses the score is not finished.
-- **Stall approaching** — the best score has not improved by a full point in 2 rounds, *or* the
-  judge has named the same gap twice running. Stop making incremental tweaks. Step back and find
-  the structural reason: wrong layout system, wrong palette, wrong camera, wrong asset quality,
-  wrong type scale. Make one dramatic change, not five small ones.
-- **Stalled** — the dramatic change did not move the score. Stop. Do not spend tokens on a second
-  architectural guess. Escalate.
-- **Round budget spent** — default cap is **5 rounds**. That is a cap, not a target. Escalate.
-- **Otherwise** — keep looping. Do not exit early because progress feels adequate.
+- **Pontuação ≥ 8/10 e todos os gates passam** — pronto. Mostre a captura mais recente, declare a
+  pontuação e as lacunas conhecidas restantes, e pergunte se deve continuar.
+- **Pontuação ≥ 8/10 mas um gate falha** — corrija o gate. Rejulgue depois para confirmar que a
+  correção não custou qualidade visual. Uma correção de gate que regride a pontuação não está
+  terminada.
+- **Estagnação se aproximando** — a melhor pontuação não melhorou um ponto inteiro em 2 rodadas,
+  *ou* o juiz nomeou a mesma lacuna duas vezes seguidas. Pare de fazer ajustes incrementais. Dê um
+  passo atrás e encontre a razão estrutural: sistema de layout errado, paleta errada, câmera
+  errada, qualidade de asset errada, escala de tipografia errada. Faça uma mudança dramática, não
+  cinco pequenas.
+- **Estagnado** — a mudança dramática não moveu a pontuação. Pare. Não gaste tokens numa segunda
+  aposta arquitetural. Escalone.
+- **Orçamento de rodadas gasto** — o teto padrão é **5 rodadas**. Isso é um teto, não uma meta.
+  Escalone.
+- **Caso contrário** — continue no loop. Não saia cedo porque o progresso parece adequado.
 
-## Escalation
+## Escalonamento
 
-Follow the standing autonomous-loop rule: interrupt only for blocking findings, for product, UX,
-security or schema calls outside the brief, or for anything destructive. Everything else goes on
-a running **Decisions needed** list while the loop keeps moving.
+Siga a regra permanente de loop autônomo: interrompa apenas para achados bloqueantes, para
+decisões de produto, UX, segurança ou schema fora do briefing, ou para qualquer coisa destrutiva.
+Tudo mais vai para uma lista corrente de **Decisões necessárias** enquanto o loop continua se
+movendo.
 
-Ambiguous design calls are not interrupts. Implement the sensible default, keep going, and
-headline it at the end for confirm or override.
+Decisões de design ambíguas não são interrupções. Implemente o padrão sensato, continue, e
+destaque-o no final para confirmação ou substituição.
 
-When you do stop, report: current score with per-axis breakdown, gate status, what you changed,
-what is still open, and the specific question you need answered.
+Quando você parar, relate: a pontuação atual com a divisão por eixo, o status dos gates, o que
+você mudou, o que ainda está em aberto, e a pergunta específica que precisa de resposta.
 
 ## Assets
 
-**Sourcing is governed entirely by the chosen `licensing` stance**, plus any path-scoped
-asset rule the project carries. Invoke the `licensing-review` skill before incorporating anything new.
+**A obtenção é governada inteiramente pela postura `licensing` escolhida**, mais qualquer regra
+de asset com escopo de caminho que o projeto carregue. Invoque a skill `licensing-review` antes de
+incorporar qualquer coisa nova.
 
-Three things this loop must never do, regardless of how much they would improve the score:
+Três coisas que este loop nunca deve fazer, não importa quanto melhorariam a pontuação:
 
-- **Never download assets without clearing the license first.** "Free download",
-  "royalty-free" and a marketplace tag are not proof.
-- **Never override a restriction the user set.** If they said don't download assets, that
-  includes generated-3D services, image-to-3D APIs and asset marketplaces. Ask; do not reinterpret.
-- **Never ship generated 3D assets on unresolved terms.** Image-to-3D output carries the vendor's
-  terms, not a clean license. Unresolved material stays out of production.
+- **Nunca baixe assets sem liberar a licença primeiro.** "Download grátis", "royalty-free" e uma
+  tag de marketplace não são prova.
+- **Nunca sobrescreva uma restrição que o usuário definiu.** Se ele disse para não baixar assets,
+  isso inclui serviços de geração 3D, APIs de imagem-para-3D e marketplaces de assets. Pergunte;
+  não reinterprete.
+- **Nunca entregue assets 3D gerados em termos não resolvidos.** A saída de imagem-para-3D carrega
+  os termos do fornecedor, não uma licença limpa. Material não resolvido fica fora da produção.
 
-If no compliant asset clears the bar, adapt a compliant base or author original geometry. Say so
-plainly rather than quietly substituting something weaker.
+Se nenhum asset compatível supera a barra, adapte uma base compatível ou crie geometria original.
+Diga isso claramente em vez de silenciosamente substituir por algo mais fraco.
 
-## Working files
+## Arquivos de trabalho
 
-Keep everything in `.design-loop/` at the repo root:
+Mantenha tudo em `.design-loop/` na raiz do repositório:
 
 ```
 .design-loop/
-  target.png          locked reference, written once
-  round-1.png         capture per round
-  verdict-1.md        judge output per round
-  notes.md            decisions needed, assumptions, gate status
+  target.png          referência travada, escrita uma vez
+  round-1.png         captura por rodada
+  verdict-1.md        saída do juiz por rodada
+  notes.md            decisões necessárias, suposições, status dos gates
 ```
 
-Add `.design-loop/` to `~/.config/git/ignore` once so it stays out of every repo.
+Adicione `.design-loop/` a `~/.config/git/ignore` uma vez para que fique fora de todo repositório.
 
-## Time budget
+## Orçamento de tempo
 
-If given one, record the clock after the target is locked and check it between rounds. **Do not
-trade visual quality for the deadline** — hitting the limit with real, beautiful progress beats
-landing complete and ugly. Report what you would do with another round.
+Se recebido um, registre o relógio depois que o alvo estiver travado e verifique entre as rodadas.
+**Não troque qualidade visual pelo prazo** — atingir o limite com progresso real e bonito supera
+entregar completo e feio. Relate o que você faria com mais uma rodada.
 
-If no budget is given, run to an exit criterion and warn up front that this consumes real tokens:
-each round is a build pass, a capture and a judge subagent.
+Se nenhum orçamento for dado, rode até um critério de saída e avise antecipadamente que isso
+consome tokens reais: cada rodada é uma passada de construção, uma captura e um subagente juiz.

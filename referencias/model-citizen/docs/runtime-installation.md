@@ -1,131 +1,141 @@
-# Installing shared primitives into agent runtimes
+# Instalando primitivos compartilhados em runtimes de agente
 
-Select targets independently in your user configuration:
+Selecione os alvos de forma independente na sua configuração de usuário:
 
 ```json
 {"claude": {"manage": false}, "codex": {"manage": true}, "vscode": {"manage": false}}
 ```
 
-`bin/harness config set claude.manage false` makes the same change. A Codex-only sync creates
-its configuration home even on a fresh machine; it does not require a Claude installation.
-`CLAUDE_CONFIG_DIR` and `CODEX_HOME` select nondefault runtime homes. `HARNESS_HOME` isolates
-the harness's own configuration and state for fixtures. It is not a native runtime setting.
+`bin/harness config set claude.manage false` faz a mesma mudança. Uma sincronização só para o
+Codex cria seu diretório de configuração mesmo em uma máquina nova; ela não exige uma instalação
+do Claude. `CLAUDE_CONFIG_DIR` e `CODEX_HOME` selecionam diretórios de runtime não padrão.
+`HARNESS_HOME` isola a própria configuração e estado do harness para fixtures. Não é uma
+configuração de runtime nativa.
 
-Codex receives shared instructions and identity, the skill catalog under `~/.agents/skills`,
-seven generated role configurations, and five `harness-*` workflow skills. Source generation
-and installation do not establish native hook activation, role confinement, or client support.
-Runtime qualification is reported separately.
+O Codex recebe instruções e identidade compartilhadas, o catálogo de skills sob
+`~/.agents/skills`, sete configurações de papel geradas, e cinco skills de workflow `harness-*`. A
+geração de fonte e a instalação não estabelecem ativação de hook nativo, confinamento de papel ou
+suporte de cliente. A qualificação de runtime é relatada separadamente.
 
-The permission choices express intent through different native controls. Codex `manual` uses
-`on-request`, `read-only`, and the user reviewer. `auto` uses `on-request`, `workspace-write`,
-and automatic approval review. `bypass` uses `never` with full access and requires the existing
-explicit acknowledgement. `inherit` preserves native choices. Codex renamed the reviewer field to
-`approvals_reviewer`, and a client drops a spelling it does not know without a word, so sync asks
-the installed client which name it accepts — from its own protocol schema, or `--strict-config`,
-neither of which starts a model turn — writes that one, and removes the other. A client that
-accepts neither gets no reviewer key, a sync notice and a `citizen doctor` finding. Native
-requirements and live
-permission overrides can restrict or supersede defaults; these mappings are not an assertion
-that Claude and Codex permission modes are equivalent.
+As escolhas de permissão expressam intenção através de controles nativos diferentes. O `manual`
+do Codex usa `on-request`, `read-only`, e o revisor de usuário. O `auto` usa `on-request`,
+`workspace-write`, e revisão de aprovação automática. O `bypass` usa `never` com acesso completo e
+exige a confirmação explícita já existente. O `inherit` preserva as escolhas nativas. O Codex
+renomeou o campo de revisor para `approvals_reviewer`, e um cliente descarta uma grafia que não
+conhece sem aviso nenhum, então a sincronização pergunta ao cliente instalado qual nome ele aceita
+— a partir do próprio schema de protocolo dele, ou de `--strict-config`, nenhum dos dois inicia um
+turno de modelo — escreve esse, e remove o outro. Um cliente que não aceita nenhum dos dois fica
+sem chave de revisor, um aviso de sincronização e um achado do `citizen doctor`. Requisitos
+nativos e sobrescritas de permissão ao vivo podem restringir ou substituir os padrões; esses
+mapeamentos não são uma afirmação de que os modos de permissão do Claude e do Codex são
+equivalentes.
 
-Configuration changes own fields, not whole files. A protected ownership ledger records prior
-and last-applied values before replacement. TOML editing preserves unrelated tables/comments;
-TOMLKit is bundled unmodified with its MIT notice, so no global Python package install is
-required. JSON-with-comments editor files are left unchanged with an explicit diagnostic.
+Mudanças de configuração possuem campos, não arquivos inteiros. Um livro-razão de posse protegido
+registra os valores anterior e o último aplicado antes da substituição. A edição de TOML preserva
+tabelas/comentários não relacionados; o TOMLKit vem empacotado sem modificações com seu aviso MIT,
+então nenhuma instalação global de pacote Python é necessária. Arquivos de editor JSON-com-
+comentários são deixados intactos com um diagnóstico explícito.
 
-`citizen diff` detects modified generated content and owned settings. Uninstall restores prior
-values only when they still match the harness's last write; intervening user changes remain
-with a conflict report and recoverable ownership state. It never deletes a redirected link.
-Concurrent sync/uninstall operations refuse a second writer. Interrupted generated/config
-writes retain an intent record that the next sync can reconcile.
+`citizen diff` detecta conteúdo gerado modificado e configurações possuídas. A desinstalação
+restaura valores anteriores somente quando ainda combinam com a última escrita do harness;
+mudanças do usuário no meio tempo permanecem, com um relatório de conflito e estado de posse
+recuperável. Ela nunca apaga um link redirecionado. Operações concorrentes de
+sincronização/desinstalação recusam um segundo escritor. Escritas geradas/de configuração
+interrompidas mantêm um registro de intenção que a próxima sincronização consegue reconciliar.
 
-Unmanaged instructions and skills require explicit adoption. Adopted Codex instruction text
-is included in subsequent projections and restored on uninstall. Existing user-owned files,
-MCP/plugin settings, selected model and credentials are not replaced by a default config.
+Instruções e skills não gerenciadas exigem adoção explícita. O texto de instrução do Codex
+adotado é incluído em projeções subsequentes e restaurado na desinstalação. Arquivos já possuídos
+pelo usuário, configurações de MCP/plugin, modelo selecionado e credenciais não são substituídos
+por uma configuração padrão.
 
-`sync` installs user defaults only. Project and session stance overrides are resolved by the
-lifecycle adapter in that invocation; they never repoint global links used by another session.
-`HARNESS_PERMISSIONS` is not a way to grant native permissions to a running client. Set a durable
-posture through user configuration and sync, or use that client's own permission controls.
-Custom Claude configuration homes receive an instruction file importing their own personal file.
+`sync` instala apenas os padrões do usuário. Sobrescritas de postura de projeto e sessão são
+resolvidas pelo adaptador de ciclo de vida naquela invocação; elas nunca redirecionam links
+globais usados por outra sessão. `HARNESS_PERMISSIONS` não é uma forma de conceder permissões
+nativas a um cliente em execução. Defina uma postura durável através da configuração de usuário e
+sincronização, ou use os próprios controles de permissão daquele cliente. Diretórios de
+configuração do Claude personalizados recebem um arquivo de instrução importando seu próprio
+arquivo pessoal.
 
-Link and adoption intent is journaled before filesystem changes, so an interrupted sync retains
-its recovery path. Malformed native JSON/TOML is rejected during preflight. Uninstall preserves
-redirected links and occupied restoration destinations, returning a conflict status and retaining
-the recovery manifest. It does not overwrite even a dangling user symlink to restore a backup.
+A intenção de link e adoção é registrada em diário antes das mudanças de sistema de arquivos,
+então uma sincronização interrompida mantém seu caminho de recuperação. JSON/TOML nativo malformado
+é rejeitado no preflight. A desinstalação preserva links redirecionados e destinos de restauração
+ocupados, retornando um status de conflito e mantendo o manifesto de recuperação. Ela não
+sobrescreve nem mesmo um symlink de usuário pendurado para restaurar um backup.
 
-## The one-line installer
+## O instalador de uma linha
 
-`scripts/install.sh` is POSIX `sh`, collapses the first eight commands of the clone path into one,
-and is safe to run twice. Its shape is borrowed from pmstack's `install.sh`.
+`scripts/install.sh` é `sh` POSIX, condensa os oito primeiros comandos do caminho de clonagem em
+um só, e é seguro rodar duas vezes. Sua forma é emprestada do `install.sh` do pmstack.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/JakeSelby/agent-harness/stable/scripts/install.sh | sh
 ```
 
-1. **Requirements.** `git`, `python3` 3.9 or newer, macOS or Linux. A missing one is a single line
-   naming what to install, and nothing else runs.
-2. **Checkout.** Clones `--branch stable` into `~/repos/agent-harness`. An existing checkout there
-   is fetched and fast-forwarded instead of re-cloned; one that cannot fast-forward, and a
-   destination that is occupied by something that is not a git checkout, both stop the script
-   rather than being reconciled for you.
-3. **Configuration.** `bin/harness init --yes` writes `~/.config/agent-harness/config.json` from
-   the example, taking the name from `git config user.name`, the handle from a signed-in `gh` and
-   the timezone from the system. Any field it cannot answer keeps its example value and is listed
-   on the way out for `citizen config set`. An existing config is never rewritten.
-4. **Preview.** `bin/harness install --dry-run`, which writes nothing.
-5. **Next command.** It prints `bin/harness install` and `bin/harness uninstall` and stops. The
-   script never runs `install` without `--dry-run`.
+1. **Requisitos.** `git`, `python3` 3.9 ou mais novo, macOS ou Linux. Um faltando é uma única
+   linha nomeando o que instalar, e nada mais roda.
+2. **Checkout.** Clona `--branch stable` em `~/repos/agent-harness`. Um checkout já existente ali
+   é atualizado (fetch) e avançado (fast-forward) em vez de clonado de novo; um que não consegue
+   avançar, e um destino ocupado por algo que não é um checkout git, ambos param o script em vez
+   de serem reconciliados por você.
+3. **Configuração.** `bin/harness init --yes` escreve `~/.config/agent-harness/config.json` a
+   partir do exemplo, tirando o nome de `git config user.name`, o identificador de um `gh` logado
+   e o fuso horário do sistema. Qualquer campo que não consiga responder mantém seu valor de
+   exemplo e é listado ao final para `citizen config set`. Uma configuração já existente nunca é
+   reescrita.
+4. **Prévia.** `bin/harness install --dry-run`, que não escreve nada.
+5. **Próximo comando.** Ele imprime `bin/harness install` e `bin/harness uninstall` e para. O
+   script nunca roda `install` sem `--dry-run`.
 
-Any failure exits non-zero with one line naming the step. `HARNESS_CHECKOUT` moves the checkout,
-`HARNESS_BRANCH` tracks another branch, `HARNESS_INSTALL_NO_HOMEBREW=1` and
-`HARNESS_INSTALL_NO_APPS=1` pass `--no-brew` and `--no-apps` to the preview, and anything after
-`sh -s --` is passed to it too.
+Qualquer falha sai com código não-zero e uma linha nomeando o passo. `HARNESS_CHECKOUT` move o
+checkout, `HARNESS_BRANCH` acompanha outra branch, `HARNESS_INSTALL_NO_HOMEBREW=1` e
+`HARNESS_INSTALL_NO_APPS=1` passam `--no-brew` e `--no-apps` para a prévia, e qualquer coisa
+depois de `sh -s --` também é passada a ela.
 
-There is no PyPI package, and one is not planned. The harness runs *from its checkout*: every hook
-in `~/.claude/settings.json` runs a script under `~/.claude/hooks/harness`, which is a link into
-the checkout; the rules, stances and skills in `~/.claude` are links into it too; and the vendored
-TOML parser is imported relative to it. A copy installed into a `site-packages` directory would
-have to become that checkout, so the script clones one instead.
-[The sync model](sync-model.md) has the detail.
+Não existe pacote PyPI, e nenhum está planejado. O harness roda *a partir do seu checkout*: todo
+hook em `~/.claude/settings.json` roda um script sob `~/.claude/hooks/harness`, que é um link para
+dentro do checkout; as regras, posturas e skills em `~/.claude` também são links para lá; e o
+parser TOML empacotado é importado relativo a ele. Uma cópia instalada em um diretório
+`site-packages` teria que se tornar esse checkout, então o script clona um em vez disso.
+[O modelo de sincronização](sync-model.md) tem o detalhe.
 
-## Install from the plugin marketplace
+## Instalar a partir do marketplace de plugins
 
-Claude Code can load the projected primitives without a checkout. In a session:
+O Claude Code consegue carregar os primitivos projetados sem um checkout. Em uma sessão:
 
 ```
 /plugin marketplace add JakeSelby/agent-harness
 /plugin install model-citizen@model-citizen
 ```
 
-`.claude-plugin/marketplace.json` lists one plugin whose source is the repository root, so the
-install reads `.claude-plugin/plugin.json` and nothing is duplicated between the two manifests.
-That manifest carries the skills, the eleven subagent roles, the slash commands and the output
-style. Claude Code namespaces them: a plugin skill is `/model-citizen:<name>`.
+`.claude-plugin/marketplace.json` lista um plugin cuja fonte é a raiz do repositório, então a
+instalação lê `.claude-plugin/plugin.json` e nada é duplicado entre os dois manifestos. Esse
+manifesto carrega as skills, os onze papéis de subagente, os comandos de barra e o estilo de
+saída. O Claude Code os coloca em namespace: uma skill de plugin é `/model-citizen:<name>`.
 
-### Moving an `agent-harness` plugin install to `model-citizen`
+### Movendo uma instalação de plugin `agent-harness` para `model-citizen`
 
-The plugin was published as `agent-harness@agent-harness` before the rename. Claude Code keeps that
-ID when its copy of the marketplace updates, and the plugin then fails to load, because the
-marketplace no longer lists a plugin by that name. Adding the same repository again does nothing
-while the old marketplace is registered, so the old plugin and marketplace go first.
+O plugin foi publicado como `agent-harness@agent-harness` antes da renomeação. O Claude Code
+mantém esse ID quando sua cópia do marketplace se atualiza, e o plugin então falha ao carregar,
+porque o marketplace não lista mais um plugin com esse nome. Adicionar o mesmo repositório de
+novo não faz nada enquanto o marketplace antigo está registrado, então o plugin e o marketplace
+antigos saem primeiro.
 
-With a checkout installed, run:
+Com um checkout instalado, rode:
 
 ```sh
-citizen upgrade --dry-run   # print the four `claude plugin` commands
-citizen upgrade             # run them
+citizen upgrade --dry-run   # imprime os quatro comandos `claude plugin`
+citizen upgrade             # os executa
 ```
 
-It reads the old install's scope and the marketplace's recorded source from Claude Code's plugin
-state, then uninstalls `agent-harness@agent-harness`, removes the `agent-harness` marketplace, adds
-the marketplace again from the same source and installs `model-citizen@model-citizen`, in that
-order. A failed step stops the run and prints the steps that did not run. Without the `claude`
-CLI on your PATH it prints the in-session steps instead.
+Ele lê o escopo da instalação antiga e a fonte registrada do marketplace a partir do estado de
+plugin do Claude Code, depois desinstala `agent-harness@agent-harness`, remove o marketplace
+`agent-harness`, adiciona o marketplace de novo a partir da mesma fonte e instala
+`model-citizen@model-citizen`, nessa ordem. Um passo que falha para a execução e imprime os passos
+que não rodaram. Sem a CLI `claude` no seu PATH, ele imprime os passos de sessão em vez disso.
 
-A plugin-only install has no `citizen` command, so run the steps in a session. The `add` line
-takes the source you first added the marketplace from; if that was a fork or a local path, add
-that instead of `JakeSelby/agent-harness`:
+Uma instalação só de plugin não tem comando `citizen`, então rode os passos em uma sessão. A linha
+`add` usa a fonte de onde você adicionou o marketplace pela primeira vez; se foi um fork ou um
+caminho local, adicione esse em vez de `JakeSelby/agent-harness`:
 
 ```
 /plugin uninstall agent-harness@agent-harness
@@ -134,18 +144,18 @@ that instead of `JakeSelby/agent-harness`:
 /plugin install model-citizen@model-citizen
 ```
 
-Skills move from `/agent-harness:<name>` to `/model-citizen:<name>`. `citizen doctor` recognizes
-either ID, names `citizen upgrade` while the old one is enabled, and warns while both are enabled,
-because every skill would then load twice. `citizen sync` prints the same pointer. The synced home
-itself is unaffected by the plugin rename.
+As skills se movem de `/agent-harness:<name>` para `/model-citizen:<name>`. `citizen doctor`
+reconhece qualquer um dos dois IDs, nomeia `citizen upgrade` enquanto o antigo está habilitado, e
+avisa enquanto os dois estão habilitados, porque toda skill carregaria em dobro. `citizen sync`
+imprime o mesmo aviso. O diretório sincronizado em si não é afetado pela renomeação do plugin.
 
-A marketplace install is a strict subset of `bin/harness install`. It does not give you:
+Uma instalação de marketplace é um subconjunto estrito de `bin/harness install`. Ela não te dá:
 
-- the ownership journal, `citizen diff`, or a restoring `citizen uninstall`;
-- stance selection — no rules, no `CLAUDE.md` projection, no personal file;
-- the Codex projection under `~/.agents/skills` and `~/.codex`;
-- hooks, so command grading, the stop gate and the usage feed are all off.
+- o diário de posse, `citizen diff`, ou uma `citizen uninstall` que restaura;
+- seleção de postura — nenhuma regra, nenhuma projeção de `CLAUDE.md`, nenhum arquivo pessoal;
+- a projeção do Codex sob `~/.agents/skills` e `~/.codex`;
+- hooks, então a avaliação de comando, o gate de parada e o feed de uso ficam todos desligados.
 
-The marketplace path is its own client surface in
-[the compatibility catalog](compatibility.md) and is **unqualified**: no native evidence has been
-recorded for it. `citizen doctor` reports which of the two paths is active.
+O caminho de marketplace é sua própria superfície de cliente no
+[catálogo de compatibilidade](compatibility.md) e é **não qualificado**: nenhuma evidência nativa
+foi registrada para ele. `citizen doctor` relata qual dos dois caminhos está ativo.

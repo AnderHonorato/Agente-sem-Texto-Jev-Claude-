@@ -1,44 +1,45 @@
-# Capturing the current state
+# Capturando o estado atual
 
-**Verify the capture command works before round 1.** A loop that discovers in round 3 that it has
-been judging a blank page or a stale image has burned every round before it.
+**Verifique se o comando de captura funciona antes da rodada 1.** Um loop que descobre na rodada 3
+que estava julgando uma página em branco ou uma imagem desatualizada queimou toda rodada anterior.
 
-Each capture must be of the **real running thing**, at the same framing and viewport as the
-target. Changing framing between rounds makes scores meaningless.
+Cada captura deve ser da **coisa real rodando**, no mesmo enquadramento e viewport que o alvo. Mudar
+o enquadramento entre rodadas torna as pontuações sem sentido.
 
-## Find the project's own path first
+## Encontre primeiro o caminho próprio do projeto
 
-Look for an existing way to run and capture before building one:
+Procure uma forma existente de rodar e capturar antes de construir uma:
 
-- A project skill covering launch or rendering
-- Claude Code's built-in `run` skill, which launches the app and can screenshot it
-- Existing render or gallery scripts in the repo
+- Uma skill de projeto cobrindo lançamento ou renderização
+- A skill nativa `run` do Claude Code, que lança o app e pode tirar screenshot dele
+- Scripts existentes de render ou galeria no repositório
 
-Use what exists. A one-off script that duplicates the repo's renderer will drift from it.
+Use o que existe. Um script avulso que duplica o renderizador do repositório vai divergir dele.
 
-## By surface
+## Por superfície
 
-| Surface | Path |
+| Superfície | Caminho |
 | --- | --- |
-| **Web / HTML doc** | Headless browser screenshot at a fixed viewport. Capture each required breakpoint and both themes as separate images. |
-| **iOS / Mac app** | Simulator screenshot, or the OS screenshot utility against a running build. Fixed device and scale factor. |
-| **Blender** | Blender MCP `get_viewport_screenshot`, or a scripted render. Read the MCP server instructions before scripting. |
-| **Project renderer or mock tool** | The repo's own capture scripts, if it has them. Label output **Mock** or **Renderer** so a concept image is never mistaken for the shipped surface. |
-| **Game at play zoom** | Capture at the actual zoom levels the player uses, not only hero framing. The readability axis depends on this. |
+| **Web / doc HTML** | Screenshot de navegador headless num viewport fixo. Capture cada breakpoint exigido e ambos os temas como imagens separadas. |
+| **iOS / Mac app** | Screenshot do simulador, ou o utilitário de screenshot do SO contra um build rodando. Dispositivo e fator de escala fixos. |
+| **Blender** | `get_viewport_screenshot` do MCP do Blender, ou um render com script. Leia as instruções do servidor MCP antes de escrever o script. |
+| **Renderizador ou ferramenta de mock do projeto** | Os próprios scripts de captura do repositório, se ele os tiver. Rotule a saída como **Mock** ou **Renderer** para que uma imagem conceitual nunca seja confundida com a superfície entregue. |
+| **Jogo no zoom de jogabilidade** | Capture nos níveis de zoom reais que o jogador usa, não apenas no enquadramento hero. O eixo de legibilidade depende disso. |
 
-## Known gaps
+## Lacunas conhecidas
 
-**A web project with no screenshot tooling cannot run this loop yet.** Standing up a headless
-browser capture is a prerequisite and it is real work — raise it rather than faking a capture from
-a component gallery or a static mockup.
+**Um projeto web sem ferramental de screenshot não pode rodar este loop ainda.** Montar uma
+captura de navegador headless é um pré-requisito e é trabalho real — levante isso em vez de forjar
+uma captura a partir de uma galeria de componentes ou uma maquete estática.
 
-## Capture rules
+## Regras de captura
 
-- **One capture per round, saved as `.design-loop/round-<n>.png`.** Keep them all; the judge needs
-  the previous one and you need the series to detect a stall.
-- **Multi-image surfaces** — breakpoints, themes, zoom levels — pass the full set to the judge each
-  round. Do not rotate which one you show; that hides regressions.
-- **Never substitute a mockup, a component gallery or a prior render** for a live capture. The
-  entire value of the loop is that it measures the real artifact.
-- **Fix breakage before capturing**, not after. Failed asset loads, wrong orientation and missing
-  fonts produce a capture that wastes a judge round on gaps you already know about.
+- **Uma captura por rodada, salva como `.design-loop/round-<n>.png`.** Mantenha todas; o juiz
+  precisa da anterior e você precisa da série para detectar estagnação.
+- **Superfícies multi-imagem** — breakpoints, temas, níveis de zoom — passe o conjunto completo
+  para o juiz a cada rodada. Não alterne qual você mostra; isso esconde regressões.
+- **Nunca substitua uma captura ao vivo** por uma maquete, uma galeria de componentes ou um render
+  anterior. O valor inteiro do loop é que ele mede o artefato real.
+- **Corrija quebras antes de capturar**, não depois. Falhas de carregamento de asset, orientação
+  errada e fontes faltando produzem uma captura que desperdiça uma rodada de juiz em lacunas que
+  você já conhece.

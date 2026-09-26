@@ -1,7 +1,8 @@
-"""Decision providers that answer the seam in `harness_core.decision` over a transport.
+"""Provedores de decisão que respondem à interface de `harness_core.decision` sobre um transporte.
 
-The contract itself — `Action`, `Decision`, `DecisionProvider`, and the `none` and `local`
-providers that need no transport — lives in `harness_core.decision`. A module here implements
-that contract against something outside this process, so a provider that must import the
-contract cannot be imported by it: `decision.select_provider` loads these lazily by name.
+O contrato em si — `Action`, `Decision`, `DecisionProvider`, e os provedores `none` e `local`
+que não precisam de transporte — vive em `harness_core.decision`. Um módulo aqui implementa
+esse contrato contra algo fora deste processo, então um provedor que precisa importar o
+contrato não pode ser importado por ele: `decision.select_provider` os carrega preguiçosamente
+por nome.
 """

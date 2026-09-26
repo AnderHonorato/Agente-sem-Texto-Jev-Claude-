@@ -1,41 +1,43 @@
-# The judge
+# O juiz
 
-## Why it is a separate agent
+## Por que é um agente separado
 
-The agent that built the thing has already decided the thing is good — it chose every value in it.
-It also carries the whole build conversation, so it scores its own reasoning rather than the
-pixels. A judge with **no build context** sees only the two images.
+O agente que construiu a coisa já decidiu que ela é boa — escolheu cada valor nela. Ele também
+carrega toda a conversa de construção, então pontua o próprio raciocínio em vez dos pixels. Um juiz
+com **nenhum contexto de construção** vê apenas as duas imagens.
 
-Spawn the **`design-judge` agent** with the image paths, the surface type and the target path — a
-fresh one every round; never fork it and never reuse the previous judge.
+Gere o agente **`design-judge`** com os caminhos de imagem, o tipo de superfície e o caminho do
+alvo — um novo a cada rodada; nunca dê fork nele nem reutilize o juiz anterior.
 
-## What to pass it
+## O que passar a ele
 
-Absolute paths, all of them, every round:
+Caminhos absolutos, todos eles, toda rodada:
 
-- The locked target
-- The current capture
-- **The previous round's capture and verdict**, if any
+- O alvo travado
+- A captura atual
+- **A captura e o veredito da rodada anterior**, se houver
 
-The prior-verdict handoff is what makes regressions visible. Without it the judge cannot tell
-improvement from drift, and scores wander.
+O handoff do veredito anterior é o que torna as regressões visíveis. Sem ele o juiz não consegue
+distinguir melhoria de deriva, e as pontuações vagam.
 
-Name the mode — `ui` or `scene` — and the agent reads its own rubric. Do not tell it what you
-changed, what you intended, or what you found hard. That is the context you are paying to keep out.
+Nomeie o modo — `ui` ou `scene` — e o agente lê sua própria rubrica. Não diga a ele o que você
+mudou, o que você pretendia, ou o que achou difícil. Isso é o contexto que você está pagando para
+manter de fora.
 
-## Handling the verdict
+## Lidando com o veredito
 
-Write it to `.design-loop/verdict-<n>.md` verbatim. You need the history to detect a stall.
+Escreva-o em `.design-loop/verdict-<n>.md` literalmente. Você precisa do histórico para detectar
+estagnação.
 
-**Address every gap, hardest first.** Cherry-picking the cheap ones is how a loop stalls at 6/10:
-the expensive gap survives every round and the judge keeps naming it.
+**Resolva cada lacuna, as mais difíceis primeiro.** Escolher só as fáceis é como um loop estagna em
+6/10: a lacuna cara sobrevive a toda rodada e o juiz continua a nomeando.
 
-The judge can be wrong. If a gap contradicts a hard gate, the design system or real-world scale,
-**the gate wins** — note the disagreement in `notes.md` and move on. Do not argue with the judge
-by re-running it on the same state hoping for a better number.
+O juiz pode estar errado. Se uma lacuna contradiz um gate obrigatório, o sistema de design ou a
+escala do mundo real, **o gate vence** — anote a discordância em `notes.md` e siga em frente. Não
+discuta com o juiz rodando-o de novo no mesmo estado esperando um número melhor.
 
-## Relaying to the user
+## Retransmitindo ao usuário
 
-Judge output is a subagent's raw prose and does not follow the house output style. **Never paste
-it through verbatim.** Reformat before it reaches the user: score and verdict first, gate failures
-next, then what you changed and what is still open.
+A saída do juiz é a prosa crua de um subagente e não segue o estilo de saída da casa. **Nunca a
+cole diretamente.** Reformate antes que chegue ao usuário: pontuação e veredito primeiro, falhas
+de gate em seguida, depois o que você mudou e o que ainda está em aberto.

@@ -127,17 +127,17 @@ WORD_HEADER = {"for", "select", "case"}
 
 NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-_PLACEHOLDER = "__ROSUB__"  # stands in for a verified substitution; never a real command
+_PLACEHOLDER = "__ROSUB__"  # representa uma substituição verificada; nunca um comando real
 
-# Redirection tokens that are safe on their own: input redirects (their operand is
-# read, never written) and fd duplication.
+# Tokens de redirecionamento que são seguros por conta própria: redirecionamentos de entrada (seu
+# operando é lido, nunca escrito) e duplicação de fd.
 READ_REDIRECTS = {"<", "<<", "<<<", "<&"}
 WRITE_REDIRECTS = re.compile(r"^\d*(>|>>|&>|>&)$")
 PUNCTUATION_RUN = re.compile(r"^\d*[<>&|]+$")
 
 
-# Characters that begin an operator outside quotes, and the operators they spell, longest
-# first. `;&` and `;;&` are not listed, so they split into delimiters and fail closed.
+# Caracteres que iniciam um operador fora de aspas, e os operadores que eles soletram, o mais
+# longo primeiro. `;&` e `;;&` não estão listados, então se dividem em delimitadores e falham fechados.
 OPERATOR_CHARS = "();<>|&"
 OPERATORS = ("&>>", "<<<", "&&", "||", ";;", "|&", "&>", ">>", ">&", ">|", "<<", "<&", "<>",
              ";", "&", "|", "(", ")", "<", ">")
@@ -145,8 +145,8 @@ _WHITESPACE = " \t\r\n"
 
 
 def _operators(run):
-    """An unquoted run of operator characters as the operators bash reads in it: the longest
-    operator at each position, left to right, so `);` is `)` then `;`."""
+    """Uma sequência sem aspas de caracteres de operador como os operadores que o bash lê nela: o
+    operador mais longo em cada posição, da esquerda para a direita, então `);` é `)` depois `;`."""
     out, i = [], 0
     while i < len(run):
         op = next(o for o in OPERATORS if run.startswith(o, i))
@@ -156,13 +156,13 @@ def _operators(run):
 
 
 def tokenize(cmd):
-    """The words and operators of `cmd`, as POSIX `shlex` with `punctuation_chars` splits them,
-    except that an unquoted run of operator characters is split into its operators. `shlex`
-    returns such a run as one token, so `(true);` ended in `);`, which is not a delimiter.
-    A quoted or escaped operator character is part of a word. Raises ValueError on an unclosed
-    quote or a trailing backslash, as `shlex` does."""
+    """As palavras e operadores de `cmd`, como o POSIX `shlex` com `punctuation_chars` os divide,
+    exceto que uma sequência sem aspas de caracteres de operador é dividida em seus operadores.
+    `shlex` retorna tal sequência como um único token, então `(true);` terminava em `);`, que não
+    é um delimitador. Um caractere de operador entre aspas ou escapado é parte de uma palavra.
+    Levanta ValueError numa aspa não fechada ou uma barra invertida no final, como `shlex` faz."""
     tokens = []
-    word = None  # None: no word in progress; "" is an empty quoted word
+    word = None  # None: nenhuma palavra em progresso; "" é uma palavra entre aspas vazia
     i, n = 0, len(cmd)
     while i < n:
         c = cmd[i]
@@ -194,7 +194,7 @@ def tokenize(cmd):
             while j < n and cmd[j] != '"':
                 if cmd[j] == "\\" and j + 1 < n:
                     if cmd[j + 1] not in '"\\':
-                        buf.append("\\")  # only a quote or a backslash is escaped here
+                        buf.append("\\")  # só uma aspa ou uma barra invertida é escapada aqui
                     buf.append(cmd[j + 1])
                     j += 2
                     continue
@@ -213,8 +213,8 @@ def tokenize(cmd):
 
 
 def assignment_ok(token):
-    """`NAME=value` may precede a command, or stand alone, only when NAME cannot
-    steer what a later approved command runs."""
+    """`NAME=value` pode preceder um comando, ou ficar sozinho, só quando NAME não
+    consegue direcionar o que um comando aprovado posterior roda."""
     return PAGER_OK.match(token) is not None or DANGEROUS_ENV.match(token) is None
 
 
@@ -242,8 +242,8 @@ def positionals(args):
 
 
 def _skip_delimited(s, i, delim):
-    """Index just past the next unescaped `delim` from s[i], honouring bracket
-    expressions; None when the section never closes."""
+    """Índice logo após o próximo `delim` não escapado a partir de s[i], respeitando expressões
+    de colchete; None quando a seção nunca fecha."""
     n = len(s)
     while i < n:
         c = s[i]

@@ -148,20 +148,20 @@ def report(run: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--all", action="store_true", help="show every run")
-    parser.add_argument("--run", help="a specific run id (wf_...)")
-    parser.add_argument("--limit", type=int, default=1, help="how many runs to show")
+    parser.add_argument("--all", action="store_true", help="mostra toda execução")
+    parser.add_argument("--run", help="um id de execução específico (wf_...)")
+    parser.add_argument("--limit", type=int, default=1, help="quantas execuções mostrar")
     args = parser.parse_args()
 
     runs = find_runs()
     if not runs:
-        print("No workflow runs found under ~/.claude/projects/*/*/subagents/workflows/")
+        print("Nenhuma execução de workflow encontrada sob ~/.claude/projects/*/*/subagents/workflows/")
         return 1
 
     if args.run:
         runs = [r for r in runs if args.run in r.name]
         if not runs:
-            print(f"No run matching {args.run!r}.")
+            print(f"Nenhuma execução correspondendo a {args.run!r}.")
             return 1
     elif not args.all:
         runs = runs[: max(1, args.limit)]

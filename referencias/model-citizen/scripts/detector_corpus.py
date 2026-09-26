@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Score every rule detector against a labelled corpus and fail under the floor.
+"""Pontua todo detector de regra contra um corpus rotulado e falha abaixo do piso.
 
-Two corpora, one registry. The vendored `ruleprobe` wheel ships a labelled corpus for the six
-generic detectors it also ships; `tests/fixtures/detector-corpus/` labels the thirteen in
-`claude/hooks/rule-detectors.py` that are about this repository's own rules. Both are scored
-with the whole registry, so a repository detector that fires on the engine's corpus is a false
-positive there too, and a precision or recall under the floor is a non-zero exit.
+Dois corpora, um registro. O wheel vendorizado `ruleprobe` entrega um corpus rotulado para os seis
+detectores genéricos que também entrega; `tests/fixtures/detector-corpus/` rotula os treze em
+`claude/hooks/rule-detectors.py` que são sobre as próprias regras deste repositório. Os dois são
+pontuados com o registro inteiro, então um detector do repositório que dispara no corpus do motor
+também é um falso positivo ali, e uma precisão ou recall abaixo do piso é uma saída diferente de
+zero.
 
-A detector with no label anywhere is a failure rather than a pass: `ruleprobe corpus` passes
-over an unmeasured detector because it cannot know whose corpus it is scoring, but in here
-every row `harness usage --rules` prints is meant to have a known precision and recall, and a
-new detector arriving without an example is the gap this job exists to show.
+Um detector sem rótulo em lugar nenhum é uma falha, não uma aprovação: `ruleprobe corpus` passa por
+cima de um detector não medido porque não consegue saber de quem é o corpus que está pontuando,
+mas aqui toda linha que `harness usage --rules` imprime deve ter uma precisão e um recall
+conhecidos, e um novo detector chegando sem um exemplo é a lacuna que este job existe para mostrar.
 
     python3 scripts/detector_corpus.py [--floor 0.9] [--json]
 """
@@ -28,7 +29,7 @@ REPO_CORPUS = ROOT / "tests" / "fixtures" / "detector-corpus"
 
 
 def rule_pack():
-    """The rule pack module, which puts the vendored wheel on `sys.path` as it loads."""
+    """O módulo do pacote de regras, que coloca o wheel vendorizado em `sys.path` ao carregar."""
     spec = importlib.util.spec_from_file_location("harness_rule_detectors", str(PACK))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -36,12 +37,12 @@ def rule_pack():
 
 
 def ungated(pack):
-    """The whole registry with every stance gate removed.
+    """O registro inteiro com todo gate de postura removido.
 
-    The scorer runs a session with no stances, so a gated detector would be disabled over the
-    corpus and every positive it was labelled for would read as a miss. What the corpus
-    measures is the detector's judgment; whether a stance turns it on is configuration, and
-    `tests/test_rule_detectors.py` holds that half.
+    O pontuador roda uma sessão sem posturas, então um detector com gate ficaria desativado sobre
+    o corpus e todo positivo para o qual foi rotulado passaria como um erro. O que o corpus mede é
+    o julgamento do detector; se uma postura o liga é configuração, e
+    `tests/test_rule_detectors.py` guarda essa metade.
     """
     from ruleprobe.registry import Registry
 
@@ -50,11 +51,11 @@ def ungated(pack):
 
 
 def wheel_corpus(into):
-    """Where the engine's own corpus is, unpacked under `into` when it needs to be.
+    """Onde fica o próprio corpus do motor, desempacotado sob `into` quando necessário.
 
-    The wheel is imported straight off `sys.path` and never installed, so its corpus is a
-    member of a zip file and not a directory anything can walk. The scorer takes a path, so
-    the corpus is extracted for the run and thrown away after it.
+    O wheel é importado direto de `sys.path` e nunca instalado, então seu corpus é um membro de um
+    arquivo zip e não um diretório que algo possa percorrer. O pontuador recebe um caminho, então
+    o corpus é extraído para a execução e descartado depois dela.
     """
     import zipfile
 
@@ -73,19 +74,19 @@ def wheel_corpus(into):
 
 
 class CorpusRecordError(Exception):
-    """A `known_below_floor` entry that cannot be checked against a measurement."""
+    """Uma entrada de `known_below_floor` que não pode ser verificada contra uma medição."""
 
 
 def known_below_floor(path):
-    """`{detector_id: (floor, precision, recall)}` the repository corpus records as known bad.
+    """`{detector_id: (floor, precision, recall)}` que o corpus do repositório registra como conhecidamente ruim.
 
-    A detector that cannot reach the floor on an honest corpus keeps the floor and is written
-    down here with the score it measured and the floor it was measured against, rather than
-    the floor being lowered to meet it. All three are compared, not merely looked up, so an
-    entry that no longer describes the detector fails the job in either direction: a
-    regression and a quiet improvement are both news. Running at a lower floor than the entry
-    names leaves it dormant rather than stale - the record is still true of the 0.9 gate CI
-    runs, whatever a one-off `--floor 0.8` asked for.
+    Um detector que não consegue alcançar o piso num corpus honesto mantém o piso e é anotado aqui
+    com a pontuação medida e o piso contra o qual foi medido, em vez de o piso ser abaixado para
+    atendê-lo. Os três são comparados, não apenas consultados, então uma entrada que não descreve
+    mais o detector falha o job nas duas direções: uma regressão e uma melhora silenciosa são
+    ambas notícia. Rodar com um piso mais baixo que o nomeado pela entrada a deixa dormente em vez
+    de desatualizada - o registro continua verdadeiro para as execuções de CI com o gate de 0,9,
+    seja lá o que um `--floor 0.8` avulso pediu.
     """
     from ruleprobe.declarative import load
 
@@ -96,13 +97,13 @@ def known_below_floor(path):
 
 
 def measured(score):
-    """A score's precision and recall to two places, or a readable failure.
+    """A precisão e o recall de uma pontuação com duas casas, ou uma falha legível.
 
-    A `known_below_floor` entry for a detector the corpus does not label, or for an id that no
-    longer exists, arrives here as an unscored row or as no row at all. An unscored row still
-    answers 1.0 to both questions - a detector that never fired and never missed - so rounding
-    it would record a perfect score for something nobody measured. That is a corpus to fix,
-    not a number to round.
+    Uma entrada de `known_below_floor` para um detector que o corpus não rotula, ou para um id que
+    não existe mais, chega aqui como uma linha não pontuada ou como nenhuma linha. Uma linha não
+    pontuada ainda responde 1,0 às duas perguntas - um detector que nunca disparou e nunca errou -
+    então arredondá-la registraria uma pontuação perfeita para algo que ninguém mediu. Isso é um
+    corpus a corrigir, não um número a arredondar.
     """
     if score is None or not score.scored or score.precision is None or score.recall is None:
         raise CorpusRecordError(
@@ -112,7 +113,7 @@ def measured(score):
 
 
 def merge(parts):
-    """One `Score` per detector over every corpus scored."""
+    """Um `Score` por detector sobre todo corpus pontuado."""
     from ruleprobe.validity import Score
 
     out = {}
@@ -125,9 +126,9 @@ def merge(parts):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--floor", type=float, default=None, metavar="F",
-                        help="fail when a detector's precision or recall is under this")
+                        help="falha quando a precisão ou o recall de um detector fica abaixo disso")
     parser.add_argument("--json", action="store_true",
-                        help="print the merged scores as JSON instead of the tables")
+                        help="imprime as pontuações mescladas como JSON em vez das tabelas")
     args = parser.parse_args(argv)
 
     pack = rule_pack()

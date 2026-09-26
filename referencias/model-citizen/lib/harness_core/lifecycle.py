@@ -127,20 +127,21 @@ def invoke(name, event):
 
 
 def selected(name, fallback):
-    """One dimension's variant, resolved by the same file the policy hooks load."""
+    """A variante de uma dimensão, resolvida pelo mesmo arquivo que os hooks de política carregam."""
     return load("posture").selected(name, fallback)
 
 
 def investigating(runtime, event):
-    """Whether this call is plan-mode investigation the selected posture already authorises.
+    """Se esta chamada é investigação de modo plano que a postura selecionada já autoriza.
 
-    Plan mode exists to force a plan, questions and a wait before anything is executed. It is not
-    a reason to drop research below the permission posture the user chose for every other mode,
-    so under `bypass` or `auto` the harness answers for the commands native plan mode would
-    otherwise prompt on. Under `manual` and `inherit` it answers nothing new, and Codex is left
-    alone because its client rejects `allow` outright.
+    O modo plano existe para forçar um plano, perguntas e uma espera antes que qualquer coisa
+    seja executada. Não é motivo para reduzir a pesquisa abaixo da postura de permissão que o
+    usuário escolheu para todo outro modo, então sob `bypass` ou `auto` o harness responde pelos
+    comandos sobre os quais o modo plano nativo de outra forma perguntaria. Sob `manual` e
+    `inherit` não responde nada de novo, e o Codex é deixado de fora porque seu cliente rejeita
+    `allow` de bandeja.
 
-    Fails closed: a config that will not open is not a posture anybody selected.
+    Falha fechado: uma config que não abre não é uma postura que alguém selecionou.
     """
     if runtime != "claude-code" or event.get("permission_mode") != "plan":
         return False
@@ -152,10 +153,10 @@ def investigating(runtime, event):
 
 
 def plan_allowed_tool(tool):
-    """Whether `tool` matches a glob the user listed under `plan_allow_tools`.
+    """Se `tool` combina com um glob que o usuário listou sob `plan_allow_tools`.
 
-    Nothing is inferred from the tool name itself: a PreToolUse payload says nothing about
-    whether an MCP tool reads or writes, so the list is empty until the user fills it.
+    Nada é inferido do próprio nome da ferramenta: um payload de PreToolUse não diz nada sobre
+    se uma ferramenta MCP lê ou escreve, então a lista fica vazia até o usuário preenchê-la.
     """
     if not isinstance(tool, str) or not tool:
         return False
@@ -167,7 +168,7 @@ def plan_allowed_tool(tool):
 
 
 def constrained_role(name):
-    """The contract of `name` when it is a shared role an isolated worker must run, else None."""
+    """O contrato de `name` quando é um papel compartilhado que um worker isolado deve rodar, senão None."""
     if not (isinstance(name, str) and ROLE_NAME.fullmatch(name)):
         return None
     if not (ROOT / "primitives/roles" / (name + ".md")).is_file():
@@ -176,29 +177,31 @@ def constrained_role(name):
     try:
         fields, _ = catalog.role_contract(ROOT, name)
     except ValueError:
-        # A shipped contract that will not load is the one case the guard cannot judge, so it
-        # judges against itself. Refusing a native spawn of a role whose own file is broken costs
-        # a message; allowing one runs a constrained role unconfined, which is the defect this
-        # guard exists for. `UNRESOLVED` says so, and carries no class to bind a model with.
+        # Um contrato embutido que não carrega é o único caso que a proteção não consegue julgar,
+        # então ela julga contra si mesma. Recusar um disparo nativo de um papel cujo próprio
+        # arquivo está quebrado custa uma mensagem; permitir um roda um papel restrito sem
+        # confinamento, que é o defeito para o qual esta proteção existe. `UNRESOLVED` diz isso,
+        # e não carrega classe alguma para vincular a um modelo.
         return dict(UNRESOLVED, name=name)
     return fields if fields["authority"] in ("read-only", "artifact-write") else None
 
 
-# The authority is the safe assumption, not a reading of the file: nothing here came from one.
+# A autoridade é a suposição segura, não uma leitura do arquivo: nada aqui veio de um.
 UNRESOLVED = {"authority": "read-only", "unresolved": True}
 
 
-# A worker that may both read a workspace and reach the network can carry what it read back out,
-# so the isolated adapters hold every role to Read/Grep/Glob. Only `gatherer` is routinely asked
-# for online evidence, so only its refusal has somewhere else to send that half of the work.
+# Um worker que pode tanto ler um workspace quanto alcançar a rede pode carregar o que leu de
+# volta para fora, então os adaptadores isolados restringem todo papel a Read/Grep/Glob. Só
+# `gatherer` é rotineiramente solicitado a buscar evidência online, então só sua recusa tem para
+# onde enviar aquela metade do trabalho.
 OFFLINE_NOTE = {"gatherer": "An isolated gatherer is offline — Read, Grep and Glob, no WebFetch or "
                             "WebSearch — so send a file or repository dimension to the worker and a web "
                             "dimension to an in-session band worker (worker-a, worker-b or worker-c)."}
 
 
-# The one sentence the refusal, the `delegation` stance and the shared role descriptions all
-# carry, word for word, so a session that follows the stance is never surprised by the refusal
-# (issue #304). `tests/test_role_refusal_matches_the_stance.py` holds the three copies together.
+# A única frase que a recusa, a stance `delegation` e as descrições de papel compartilhadas
+# carregam, palavra por palavra, para que uma sessão que segue a stance nunca seja surpreendida
+# pela recusa (issue #304). `tests/test_role_refusal_matches_the_stance.py` mantém as três cópias juntas.
 CONFINEMENT_SENTENCE = ("A read-only role runs through `citizen role run <role>`: confinement is "
                         "read roots and return shape, not the absence of write tools, so `builder` "
                         "needs neither and spawns natively.")

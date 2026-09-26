@@ -66,15 +66,16 @@ def posture_record(root, runtime, fields, table, row, binding, overrides, model)
 
 
 def resolution(root, config, runtime, name, model=None, prompt=None):
-    """Everything a run resolves before it launches: contract, binding, instructions, posture.
+    """Tudo que uma execução resolve antes de lançar: contrato, binding, instruções, postura.
 
-    The cost variant reaches a worker through the same function and the same precedence the sync
-    path renders a native definition with — role defaults, then the variant's row, then
-    `role_bindings`, then an explicit `--model` — because the constrained roles are denied as
-    native spawns and only ever run here. The table is built non-strict: a variant with no row
-    for this role, or one that will not build at all, leaves the worker exactly as it was before
-    cost variants had rows. `prompt` is the caller's brief, priced when it states no budget of
-    its own; without one there is nothing to price.
+    A variante de custo alcança um worker através da mesma função e da mesma precedência com
+    que o caminho de sincronização renderiza uma definição nativa — padrões do papel, depois a
+    linha da variante, depois `role_bindings`, depois um `--model` explícito — porque os papéis
+    restritos são negados como disparos nativos e só rodam aqui. A tabela é construída não
+    estritamente: uma variante sem linha para este papel, ou uma que não constrói de jeito
+    nenhum, deixa o worker exatamente como estava antes de variantes de custo terem linhas.
+    `prompt` é o brief do chamador, precificado quando não declara orçamento próprio; sem um não
+    há nada para precificar.
     """
     if runtime not in RUNTIMES:
         raise ValueError("unsupported worker runtime")
@@ -123,12 +124,12 @@ def resolution(root, config, runtime, name, model=None, prompt=None):
 
 
 def session_selection(root, env=None):
-    """The selection the launching session resolves, recorded with the run; None without a resolver.
+    """A seleção que a sessão de lançamento resolve, registrada junto com a execução; None sem um resolvedor.
 
-    The worker's own environment is scrubbed, so it never re-reads a session file or
-    `HARNESS_STANCE_*`: the stances its instructions carry are the launching session's, and this
-    record is the evidence. Non-strict, because evidence must never stop a run the stance ladder
-    already allowed.
+    O próprio ambiente do worker é limpo, então nunca relê um arquivo de sessão nem
+    `HARNESS_STANCE_*`: as stances que suas instruções carregam são as da sessão de lançamento, e
+    este registro é a evidência. Não estrito, porque evidência nunca deve parar uma execução que
+    a escada de stances já permitiu.
     """
     module = catalog.posture_module(root)
     if module is None:
@@ -140,11 +141,11 @@ def session_selection(root, env=None):
 
 
 def session_fingerprint(root, env=None):
-    """The launching session's profile fingerprint, stamped on the run's ledger row; None without one.
+    """A fingerprint de perfil da sessão de lançamento, carimbada na linha de ledger da execução; None sem uma.
 
-    Taken from the same environment as `session_selection` and for the same reason: the worker
-    runs the launching session's profile. Never raises, since a missing stamp is an unattributed
-    row and never a reason to refuse a run.
+    Tirada do mesmo ambiente que `session_selection` e pela mesma razão: o worker roda o perfil
+    da sessão de lançamento. Nunca levanta exceção, já que um carimbo ausente é uma linha não
+    atribuída e nunca motivo para recusar uma execução.
     """
     module = catalog.posture_module(root)
     try:
@@ -154,10 +155,10 @@ def session_fingerprint(root, env=None):
 
 
 def switched_off(selection):
-    """`{kind: units set off}` for the rules, skills and roles a worker run is built from.
+    """`{kind: unidades desligadas}` para as regras, skills e papéis dos quais uma execução de worker é construída.
 
-    A worker is a projection like any other, so a unit the launching session switches off is
-    absent from it; a selection nobody could resolve switches nothing off.
+    Um worker é uma projeção como qualquer outra, então uma unidade que a sessão de lançamento
+    desliga fica ausente dela; uma seleção que ninguém conseguiu resolver não desliga nada.
     """
     selection = selection if isinstance(selection, dict) else {}
     return {kind: {unit for unit, value in (selection.get(kind) or {}).items() if value == "off"}
@@ -168,14 +169,14 @@ POLICY_DOC = re.compile(r"docs/[a-z0-9][a-z0-9.-]*\.md")
 
 
 def policy_reads(root, instructions, declared):
-    """The skills and documents the resolved policy tells this worker to open, as `(skills, docs)`.
+    """As skills e documentos que a política resolvida diz a este worker para abrir, como `(skills, docs)`.
 
-    Every rule and stance in that text points somewhere — "the `licensing-review` skill", "Lists:
-    `docs/preferences.md`" — and a worker that cannot follow the pointer is being told to obey a
-    policy it cannot read. So the set is derived from the text itself rather than maintained by
-    hand: a stance that stops citing a skill stops paying for it on the next run. `declared` is
-    the role's own `skills:` line, which adds what its body assumes but the shared text never
-    names.
+    Toda regra e stance nesse texto aponta para algum lugar — "a skill `licensing-review`",
+    "Listas: `docs/preferences.md`" — e um worker que não consegue seguir o ponteiro está sendo
+    instruído a obedecer uma política que não consegue ler. Então o conjunto é derivado do
+    próprio texto em vez de mantido à mão: uma stance que para de citar uma skill para de pagar
+    por ela na próxima execução. `declared` é a própria linha `skills:` do papel, que adiciona o
+    que seu corpo assume mas o texto compartilhado nunca nomeia.
     """
     available = sorted(p for p in (root / "primitives" / "skills").iterdir() if (p / "SKILL.md").is_file())
     cited = [p for p in available if re.search(r"\b" + re.escape(p.name) + r"\b", instructions)]
@@ -185,12 +186,12 @@ def policy_reads(root, instructions, declared):
 
 
 def est_tokens(chars):
-    """Characters to tokens, the tokenizer-free approximation. See CHARS_PER_TOKEN."""
+    """Caracteres para tokens, a aproximação sem tokenizador. Veja CHARS_PER_TOKEN."""
     return int(round(chars / CHARS_PER_TOKEN))
 
 
 def text_size(paths):
-    """Characters of every readable text file at or under these paths."""
+    """Caracteres de todo arquivo de texto legível nesses caminhos ou abaixo deles."""
     total = 0
     for path in paths:
         for item in [path] + (sorted(path.rglob("*")) if path.is_dir() else []):

@@ -670,11 +670,12 @@ def _encode_pre(runtime, original, normalized, results):
 
 
 def policy_file_result(runtime, event):
-    """The answer to a file-tool write to a governance policy file, or None.
+    """A resposta a uma escrita de ferramenta de arquivo num arquivo de política de governança, ou None.
 
-    Asked about in a prompting mode. Where nothing can prompt it is refused, and in Claude
-    Code's auto mode the refusal names an approval code for that exact edit, which the user's
-    `approve <code>` reply lets through once, as it does a Bash command `grade-bash` refused.
+    Perguntado num modo de prompt. Onde nada pode perguntar é recusado, e no modo auto do Claude
+    Code a recusa nomeia um código de aprovação para essa edição exata, que a resposta
+    `approve <code>` do usuário deixa passar uma vez, como faz com um comando Bash que
+    `grade-bash` recusou.
     """
     grader = load("grade-bash")
     guarded = grader.govern_file(event["tool_name"], event["tool_input"], patch_paths(event),
@@ -703,19 +704,21 @@ def patch_paths(event):
     if event["tool_name"] == "apply_patch":
         patch = inputs.get("command", inputs.get("patch", ""))
         if isinstance(patch, str):
-            # Every path a patch touches, deletions included: a delete-only patch that named no
-            # path would otherwise pass every guard on a file it removes.
+            # Todo caminho que um patch toca, exclusões incluídas: um patch só de exclusão que
+            # não nomeasse nenhum caminho de outra forma passaria por toda proteção num arquivo
+            # que remove.
             paths.extend(re.findall(r"^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$",
                                     patch, re.M))
     return sorted(set(str(Path(event.get("cwd") or os.getcwd()) / p) for p in paths if p))
 
 
 def store_write_deny(paths):
-    """The store guard without `approvals.py`, for when that module cannot load.
+    """A proteção do store sem `approvals.py`, para quando aquele módulo não consegue carregar.
 
-    Every file-tool call would otherwise fail on the load and be denied as unverified; this
-    refuses only a write under the approvals directory and lets the rest through. The path is
-    the one `approvals.store_dir` names, resolved here from the same environment."""
+    Toda chamada de ferramenta de arquivo de outra forma falharia no carregamento e seria negada
+    como não verificada; isto recusa só uma escrita sob o diretório de aprovações e deixa o resto
+    passar. O caminho é o mesmo que `approvals.store_dir` nomeia, resolvido aqui a partir do
+    mesmo ambiente."""
     home = os.environ.get("HARNESS_HOME") or os.environ.get("HOME") or str(Path.home())
     root = os.path.realpath(os.path.join(home, ".local", "state", "agent-harness", "approvals"))
     for path in paths:
@@ -738,17 +741,19 @@ def dispatch(runtime, payload):
 
 
 def _dispatch(runtime, payload):
-    """Compose the policies for one event. Logic that is not an `invoke` checks its owning id:
-    Bash grading, its ask and its decision log are `grade-bash`; plan-mode and read-only allows
-    are `allow-readonly-bash`; the integration notice is `tier-agent-spawns`. Role confinement,
-    by name, marker, framework mapping or evasion, has no id and runs with every hook off, as the
-    Workflow launch guard does: a switch routes spawns, it never unconfines a role."""
+    """Compõe as políticas para um evento. Lógica que não é um `invoke` verifica seu próprio id
+    dono: avaliação de Bash, seu ask e seu log de decisão são `grade-bash`; allows de modo plano e
+    somente leitura são `allow-readonly-bash`; o aviso de integração é `tier-agent-spawns`. O
+    confinamento de papel, por nome, marcador, mapeamento de framework ou evasão, não tem id e
+    roda com todo hook desligado, assim como a proteção de lançamento de Workflow: um switch
+    roteia disparos, nunca desconfina um papel."""
     event = normalize(payload)
     kind, tool = event.get("hook_event_name"), event.get("tool_name")
     if kind == "PreToolUse":
         results = []
-        # The store of approvals the user typed is the user's alone; `grade-bash` consumes it, so
-        # it guards it too. A Bash write to it is graded, a file-tool write is refused here.
+        # O store de aprovações que o usuário digitou pertence só ao usuário; `grade-bash` o
+        # consome, então também o protege. Uma escrita Bash nele é avaliada, uma escrita de
+        # ferramenta de arquivo é recusada aqui.
         if tool in FILE_TOOLS and enabled("grade-bash"):
             paths = patch_paths(event)
             try:

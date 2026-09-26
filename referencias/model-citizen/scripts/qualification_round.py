@@ -257,9 +257,9 @@ def main(argv=None):
         raise SystemExit("unknown qualification target: " + ", ".join(unknown))
     tier_routing = with_models(routing(targets, args.execution_class, args.assessment_class),
                                args.model)
-    # A target whose platform is not this host's is reported and left out, never run: the runner
-    # would refuse it, and a round driven here would otherwise write one platform's outcome under
-    # another's name.
+    # Um alvo cuja plataforma não é a deste host é relatado e deixado de fora, nunca rodado: o
+    # runner o recusaria, e uma rodada conduzida aqui senão escreveria o resultado de uma
+    # plataforma sob o nome de outra.
     elsewhere = dict((client, reason) for client, reason in
                      ((client, host_mismatch(client)) for client in targets) if reason)
     here = [client for client in targets if client not in elsewhere]

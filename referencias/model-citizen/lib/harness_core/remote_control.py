@@ -64,7 +64,7 @@ def settings(cfg):
 
 
 def folder_entry(raw, index):
-    """One `folders` entry as `(resolved path, {"spawn"?: mode, "env": {name: value}})`."""
+    """Uma entrada de `folders` como `(caminho resolvido, {"spawn"?: mode, "env": {name: value}})`."""
     where = f"remote_control.folders[{index}]"
     if isinstance(raw, str):
         raw = {"path": raw}
@@ -90,27 +90,28 @@ def folder_entry(raw, index):
 
 
 def folder_options(folder, opts):
-    """The block's options with one folder's own `spawn` and `env` laid over them."""
+    """As opções do bloco com o próprio `spawn` e `env` de uma pasta sobrepostos."""
     extra = (opts.get("folder_options") or {}).get(Path(folder), {})
     return {"spawn": extra.get("spawn", opts["spawn"]), "env": dict(extra.get("env") or {})}
 
 
 def label(folder):
-    """Stable launchd label: a readable slug plus a path hash, so two `api` folders never collide."""
+    """Rótulo launchd estável: um slug legível mais um hash de caminho, para que duas pastas `api` nunca colidam."""
     slug = re.sub(r"[^a-z0-9]+", "-", Path(folder).name.lower()).strip("-") or "folder"
     digest = hashlib.sha256(str(folder).encode("utf-8")).hexdigest()[:8]
     return f"{LABEL_PREFIX}{slug}-{digest}"
 
 
 def command(folder, opts, claude_bin):
-    # No `--no-create-session-in-dir`: Claude Code 2.1.280 reads the bridge pointer, and so
-    # reuses the environment on a relaunch, only while createSessionInDir is on. The session it
-    # pre-creates is reused across restarts for as long as the pointer stays fresh.
+    # Sem `--no-create-session-in-dir`: o Claude Code 2.1.280 lê o ponteiro de ponte, e por isso
+    # reutiliza o ambiente num relançamento, só enquanto createSessionInDir está ligado. A sessão
+    # que ele pré-cria é reutilizada entre reinícios enquanto o ponteiro se mantiver fresco.
     argv = [str(claude_bin), "remote-control", "--name", Path(folder).name,
             "--spawn", folder_options(folder, opts)["spawn"],
             "--permission-mode", opts["permission_mode"]]
     if opts["keep_awake"]:
-        # -i holds idle sleep, -s holds system sleep on AC power; neither survives a closed lid.
+        # -i segura o sono ocioso, -s segura o sono do sistema na energia AC; nenhum sobrevive a
+        # uma tampa fechada.
         argv = ["/usr/bin/caffeinate", "-is"] + argv
     return argv
 
@@ -139,11 +140,11 @@ def render(folder, opts, claude_bin, home, log_dir):
 
 
 def trusted(folder, claude_json):
-    """Whether Claude Code's workspace-trust dialog was accepted for this exact folder.
+    """Se o diálogo de confiança de workspace do Claude Code foi aceito para esta pasta exata.
 
-    A trusted parent does not trust a child: Claude Code keys trust by the directory it was
-    started in, so a host in an untrusted child exits at the prompt and launchd restarts that
-    refusal every minute forever.
+    Um pai confiável não confia num filho: o Claude Code chaveia a confiança pelo diretório em
+    que foi iniciado, então um host num filho não confiável sai no prompt e o launchd reinicia
+    essa recusa a cada minuto para sempre.
     """
     try:
         projects = json.loads(Path(claude_json).read_text(encoding="utf-8")).get("projects", {})

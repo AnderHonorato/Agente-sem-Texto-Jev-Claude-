@@ -1,54 +1,54 @@
-# <What gets built — a noun phrase, not a sentence>
+# <O que será construído — um sintagma nominal, não uma frase>
 
-> **Verdict.** <What this builds, one sentence.> <The mechanism, one sentence.>
-> **Effort** <n> · **Risk** <low/med/high — the one reason> · **Blast radius** <what it can break>
+> **Veredito.** <O que isto constrói, uma frase.> <O mecanismo, uma frase.>
+> **Esforço** <n> · **Risco** <baixo/médio/alto — a única razão> · **Raio de impacto** <o que pode quebrar>
 
-## At a glance
+## Em resumo
 
-- **Outcome** — What is true when this is done
-- **Approach** — The mechanism in one line
-- **Touches** — Repos, surfaces, file count
-- **New deps** — Name + license, or None
-- **Not in scope** — The 2–3 things a reader would assume are included
-- **Exit test** — How we know it worked
-- **Open question** — The one thing still unresolved, pointing at its decision number
+- **Resultado** — O que é verdade quando isto está pronto
+- **Abordagem** — O mecanismo em uma linha
+- **Toca** — Repositórios, superfícies, número de arquivos
+- **Novas dependências** — Nome + licença, ou Nenhuma
+- **Fora de escopo** — As 2–3 coisas que um leitor assumiria estarem incluídas
+- **Teste de saída** — Como sabemos que funcionou
+- **Questão em aberto** — A única coisa ainda não resolvida, apontando para seu número de decisão
 
-## System design
+## Design do sistema
 
 ```text
-Source ── what moves ──▶ *Transform ──▶ Sink
+Fonte ── o que se move ──▶ *Transformação ──▶ Destino
 ```
 
-<One caption line. `*` = new or changed.>
+<Uma linha de legenda. `*` = novo ou alterado.>
 
-## Steps
+## Passos
 
-1. **<The cheapest thing that could invalidate the rest>** — [file.ts](src/file.ts).
-   *Exit:* `pnpm test x` passes.
-2. **[<Step with detail>](#step-2--title)** — <what it touches>.
-   *Exit:* <a command, a render, or a passing assertion>.
+1. **<A coisa mais barata que poderia invalidar o resto>** — [file.ts](src/file.ts).
+   *Exit:* `pnpm test x` passa.
+2. **[<Passo com detalhe>](#step-2--title)** — <o que ele toca>.
+   *Exit:* <um comando, um render, ou uma asserção que passa>.
 
-## Decisions for the reviewer
+## Decisões para o revisor
 
-> **1. <Question, stated so it can be answered by number.>**
-> *Recommend* <option> — <the reason, one clause>.
-> *Alternative* <option> — <its honest case>.
+> **1. <Pergunta, declarada de forma que possa ser respondida por número.>**
+> *Recomendo* <opção> — <a razão, uma oração>.
+> *Alternativa* <opção> — <seu caso honesto>.
 
-## Risks
+## Riscos
 
-- **<Trigger>** — <what we do when it fires>.
+- **<Gatilho>** — <o que fazemos quando ele dispara>.
 
 ---
 
-# Addendum
+# Adendo
 
-Everything the implementing agent needs and the reviewer does not. Nothing above the rule is
-repeated here.
+Tudo que o agente implementador precisa e o revisor não precisa. Nada acima da régua é repetido
+aqui.
 
-## Step 2 — <title>
+## Passo 2 — <titulo>
 
-## Context and background
+## Contexto e background
 
-## Evidence and verification
+## Evidência e verificação
 
-## Deferred, and why
+## Adiado, e por quê

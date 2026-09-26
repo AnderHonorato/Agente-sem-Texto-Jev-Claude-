@@ -1,33 +1,33 @@
-"""Replay the decision log through the Jev pack and say how well the judgment tracked it.
+"""Reproduz o log de decisão através do pacote Jev e diz o quão bem o julgamento acompanhou.
 
-The labelled set is #370's decision log, not a synthetic one: real inputs, the answer the
-deterministic hook gave, and the outcome the session later showed. `grade-bash` writes a row
-only when the harness said `ask` or `deny`, so every label here answers one question — **did the
-user actually want to be asked?** `ran` is the user letting the command through and is read as
-`proceed`; `not_run` is the session ending without it and is read as `confirm`. Both readings
-are weaker than they look and the report says so: an approval after a prompt is evidence the
-prompt was unnecessary and not proof, and `decisions.py` says itself that a refusal, an
-interrupted turn and a crash are indistinguishable in `not_run`.
+O conjunto rotulado é o log de decisão da #370, não um sintético: entradas reais, a resposta que
+o hook determinístico deu, e o resultado que a sessão mostrou depois. `grade-bash` escreve uma
+linha só quando o harness disse `ask` ou `deny`, então todo rótulo aqui responde a uma pergunta —
+**o usuário realmente queria ser questionado?** `ran` é o usuário deixando o comando passar e é
+lido como `proceed`; `not_run` é a sessão terminando sem ele e é lido como `confirm`. Ambas as
+leituras são mais fracas do que parecem e o relatório diz isso: uma aprovação depois de um prompt
+é evidência de que o prompt era desnecessário e não uma prova, e o próprio `decisions.py` diz que
+uma recusa, um turno interrompido e uma travada são indistinguíveis em `not_run`.
 
-Four choices the rest of the module follows from.
+Quatro escolhas das quais o resto do módulo decorre.
 
-* **One replay, many thresholds.** Every case is asked at threshold zero, so a result carries
-  the raw judgment and its confidence; the threshold is applied here afterwards. Fitting a
-  threshold is then a sweep over one recorded set rather than one request per candidate.
-* **A threshold is per decision point and there is no default.** Published routing work finds
-  an optimal cutoff does not transfer between workloads, so a point with no dev cases is
-  reported unfitted rather than given the global 0.8 as if it had been measured.
-* **The split is seeded by content, never by `random`.** A case lands in `dev` or `heldout` by
-  the first bytes of the hash of the text that was judged, so the same command is always on the
-  same side, a re-run reproduces the split, and adding rows does not reshuffle the old ones.
-* **An error is never a pass.** `unavailable`, `error` and an abstention are counted in their
-  own column and are wrong for the purpose of accuracy; a report where they dominate says so in
-  the headline rather than in a rate over the handful that answered.
+* **Uma reprodução, muitos limiares.** Todo caso é perguntado no limiar zero, então um resultado
+  carrega o julgamento bruto e sua confiança; o limiar é aplicado aqui depois. Ajustar um limiar
+  é então uma varredura sobre um único conjunto gravado em vez de uma requisição por candidato.
+* **Um limiar é por ponto de decisão e não há padrão.** Trabalho publicado sobre roteamento
+  descobre que um corte ótimo não se transfere entre cargas de trabalho, então um ponto sem
+  casos de dev é reportado sem ajuste em vez de receber o 0,8 global como se tivesse sido medido.
+* **A divisão é semeada pelo conteúdo, nunca por `random`.** Um caso cai em `dev` ou `heldout`
+  pelos primeiros bytes do hash do texto que foi julgado, então o mesmo comando está sempre do
+  mesmo lado, uma nova execução reproduz a divisão, e adicionar linhas não embaralha as antigas.
+* **Um erro nunca é um acerto.** `unavailable`, `error` e uma abstenção são contados em sua
+  própria coluna e são errados para o propósito de acurácia; um relatório onde eles dominam diz
+  isso no título em vez de numa taxa sobre o punhado que respondeu.
 
-Nothing here writes to the decision ledger, and with `--replay` nothing here opens a socket:
-the client is `jev.ReplayClient` over a recorded fixture. `--live` is the opt-in path and needs
-an explicit request ceiling; the allowlist it sends under is the user's own configuration, so an
-evaluation cannot send a field the user never allowed a hook to send.
+Nada aqui escreve no ledger de decisão, e com `--replay` nada aqui abre um socket: o cliente é
+`jev.ReplayClient` sobre um fixture gravado. `--live` é o caminho de opt-in e exige um teto de
+requisições explícito; a allowlist sob a qual ele envia é a própria configuração do usuário,
+então uma avaliação não pode enviar um campo que o usuário nunca permitiu que um hook enviasse.
 """
 import hashlib
 import json
@@ -44,21 +44,21 @@ ABSTAIN = "abstain"
 DEV = "dev"
 HELDOUT = "heldout"
 SPLITS = (DEV, HELDOUT)
-# Half and half. A held-out half of a log this size is small, and a smaller one would make the
-# only number anybody should quote the noisier of the two.
+# Metade e metade. Uma metade reservada de um log deste tamanho já é pequena, e uma menor
+# tornaria o único número que alguém deveria citar mais ruidoso dos dois.
 DEV_SHARE = 0.5
 
-# What a recorded outcome says about the judgment that preceded it, per point, in the
-# vocabulary each hook actually writes. Anything else is unlabelled and is counted as such: a
-# label this module invented would be a number nobody measured. `untrusted`, `timeout` and
-# `unverified` are stop-gate rows where the gate never produced a verdict, so they say nothing
-# about the judgment either way.
+# O que um resultado gravado diz sobre o julgamento que o precedeu, por ponto, no vocabulário
+# que cada hook de fato escreve. Qualquer outra coisa não é rotulada e é contada como tal: um
+# rótulo que este módulo inventasse seria um número que ninguém mediu. `untrusted`, `timeout` e
+# `unverified` são linhas do stop-gate onde o portão nunca produziu um veredito, então elas não
+# dizem nada sobre o julgamento de nenhuma forma.
 OUTCOME_LABELS = {
     "grade-bash": {"ran": PROCEED, "not_run": CONFIRM},
     "stop-gate": {"passed": PROCEED, "failed": CONFIRM},
 }
-# The deterministic answers, per point, that mean "the turn was stopped". `deny` is stronger
-# than a confirmation, but on this axis — interrupted or not — it agrees with `ask`.
+# As respostas determinísticas, por ponto, que significam "o turno foi interrompido". `deny` é
+# mais forte que uma confirmação, mas neste eixo — interrompido ou não — concorda com `ask`.
 DETERMINISTIC_CONFIRM = {
     "grade-bash": ("ask", "deny"),
     "stop-gate": ("blocked",),
@@ -66,17 +66,18 @@ DETERMINISTIC_CONFIRM = {
     "brief-guard": ("cap", "budget", "cap+budget"),
 }
 
-# The decision log records the text a hook judged and not an action class, so the replay
-# derives one per point. `grade-bash` is a shell command; the rest judge a turn or a brief,
-# which is the nearest class the contract offers and is stated in the report as a derivation.
+# O log de decisão registra o texto que um hook julgou e não uma classe de ação, então a
+# reprodução deriva uma por ponto. `grade-bash` é um comando shell; o resto julga um turno ou um
+# brief, que é a classe mais próxima que o contrato oferece e é declarado no relatório como uma
+# derivação.
 POINT_ACTIONS = {"grade-bash": "coding.shell_exec", "stop-gate": "coding.shell_exec",
                  "evasion-deny": "coding.shell_exec", "brief-guard": "coding.file_write",
                  "tier-agent-spawns": "coding.file_write"}
 DEFAULT_ACTION = "coding.shell_exec"
-# "an unknown grade is judged as 1", the same reading the pack's own grade scale states.
+# "uma nota desconhecida é julgada como 1", a mesma leitura que a escala de notas do próprio pacote declara.
 DEFAULT_GRADE = 1
 
-# Source keys whose value is a path and is reduced to its file name before it is written.
+# Chaves de origem cujo valor é um caminho e é reduzido ao seu nome de arquivo antes de ser escrito.
 PATH_FIELDS = ("log", "replay")
 
 CALIBRATION_BINS = 10
@@ -84,25 +85,26 @@ BOOTSTRAP_RESAMPLES = 200
 
 
 class EvalError(ValueError):
-    """A run this module will not make, or a report it will not write."""
+    """Uma execução que este módulo não fará, ou um relatório que não vai escrever."""
 
 
-# ------------------------------------------------------------------ the split
+# ------------------------------------------------------------------ a divisão
 
 
 def content_key(point: str, text: str) -> str:
-    """The identity a case is split by: the point and the text a request would actually carry.
+    """A identidade pela qual um caso é dividido: o ponto e o texto que uma requisição de fato carregaria.
 
-    Not the row's `input_sha256`. That hash is over the uncapped command, and the replay builds
-    its request from the capped `input` the row holds, so two rows that differ only past the
-    2 KiB cap share one request and would otherwise land on opposite sides of the split — the
-    same request in dev and in held-out, which is the leak a held-out set exists to prevent.
+    Não o `input_sha256` da linha. Esse hash é sobre o comando sem o teto, e a reprodução
+    constrói sua requisição a partir do `input` já limitado a 2 KiB que a linha guarda, então
+    duas linhas que diferem só além do teto compartilham uma requisição e de outra forma
+    cairiam em lados opostos da divisão — a mesma requisição em dev e em heldout, que é o
+    vazamento que um conjunto reservado existe para prevenir.
     """
     return hashlib.sha256((str(point) + "\x00" + str(text)).encode("utf-8", "replace")).hexdigest()
 
 
 def split_for(content_hash: str, dev_share: float = DEV_SHARE) -> str:
-    """`dev` or `heldout`, from the content hash alone. No clock, no `random`, no order."""
+    """`dev` ou `heldout`, apenas a partir do hash de conteúdo. Sem relógio, sem `random`, sem ordem."""
     if not isinstance(content_hash, str) or len(content_hash) < 8:
         raise EvalError("a split needs a content hash to be seeded by")
     if isinstance(dev_share, bool) or not isinstance(dev_share, (int, float)) \
@@ -113,14 +115,14 @@ def split_for(content_hash: str, dev_share: float = DEV_SHARE) -> str:
 
 
 class _Stream:
-    """Indices drawn from a digest, for the bootstrap below.
+    """Índices tirados de um digest, para o bootstrap abaixo.
 
-    `random` is seeded from the clock unless a caller remembers not to let it be, and a report
-    that moves between runs is not the evidence this command exists to produce. A hash per draw
-    rather than a linear congruential generator: an LCG modulo 2**32 has a low bit of period 2
-    and a low nibble of period 16, so `state % n` for a power-of-two `n` walks the indices in a
-    cycle and every resample comes out a permutation of the sample — a bootstrap that resamples
-    nothing and reports an interval of width zero.
+    `random` é semeado pelo relógio a menos que um chamador se lembre de não deixar, e um
+    relatório que muda entre execuções não é a evidência que este comando existe para produzir.
+    Um hash por tiragem em vez de um gerador congruente linear: um LCG módulo 2**32 tem um bit
+    baixo de período 2 e um nibble baixo de período 16, então `state % n` para um `n` potência de
+    dois percorre os índices num ciclo e toda reamostra sai como uma permutação da amostra — um
+    bootstrap que não reamostra nada e reporta um intervalo de largura zero.
     """
 
     def __init__(self, seed: str):
@@ -133,16 +135,16 @@ class _Stream:
         return int(digest[:16], 16) % max(ceiling, 1)
 
 
-# ------------------------------------------------------------------ cases
+# ------------------------------------------------------------------ casos
 
 
 def cases_from_rows(rows: List[Dict[str, Any]], point: Optional[str] = None,
                     dev_share: float = DEV_SHARE) -> List[Dict[str, Any]]:
-    """Every joined decision row that can be replayed, as a case. Oldest first.
+    """Toda linha de decisão unida que pode ser reproduzida, como um caso. Mais antiga primeiro.
 
-    A row with no input text cannot be replayed at all and is dropped; a row whose outcome is
-    not one this module knows how to read is kept, unlabelled, so the report can say how much
-    of the log is not yet evidence.
+    Uma linha sem texto de entrada não pode ser reproduzida de forma alguma e é descartada; uma
+    linha cujo resultado não é um que este módulo sabe ler é mantida, sem rótulo, para que o
+    relatório possa dizer quanto do log ainda não é evidência.
     """
     out = []
     for row in rows:
@@ -166,11 +168,12 @@ def cases_from_rows(rows: List[Dict[str, Any]], point: Optional[str] = None,
 
 
 def check_no_leak(results: List[Dict[str, Any]]) -> None:
-    """Raise unless every request hash sits on one side of the split.
+    """Levanta exceção a menos que toda requisição hash esteja de um lado só da divisão.
 
-    The split key is built to make this impossible, so a failure here is the key and the request
-    having drifted apart rather than a bad log — and a held-out number measured on a request the
-    threshold was fitted against is worth nothing, so it is a refusal and not a warning.
+    A chave de divisão é construída para tornar isso impossível, então uma falha aqui é a chave
+    e a requisição tendo se afastado uma da outra em vez de um log ruim — e um número reservado
+    medido sobre uma requisição contra a qual o limiar foi ajustado não vale nada, então é uma
+    recusa e não um aviso.
     """
     sides = {}
     for result in results:
@@ -186,11 +189,11 @@ def check_no_leak(results: List[Dict[str, Any]]) -> None:
 
 def case_state(case: Dict[str, Any], allowlist: controls.Controls,
                counterparty: str) -> Dict[str, Any]:
-    """The request state for one case, built by the provider's own state builder.
+    """O estado de requisição para um caso, construído pelo próprio construtor de estado do provedor.
 
-    Through `jev.decision_state`, not beside it: a field this configuration does not allow out
-    must be as absent from a replayed request as from a live one, and the only way to be sure of
-    that is to use the same code.
+    Através de `jev.decision_state`, não ao lado dele: um campo que esta configuração não
+    permite sair precisa estar tão ausente de uma requisição reproduzida quanto de uma real, e a
+    única forma de ter certeza disso é usar o mesmo código.
     """
     action = decision.Action(action_class=case["action_class"], grade=DEFAULT_GRADE)
     return jev.decision_state(action, counterparty, {"command": case["input"]}, allowlist)
@@ -198,13 +201,13 @@ def case_state(case: Dict[str, Any], allowlist: controls.Controls,
 
 def shadow_controls(state_fields=controls.STATE_FIELDS, configured: bool = False,
                     **kwargs) -> controls.Controls:
-    """Controls with every point in `shadow` and nothing else changed.
+    """Controles com todo ponto em `shadow` e nada mais alterado.
 
-    `shadow` is the only mode an evaluation may run under: it is the mode whose answer reaches
-    the ledger and neither the model nor the user, which is what makes a measurement a
-    measurement rather than a change of behaviour on a live machine. `judge` checks the modes
-    these carry rather than what `mode_for` resolves to, because `mode_for` reads the kill
-    switch and a replay makes no request for a kill switch to stop.
+    `shadow` é o único modo sob o qual uma avaliação pode rodar: é o modo cuja resposta chega ao
+    ledger e nem ao modelo nem ao usuário, o que é o que torna uma medição uma medição em vez de
+    uma mudança de comportamento numa máquina real. `judge` verifica os modos que estes carregam
+    em vez do que `mode_for` resolve, porque `mode_for` lê o interruptor de emergência e uma
+    reprodução não faz nenhuma requisição para um interruptor de emergência parar.
     """
     return controls.Controls(default_mode="shadow",
                              modes=dict((point, "shadow") for point in controls.POINTS),
@@ -215,11 +218,11 @@ def judge(cases: List[Dict[str, Any]], client, pack: packs.Pack,
           allowlist: Optional[controls.Controls] = None, counterparty: str = "repo:eval/replay",
           model: str = jev.DEFAULT_MODEL,
           budget: Optional[jev.Budget] = None) -> List[Dict[str, Any]]:
-    """Ask the pack about every case, at threshold zero. Returns the cases with results on them.
+    """Pergunta ao pacote sobre cada caso, no limiar zero. Retorna os casos com resultados anexados.
 
-    Threshold zero because the threshold is what this run is trying to fit: `jev.ask` would
-    report a below-threshold answer as `unknown` and throw away the confidence the sweep needs.
-    The status is recomputed here at each candidate instead.
+    Limiar zero porque o limiar é o que esta execução está tentando ajustar: `jev.ask` reportaria
+    uma resposta abaixo do limiar como `unknown` e descartaria a confiança de que a varredura
+    precisa. O status é recalculado aqui a cada candidato em vez disso.
     """
     allowlist = shadow_controls() if allowlist is None else allowlist
     configured = set([allowlist.default_mode]) | set(allowlist.modes.values())
@@ -243,22 +246,22 @@ def judge(cases: List[Dict[str, Any]], client, pack: packs.Pack,
     return out
 
 
-# ------------------------------------------------------------------ metrics
+# ------------------------------------------------------------------ métricas
 
 
 def deterministic_of(result: Dict[str, Any]) -> str:
-    """The deterministic answer on this row, as `confirm` or `proceed`."""
+    """A resposta determinística nesta linha, como `confirm` ou `proceed`."""
     confirming = DETERMINISTIC_CONFIRM.get(str(result.get("point") or ""), ())
     return CONFIRM if result.get("deterministic_answer") in confirming else PROCEED
 
 
 def used_judgment(result: Dict[str, Any], threshold: float) -> bool:
-    """Whether the judgment answers at this threshold, or the deterministic answer does.
+    """Se o julgamento responde neste limiar, ou se a resposta determinística responde.
 
-    `unknown`, a confidence below the threshold and no judgment at all are the same thing to the
-    provider: the deterministic decision stands. This is the line the fit has to score against.
-    Scoring an abstention as a miss would make every threshold above the lowest confidence look
-    worse than it is, and drive the fit to the floor whatever the answers said.
+    `unknown`, uma confiança abaixo do limiar e nenhum julgamento algum são a mesma coisa para o
+    provedor: a decisão determinística permanece. Esta é a linha contra a qual o ajuste precisa
+    ser pontuado. Pontuar uma abstenção como um erro faria todo limiar acima da confiança mais
+    baixa parecer pior do que é, e levaria o ajuste ao chão não importa o que as respostas dissessem.
     """
     judgment, confidence = result.get("judgment"), result.get("confidence")
     return (judgment is not None and judgment != jev.UNKNOWN
@@ -266,15 +269,15 @@ def used_judgment(result: Dict[str, Any], threshold: float) -> bool:
 
 
 def effective_answer(result: Dict[str, Any], threshold: float) -> str:
-    """What the harness would have answered with this judgment at this threshold."""
+    """O que o harness teria respondido com este julgamento neste limiar."""
     return result["judgment"] if used_judgment(result, threshold) else deterministic_of(result)
 
 
 def predict(result: Dict[str, Any], threshold: float) -> Optional[str]:
-    """The judgment's own call, or `abstain` where the deterministic answer takes over.
+    """A própria decisão do julgamento, ou `abstain` onde a resposta determinística assume.
 
-    The judgment-level view, for reading how often the provider had anything to say at all.
-    `effective_answer` is what is scored.
+    A visão em nível de julgamento, para ler com que frequência o provedor tinha algo a dizer.
+    `effective_answer` é o que é pontuado.
     """
     judgment, confidence = result.get("judgment"), result.get("confidence")
     if judgment is None or confidence is None:
@@ -283,7 +286,7 @@ def predict(result: Dict[str, Any], threshold: float) -> Optional[str]:
 
 
 def _counted(results, threshold):
-    """`(correct, agreed, confusion)` over the labelled results, under provider semantics."""
+    """`(correct, agreed, confusion)` sobre os resultados rotulados, sob a semântica do provedor."""
     correct = agreed = 0
     confusion = {}
     for result in results:
@@ -301,14 +304,14 @@ def _counted(results, threshold):
 
 
 def fit_threshold(results: List[Dict[str, Any]]) -> Optional[float]:
-    """The threshold with the best accuracy on these results, or None when none can be fitted.
+    """O limiar com a melhor acurácia sobre estes resultados, ou None quando nenhum pode ser ajustado.
 
-    Scored under provider semantics through `effective_answer`: below the threshold the
-    deterministic answer is what is compared against the label, because that is what the harness
-    would have done. Candidates are the confidences actually observed, so the sweep only ever
-    tries a cutoff that changes an answer. Ties go to the higher threshold: two cutoffs that
-    score the same on this split are not equally good, and the one that overrides fewer
-    deterministic answers is the one whose mistakes are cheaper.
+    Pontuado sob a semântica do provedor através de `effective_answer`: abaixo do limiar a
+    resposta determinística é o que é comparado contra o rótulo, porque é o que o harness teria
+    feito. Os candidatos são as confianças de fato observadas, então a varredura só tenta um
+    corte que muda uma resposta. Empates vão para o limiar mais alto: dois cortes que pontuam
+    igual nesta divisão não são igualmente bons, e o que sobrepõe menos respostas
+    determinísticas é o cujos erros são mais baratos.
     """
     labelled = [r for r in results if r.get("label")]
     if not labelled or not any(r.get("confidence") is not None for r in labelled):
@@ -326,12 +329,12 @@ def fit_threshold(results: List[Dict[str, Any]]) -> Optional[float]:
 
 
 def calibration(results: List[Dict[str, Any]], bins: int = CALIBRATION_BINS) -> Dict[str, Any]:
-    """Bin the judged cases by confidence and compare each bin's confidence to its accuracy.
+    """Divide os casos julgados por confiança em bins e compara a confiança de cada bin à sua acurácia.
 
-    The figure is the expected calibration error: the weighted mean of that gap. It is reported
-    over the raw judgment rather than the thresholded one, because the question it answers is
-    whether the number the service calls a confidence behaves like one — which has to be true
-    before a threshold over it means anything.
+    A cifra é o erro de calibração esperado: a média ponderada dessa diferença. É reportada sobre
+    o julgamento bruto em vez do já submetido ao limiar, porque a pergunta que responde é se o
+    número que o serviço chama de confiança se comporta como uma — o que precisa ser verdade
+    antes que um limiar sobre ele signifique qualquer coisa.
     """
     judged = [r for r in results if r.get("label") and r.get("confidence") is not None
               and r.get("judgment") is not None]
@@ -370,11 +373,11 @@ def _ece(judged, bins):
 
 
 def _ece_interval(judged, bins):
-    """A percentile bootstrap interval on the calibration error, or None under two cases.
+    """Um intervalo de bootstrap por percentil sobre o erro de calibração, ou None com menos de dois casos.
 
-    An interval is the difference between "0.08" and "0.08, and a re-sample of this log could
-    as easily have said 0.2". The resample stream is seeded from the cases themselves, so the
-    interval is a property of the input and not of when the command was run.
+    Um intervalo é a diferença entre "0.08" e "0.08, e uma reamostra deste log poderia com a
+    mesma facilidade ter dito 0.2". O fluxo de reamostra é semeado pelos próprios casos, então o
+    intervalo é uma propriedade da entrada e não de quando o comando foi rodado.
     """
     if len(judged) < 2:
         return None
@@ -405,13 +408,13 @@ def _percentile(values, share):
 def metrics(results: List[Dict[str, Any]], threshold: Optional[float],
             bins: int = CALIBRATION_BINS, usd_per_mtok: Optional[float] = None,
             timed: bool = False) -> Dict[str, Any]:
-    """Everything the report says about one point on one split.
+    """Tudo o que o relatório diz sobre um ponto numa divisão.
 
-    `accuracy` counts a case correct only when the judgment named the label. An error, an
-    unavailable case and an abstention are each in `unusable` and none of them is a pass, so a
-    run that mostly failed reads as a low accuracy rather than as a high one over the few that
-    answered; `accuracy_judged` is the same rate over the cases that did answer, for reading the
-    two apart.
+    `accuracy` conta um caso como correto só quando o julgamento nomeou o rótulo. Um erro, um
+    caso indisponível e uma abstenção estão cada um em `unusable` e nenhum deles é um acerto,
+    então uma execução que em sua maioria falhou lê como uma acurácia baixa em vez de uma alta
+    sobre o punhado que respondeu; `accuracy_judged` é a mesma taxa sobre os casos que de fato
+    responderam, para ler as duas separadamente.
     """
     labelled = [r for r in results if r.get("label")]
     judged = [r for r in labelled
@@ -437,14 +440,14 @@ def metrics(results: List[Dict[str, Any]], threshold: Optional[float],
                             if threshold is not None and judged else None),
         "agreement_deterministic": (round(agreed / float(len(labelled)), 4)
                                     if threshold is not None and labelled else None),
-        # The baseline the issue asks for: what the deterministic answer alone scores on the
-        # same labels. A judgment that does not beat this is not worth a request.
+        # A linha de base que a issue pede: o que a resposta determinística sozinha pontua nos
+        # mesmos rótulos. Um julgamento que não supera isso não vale uma requisição.
         "deterministic_accuracy": (round(sum(1 for r in labelled
                                              if deterministic_of(r) == r["label"])
                                          / float(len(labelled)), 4) if labelled else None),
-        # How many labelled cases the provider could have changed at all: it may tighten an
-        # allow into an ask and may never widen one, so a row the hook already asked about is
-        # one the judgment cannot move whatever it says.
+        # Quantos casos rotulados o provedor sequer poderia ter mudado: ele pode apertar um allow
+        # para um ask e nunca alargar um, então uma linha sobre a qual o hook já perguntou é uma
+        # que o julgamento não pode mover seja o que ele disser.
         "provider_could_change": sum(1 for r in labelled if deterministic_of(r) == PROCEED),
         "confusion": confusion,
         "calibration": calibration(results, bins),
@@ -457,9 +460,9 @@ def metrics(results: List[Dict[str, Any]], threshold: Optional[float],
         },
         "input_tokens": sum(tokens), "output_tokens": sum(output),
         "usd_per_1000_decisions": cost,
-        # Null unless the client was the live one: a replay's latency is this runner's, and a
-        # number that answers a different question from the one its name asks is worse than
-        # none. It is also what keeps a replayed report byte-identical between runs.
+        # Nulo a menos que o cliente fosse o real: a latência de uma reprodução é deste
+        # executor, e um número que responde a uma pergunta diferente da que seu nome pede é
+        # pior que nenhum. É também o que mantém um relatório reproduzido byte-idêntico entre execuções.
         "latency_ms": {"p50": _percentile(latencies, 0.5) if timed else None,
                        "p95": _percentile(latencies, 0.95) if timed else None,
                        "measured": bool(timed)},
@@ -468,11 +471,11 @@ def metrics(results: List[Dict[str, Any]], threshold: Optional[float],
 
 
 def flip_rate(passes: List[List[Dict[str, Any]]]) -> Dict[str, Any]:
-    """The share of cases whose judgment was not the same in every pass.
+    """A fração de casos cujo julgamento não foi o mesmo em toda passagem.
 
-    Over a replay this is zero by construction and the report says which source it came from: a
-    recorded response cannot disagree with itself, so a zero here is evidence about the runner
-    and not about the service.
+    Sobre uma reprodução isso é zero por construção e o relatório diz de qual fonte veio: uma
+    resposta gravada não pode discordar de si mesma, então um zero aqui é evidência sobre o
+    executor e não sobre o serviço.
     """
     if len(passes) < 2:
         return {"passes": len(passes), "rate": None, "cases": 0}
@@ -486,7 +489,7 @@ def flip_rate(passes: List[List[Dict[str, Any]]]) -> Dict[str, Any]:
             "rate": round(flipped / float(len(first)), 4) if first else None}
 
 
-# ------------------------------------------------------------------ the run
+# ------------------------------------------------------------------ a execução
 
 
 def report(rows: List[Dict[str, Any]], client, pack: Optional[packs.Pack] = None,
@@ -496,13 +499,13 @@ def report(rows: List[Dict[str, Any]], client, pack: Optional[packs.Pack] = None
            budget: Optional[jev.Budget] = None,
            usd_per_mtok: Optional[float] = None,
            source: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """The whole evaluation as a JSON-safe dict. Carries no clock, so a re-run is byte-identical.
+    """A avaliação inteira como um dict seguro para JSON. Não carrega relógio, então uma nova execução é byte-idêntica.
 
-    Per point: the threshold fitted on `dev`, then that threshold's metrics on both splits.
-    Only the held-out block is evidence of anything; the dev block is in the file so a reader
-    can see how far the fitted split flatters the fit, and is labelled as the fitted one. A
-    point with no labelled dev case is reported with a null threshold and null rates —
-    unfitted is a finding, and a global default dressed up as a measurement is not.
+    Por ponto: o limiar ajustado em `dev`, depois as métricas desse limiar em ambas as
+    divisões. Só o bloco reservado é evidência de qualquer coisa; o bloco de dev está no arquivo
+    para que um leitor veja o quanto a divisão ajustada favorece o ajuste, e é rotulado como o
+    ajustado. Um ponto sem caso de dev rotulado é reportado com limiar nulo e taxas nulas — sem
+    ajuste é um achado, e um padrão global travestido de medição não é.
     """
     pack = packs.get(packs.DECISION_ID) if pack is None else pack
     if isinstance(bins, bool) or not isinstance(bins, int) or bins < 1:
@@ -534,8 +537,8 @@ def report(rows: List[Dict[str, Any]], client, pack: Optional[packs.Pack] = None
         }
     return {
         "pack": pack.identity(),
-        # File names only. A report is an artifact somebody sends on, and an absolute path
-        # carries the home directory it was produced under into it.
+        # Só nomes de arquivo. Um relatório é um artefato que alguém repassa adiante, e um
+        # caminho absoluto carregaria junto o diretório home sob o qual foi produzido.
         "source": dict({"rows": len(rows), "cases": len(cases),
                         "labelled": sum(1 for c in cases if c["label"]),
                         "point": point or "(all)"},
@@ -565,11 +568,11 @@ CAVEATS = (
 
 
 def render(data: Dict[str, Any], split: str = HELDOUT) -> List[str]:
-    """The report as lines, for a terminal. The file is the artifact; this is the glance.
+    """O relatório como linhas, para um terminal. O arquivo é o artefato; isto é o relance rápido.
 
-    Held-out by default, and the only side that is evidence. `split="dev"` prints the fitted
-    side with a line saying so, because a rate on the split a threshold was chosen on measures
-    the choosing and not the provider; the file carries both either way.
+    Reservado (`heldout`) por padrão, e o único lado que é evidência. `split="dev"` imprime o
+    lado ajustado com uma linha dizendo isso, porque uma taxa sobre a divisão em que um limiar
+    foi escolhido mede a escolha e não o provedor; o arquivo carrega ambos de qualquer forma.
     """
     split = split if split in SPLITS else HELDOUT
     pack = data["pack"]
@@ -607,7 +610,7 @@ def _cell(value):
 
 
 def write(data: Dict[str, Any], path) -> str:
-    """Write the report and return the path. Sorted and indented, so a diff of two runs reads."""
+    """Escreve o relatório e retorna o caminho. Ordenado e indentado, para que um diff de duas execuções se leia bem."""
     target = str(path)
     with open(target, "w", encoding="utf-8") as stream:
         stream.write(json.dumps(data, indent=2, sort_keys=True) + "\n")

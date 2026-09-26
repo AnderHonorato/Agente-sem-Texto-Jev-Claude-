@@ -1,94 +1,112 @@
-This is a real 884-line plan reduced to its Review Card. Every fact below already existed in
-that file — it was spread across 590 lines before the first thing the reviewer had to decide.
-Nothing was invented to shorten it. Names are changed; the shape is not.
+Este é um plano real de 884 linhas reduzido ao seu Review Card. Todo fato abaixo já existia
+naquele arquivo — estava espalhado por 590 linhas antes da primeira coisa que o revisor precisava
+decidir. Nada foi inventado para encurtá-lo. Nomes foram trocados; a forma não.
 
 ---
 
-# Design run 2 — four-handoff integration
+# Execução de design 2 — integração de quatro handoffs
 
-> **Verdict.** Reconciles four parallel agents' handoffs into one board, one decisions ledger and
-> one ordered review queue, verifying every closing claim against the repos instead of relaying it.
-> Phase 0 records verified state on "build"; publication and every status change wait on a gate.
-> **Effort** one session + ~80 min of review · **Risk** med — two unpublished submissions
-> both write the shared `terrain` object · **Blast radius** planning-repo commits only
+> **Veredito.** Reconcilia os handoffs de quatro agentes paralelos num único board, um único
+> registro de decisões e uma única fila de revisão ordenada, verificando toda alegação de
+> fechamento contra os repositórios em vez de retransmiti-la.
+> A Fase 0 registra o estado verificado no "build"; publicação e toda mudança de status esperam
+> um gate.
+> **Esforço** uma sessão + ~80 min de revisão · **Risco** médio — duas submissões não publicadas
+> ambas escrevem o objeto compartilhado `terrain` · **Raio de impacto** apenas commits no
+> repositório de planejamento
 
-## At a glance
+## Em resumo
 
-- **Outcome** — One board, one ledger, one ordered review queue. Nothing published, nothing `done`
-- **Approach** — Check every claim against repo, hash, commit and render, then one central edit pass
-- **Touches** — the planning repo (board, `decisions.md`); the art repo read-only; 4 handoff records
-- **New deps** — None. Gate 2 adds two CC0-1.0 asset packs, already manifested
-- **Not in scope** — Publishing any submission · Gate 3+ · track C1c · any item reaching `done`
-- **Exit test** — Counts recomputed once centrally and reconciling to 104 items; every status change carries a linked, **Mock**-labelled artifact
-- **Open question** — Who publishes, and in what order — decisions 2 and 3
+- **Resultado** — Um board, um registro, uma fila de revisão ordenada. Nada publicado, nada `done`
+- **Abordagem** — Checar toda alegação contra o repositório, hash, commit e render, depois uma
+  passada de edição central
+- **Toca** — o repositório de planejamento (board, `decisions.md`); o repositório de arte
+  somente-leitura; 4 registros de handoff
+- **Novas dependências** — Nenhuma. O Gate 2 adiciona dois pacotes de asset CC0-1.0, já
+  manifestados
+- **Fora de escopo** — Publicar qualquer submissão · Gate 3+ · trilha C1c · qualquer item chegando
+  a `done`
+- **Teste de saída** — Contagens recomputadas uma vez centralmente e reconciliando para 104
+  itens; toda mudança de status carrega um artefato vinculado e rotulado como **Mock**
+- **Questão em aberto** — Quem publica, e em que ordem — decisões 2 e 3
 
-## System design
+## Design do sistema
 
 ```text
-H1 Structures ──┐
-H2 Water ───────┤
-H3 Vegetation ──┼─▶ Verify against repos
-H4 Settlements ─┘     ├── verified claims ──▶ Board + decisions.md
-                      ├── 3 items, ~80 min ─▶ *Review queue
-                      │                          └── acceptance ──▶ Board
-                      └┄┄ frozen ┄┄▶ 3 prepared submissions
-                                       └┄ needs ┄▶ *Publisher — unfilled
+H1 Estruturas ──┐
+H2 Água ────────┤
+H3 Vegetação ───┼─▶ Verificar contra os repositórios
+H4 Assentamentos┘     ├── alegações verificadas ──▶ Board + decisions.md
+                      ├── 3 itens, ~80 min ──▶ *Fila de revisão
+                      │                          └── aceitação ──▶ Board
+                      └┄┄ congelado ┄┄▶ 3 submissões preparadas
+                                       └┄ precisa ┄▶ *Publicador — não preenchido
 ```
 
-`*` marks a gate: nothing crosses it without the reviewer.
+`*` marca um gate: nada o atravessa sem o revisor.
 
-## Steps
+## Passos
 
-1. **[Preserve the orphaned dirty buffer](#step-1--the-orphaned-dirty-buffer)** — `renders/settlements/c1b/`.
-   *Exit:* dated copy written and SHA-256 recorded. Blocks every other editor action.
-2. **Board edits** — C1b and C1h to `blocked`, three corpus defects, Q17–Q18, X38–X47.
-   *Exit:* every row carries an evidence link and a **Mock** label.
-3. **Append six rows to `decisions.md`** — append-only, nothing reordered.
-   *Exit:* no existing row edited, confirmed by diff.
-4. **[Recompute counts centrally, once](#step-4--why-counts-are-central)** — not per handoff.
-   *Exit:* reconciles to 104 — 51 track items, 37 deferred, 16 questions.
-5. **Commit, one Conventional Commit per logical step** — planning `main`.
-   *Exit:* governance check and log attempted around each.
-6. **Hold for Gate 1 (C1b) and Gate 2 (structures)** — no further work until both answer.
-   *Exit:* the reviewer's exact wording and date recorded verbatim.
+1. **[Preservar o buffer sujo órfão](#step-1--the-orphaned-dirty-buffer)** — `renders/settlements/c1b/`.
+   *Exit:* cópia datada escrita e SHA-256 registrado. Bloqueia toda outra ação de editor.
+2. **Edições no board** — C1b e C1h para `blocked`, três defeitos de corpus, Q17–Q18, X38–X47.
+   *Exit:* toda linha carrega um link de evidência e um rótulo **Mock**.
+3. **Adicionar seis linhas a `decisions.md`** — apenas anexação, nada reordenado.
+   *Exit:* nenhuma linha existente editada, confirmado por diff.
+4. **[Recomputar contagens centralmente, uma vez](#step-4--why-counts-are-central)** — não por
+   handoff.
+   *Exit:* reconcilia para 104 — 51 itens de trilha, 37 adiados, 16 questões.
+5. **Commit, um Conventional Commit por passo lógico** — planejamento `main`.
+   *Exit:* check de governança e log tentados ao redor de cada um.
+6. **Aguardar o Gate 1 (C1b) e o Gate 2 (estruturas)** — nenhum trabalho adicional até que ambos
+   respondam.
+   *Exit:* a formulação exata e a data do revisor registradas literalmente.
 
-## Decisions for the reviewer
+## Decisões para o revisor
 
-> **1. The orphaned dirty buffer — preserve, preserve and close, or discard?**
-> *Recommend* preserve to a dated copy and leave the process alone — the standing guard says so and
-> this scene has been preserved this way before.
-> *Alternative* discard, if the four-day-old district review is known-superseded.
+> **1. O buffer sujo órfão — preservar, preservar e fechar, ou descartar?**
+> *Recomendo* preservar numa cópia datada e deixar o processo em paz — a proteção permanente diz
+> isso e esta cena já foi preservada desta forma antes.
+> *Alternativa* descartar, se a revisão de distrito de quatro dias for conhecidamente superada.
 
-> **2. Who is the designated publisher, or does publication stay frozen?**
-> *Recommend* name one — three prepared submissions cannot move, and no owner will attest for another.
-> *Alternative* stay frozen; all three submissions remain immutable and nothing is lost.
+> **2. Quem é o publicador designado, ou a publicação fica congelada?**
+> *Recomendo* nomear um — três submissões preparadas não podem se mover, e nenhum dono vai
+> atestar por outro.
+> *Alternativa* ficar congelado; as três submissões permanecem imutáveis e nada se perde.
 
-> **3. If a publisher is named, what is the publication order?**
-> *Recommend* the standing rule as written — water re-projects against the published
-> revision, never an old vegetation scene overwriting it.
-> *Alternative* publish vegetation's canopy attachment first and re-run water's 28 m gate after.
+> **3. Se um publicador for nomeado, qual é a ordem de publicação?**
+> *Recomendo* a regra permanente como está escrita — água se reprojeta contra a revisão publicada,
+> nunca uma cena antiga de vegetação sobrescrevendo-a.
+> *Alternativa* publicar o anexo de dossel de vegetação primeiro e rerodar o gate de 28 m de água
+> depois.
 
-> **4. Q17 — does C1h's exit accept the 7 km and 20 km pair, or require a strategic band?**
-> *Recommend* accept the pair; the gallery is complete at both bands and a third render is new work.
-> *Alternative* require it, and C1h stays `blocked` until that pass exists.
+> **4. Q17 — a saída de C1h aceita o par 7 km e 20 km, ou exige uma faixa estratégica?**
+> *Recomendo* aceitar o par; a galeria está completa em ambas as faixas e um terceiro render é
+> trabalho novo.
+> *Alternativa* exigi-la, e C1h fica `blocked` até que essa passada exista.
 
-> **5. Q18 — do water and vegetation get board items, or stay tracked by their specs?**
-> *Recommend* board items — both are authorized and active, and the register still calls the 28 m
-> rebuild "scoped, not authorised", which is now false.
-> *Alternative* leave both to their specs and just amend X19's stale text.
+> **5. Q18 — água e vegetação recebem itens no board, ou permanecem rastreados por suas
+> especificações?**
+> *Recomendo* itens no board — ambas estão autorizadas e ativas, e o registro ainda chama a
+> reconstrução de 28 m de "escopada, não autorizada", que agora é falso.
+> *Alternativa* deixar ambas para suas especificações e apenas emendar o texto desatualizado de
+> X19.
 
-## Risks
+## Riscos
 
-- **Shared `terrain` is written by two unpublished submissions** — publication order is a
-  correctness constraint, not a preference; everything stays frozen until decisions 2 and 3.
-- **Two editor windows both show "C1b"** — the queue names one process explicitly; judging the
-  other judges a four-day-old revision.
-- **Track D is the critical path and no agent is on it** — D1 waits on B2c, which is `not started`.
+- **O `terrain` compartilhado é escrito por duas submissões não publicadas** — a ordem de
+  publicação é uma restrição de correção, não uma preferência; tudo fica congelado até as decisões
+  2 e 3.
+- **Duas janelas de editor mostram ambas "C1b"** — a fila nomeia um processo explicitamente;
+  julgar o outro julga uma revisão de quatro dias.
+- **A trilha D é o caminho crítico e nenhum agente está nela** — D1 espera por B2c, que está
+  `not started`.
 
 ---
 
-# Addendum
+# Adendo
 
-<The other 800 lines go here: the gate register, the ID ledger, the touch matrix, the four
-per-handoff verification sections, the licensing record, the review-queue scripts, the
-per-track assessment. One `## Step N — <title>` heading for each step the card anchors to.>
+<As outras 800 linhas vão aqui: o registro de gates, o registro de IDs, a matriz de toque, as
+quatro seções de verificação por handoff, o registro de licenciamento, os scripts da fila de
+revisão, a avaliação por trilha. Um cabeçalho `## Step N — <titulo>` para cada passo ao qual o
+card se ancora.>

@@ -1,184 +1,240 @@
-# Complete the stance and settings contract
+# Complete o contrato de postura e configurações
 
-> Make workflow preferences effective across the entire harness while keeping authorization, honesty and secret protection invariant.
-> Build on the shared primitive architecture, move hidden opinions into explicit choices, and test selection through execution.
-> Effort: substantial · Risk: policy drift · Blast radius: generated instructions, workflows, runtime hooks and user configuration.
+> Torne as preferências de fluxo de trabalho efetivas em todo o harness mantendo autorização,
+> honestidade e proteção de segredos invariantes.
+> Construa sobre a arquitetura de primitivo compartilhado, mova opiniões escondidas para escolhas
+> explícitas, e teste a seleção através da execução.
+> Esforço: substancial · Risco: desvio de política · Raio de impacto: instruções geradas,
+> workflows, hooks de runtime e configuração do usuário.
 
-## At a glance
+## Em resumo
 
-- **Outcome:** Every audited preference has an explicit choice and a verified implementation contract.
-- **Approach:** Repair existing switches, extract fixed preferences, then validate interacting selections.
-- **Touches:** Shared primitives, resolver, runtime adapters, hooks, tests, configuration and documentation.
-- **New deps:** None; reuse the shared primitive and runtime foundation tracked in #93–#100.
-- **Not in scope:** Merging the existing PR stack, native-client qualification, deployment or changes to live user settings.
-- **Exit test:** All fourteen child issues pass their acceptance checks, local gates and required PR checks.
-- **Open question:** Stack implementation on PR #115, or implement against current main and reconcile later?
+- **Resultado:** Toda preferência auditada tem uma escolha explícita e um contrato de
+  implementação verificado.
+- **Abordagem:** Repare switches existentes, extraia preferências fixas, depois valide seleções
+  que interagem entre si.
+- **Toca em:** Primitivos compartilhados, resolvedor, adaptadores de runtime, hooks, testes,
+  configuração e documentação.
+- **Novas dependências:** Nenhuma; reaproveita a base de primitivo compartilhado e runtime
+  rastreada em #93–#100.
+- **Fora de escopo:** Mesclar a pilha de PR existente, qualificação de cliente nativo, deploy ou
+  mudanças nas configurações de usuário ao vivo.
+- **Teste de saída:** As quatorze issues filhas passam em suas verificações de aceitação, gates
+  locais e checks obrigatórios de PR.
+- **Pergunta em aberto:** Empilhar a implementação sobre o PR #115, ou implementar contra a main
+  atual e reconciliar depois?
 
-## System design
+## Design do sistema
 
 ```mermaid
 flowchart LR
-    C[Stances and settings] -->|validated selection| R[Shared resolver]
-    R -->|effective policy| P[Primitives and workflows]
-    R -->|effective policy| A[Runtime adapters]
-    A -->|execution policy| H[Hooks and detectors]
-    P -->|expected behavior| T[Contract tests]
-    H -->|observed behavior| T
+    C[Posturas e configurações] -->|seleção validada| R[Resolvedor compartilhado]
+    R -->|política efetiva| P[Primitivos e workflows]
+    R -->|política efetiva| A[Adaptadores de runtime]
+    A -->|política de execução| H[Hooks e detectores]
+    P -->|comportamento esperado| T[Testes de contrato]
+    H -->|comportamento observado| T
 ```
-One effective selection governs guidance and enforcement; native restrictions remain the ceiling.
+Uma única seleção efetiva governa orientação e aplicação; restrições nativas continuam sendo o
+teto.
 
-## Steps
+## Passos
 
-1. **[Establish the base](#step-1--base-and-tracking)** — link every change to an issue and confirm implementation sequencing.
-   *Exit:* all child issues exist and the base decision is recorded before implementation starts.
-2. **[Repair selection semantics](#step-2--selection-contract)** — fix voice/cost contradictions and define policy ownership.
-   *Exit:* off/on/off, override and user-value restoration tests pass in both projections.
-3. **[Extract fixed preferences](#step-3--existing-opinions)** — add verification, external-action, delegation, decision and documentation controls.
-   *Exit:* each alternative resolves without contradictory rules, workflows or skills.
-4. **[Add missing alternatives](#step-4--new-choices)** — deliver review, build-versus-buy, change-scope and research policies.
-   *Exit:* all variants and the critical delegation/review interactions pass contract tests.
-5. **[Configure runtime mechanics](#step-5--settings-and-runtime-behavior)** — resolve budgets, telemetry and gate behavior centrally.
-   *Exit:* boundary, timeout, retention, disabled-collection and adapter tests pass.
-6. **[Validate and document](#step-6--verification-and-migration)** — exercise migration, ownership and the six policy surfaces.
-   *Exit:* CI-equivalent gates, floor/current Python, isolated sync and applicable projection checks pass on HEAD.
-7. **[Review and merge](#step-7--delivery)** — publish verified, issue-linked changes without closing unimplemented work.
-   *Exit:* required checks are green on the current head and completed issues close through merged implementation.
+1. **[Estabeleça a base](#step-1--base-and-tracking)** — ligue toda mudança a uma issue e
+   confirme o sequenciamento de implementação.
+   *Saída:* todas as issues filhas existem e a decisão de base está registrada antes de a
+   implementação começar.
+2. **[Repare a semântica de seleção](#step-2--selection-contract)** — corrija contradições de
+   voice/cost e defina a posse de política.
+   *Saída:* testes de off/on/off, sobrescrita e restauração de valor do usuário passam nas duas
+   projeções.
+3. **[Extraia preferências fixas](#step-3--existing-opinions)** — adicione controles de
+   verificação, ação externa, delegação, decisão e documentação.
+   *Saída:* cada alternativa resolve sem regras, workflows ou skills contraditórios.
+4. **[Adicione alternativas ausentes](#step-4--new-choices)** — entregue políticas de review,
+   build-versus-buy, escopo de mudança e pesquisa.
+   *Saída:* todas as variantes e as interações críticas de delegação/review passam nos testes de
+   contrato.
+5. **[Configure a mecânica de runtime](#step-5--settings-and-runtime-behavior)** — resolva
+   orçamentos, telemetria e comportamento de gate centralmente.
+   *Saída:* testes de limite, timeout, retenção, coleta desabilitada e adaptador passam.
+6. **[Valide e documente](#step-6--verification-and-migration)** — exercite migração, posse e as
+   seis superfícies de política.
+   *Saída:* gates equivalentes à CI, Python de piso/atual, sincronização isolada e verificações
+   de projeção aplicáveis passam no HEAD.
+7. **[Revise e mescle](#step-7--delivery)** — publique mudanças verificadas, ligadas a issue, sem
+   fechar trabalho não implementado.
+   *Saída:* checks obrigatórios estão verdes no head atual e issues completas fecham através de
+   implementação mesclada.
 
-## Decisions for the reviewer
+## Decisões para o revisor
 
-1. **Which implementation base should be used?**
-   *Recommend:* stack on PR #115 and merge implementation only after its dependencies land; this avoids rebuilding replaced code.
-   *Alternative:* work against current main, accepting a separate reconciliation pass across the existing stack.
+1. **Qual base de implementação deve ser usada?**
+   *Recomendação:* empilhar sobre o PR #115 e mesclar a implementação só depois que suas
+   dependências entrarem; isso evita reconstruir código substituído.
+   *Alternativa:* trabalhar contra a main atual, aceitando uma passagem de reconciliação separada
+   através da pilha existente.
 
-## Risks
+## Riscos
 
-- **Concurrent architecture changes:** refresh the base and reconcile affected contracts before each implementation PR.
-- **Preference mistaken for permission:** native restrictions, repository requirements and user authorization always constrain execution.
-- **Configuration growth:** preserve defaults, provide presets, and keep advanced questions optional rather than lengthening every setup.
+- **Mudanças de arquitetura concorrentes:** atualize a base e reconcilie os contratos afetados
+  antes de cada PR de implementação.
+- **Preferência confundida com permissão:** restrições nativas, requisitos de repositório e
+  autorização de usuário sempre restringem a execução.
+- **Crescimento de configuração:** preserve padrões, forneça predefinições, e mantenha perguntas
+  avançadas opcionais em vez de alongar toda configuração.
 
 ---
 
-# Addendum
+# Adendo
 
-## Step 1 — Base and tracking
+## Passo 1 — Base e rastreamento
 
-Status at authoring: implementation is proposed, not delivered. The user requested issues, a plan,
-testing, a PR and merge. The plan PR can merge independently; it does not close implementation issues.
-The implementation-base question arose from discovering a concurrent architecture migration and
-must be answered before dependent code changes. Do not infer approval from silence.
+Status no momento da escrita: a implementação é proposta, não entregue. O usuário pediu issues,
+um plano, testes, um PR e merge. O PR do plano pode mesclar independentemente; ele não fecha
+issues de implementação. A pergunta sobre a base de implementação surgiu ao descobrir uma migração
+de arquitetura concorrente e precisa ser respondida antes de mudanças de código dependentes. Não
+infira aprovação do silêncio.
 
-The installed source is v0.8.0, commit `f9591ba`. The pending foundation is the PR stack
-[#101](https://github.com/JakeSelby/agent-harness/pull/101) through
-[#115](https://github.com/JakeSelby/agent-harness/pull/115), whose inspected head is `3be4cc4`.
-The latter introduces shared primitive authority, runtime lifecycle policy and isolated role workers.
-It remains an open draft stack with unresolved native acceptance; do not merge it as a side effect.
+A fonte instalada é a v0.8.0, commit `f9591ba`. A fundação pendente é a pilha de PR
+[#101](https://github.com/JakeSelby/agent-harness/pull/101) até
+[#115](https://github.com/JakeSelby/agent-harness/pull/115), cujo head inspecionado é `3be4cc4`.
+Este último introduz a autoridade de primitivo compartilhado, política de ciclo de vida de runtime
+e workers de papel isolados. Continua sendo uma pilha de rascunho aberta com aceitação nativa não
+resolvida; não a mescle como efeito colateral.
 
-Track this work under [epic #116](https://github.com/JakeSelby/agent-harness/issues/116).
-Each child issue owns its detailed acceptance criteria; the following links are the delivery map:
+Rastreie este trabalho sob o [épico #116](https://github.com/JakeSelby/agent-harness/issues/116).
+Cada issue filha possui seus próprios critérios de aceitação detalhados; os links a seguir são o
+mapa de entrega:
 
-1. [#117 — Effective existing selections](https://github.com/JakeSelby/agent-harness/issues/117).
-2. [#118 — Verification policy](https://github.com/JakeSelby/agent-harness/issues/118).
-3. [#119 — External-action authorization](https://github.com/JakeSelby/agent-harness/issues/119).
-4. [#120 — Delegation topology](https://github.com/JakeSelby/agent-harness/issues/120).
-5. [#121 — Decision interaction](https://github.com/JakeSelby/agent-harness/issues/121).
-6. [#122 — Documentation and history](https://github.com/JakeSelby/agent-harness/issues/122).
-7. [#123 — Context lifecycle and budgets](https://github.com/JakeSelby/agent-harness/issues/123).
-8. [#124 — Review depth and independence](https://github.com/JakeSelby/agent-harness/issues/124).
-9. [#125 — Build-versus-buy alternatives](https://github.com/JakeSelby/agent-harness/issues/125).
-10. [#126 — Change scope](https://github.com/JakeSelby/agent-harness/issues/126).
-11. [#127 — Research depth](https://github.com/JakeSelby/agent-harness/issues/127).
-12. [#128 — Observability controls](https://github.com/JakeSelby/agent-harness/issues/128).
-13. [#129 — Gate behavior](https://github.com/JakeSelby/agent-harness/issues/129).
-14. [#130 — Coverage, migration and documentation](https://github.com/JakeSelby/agent-harness/issues/130).
+1. [#117 — Seleções existentes efetivas](https://github.com/JakeSelby/agent-harness/issues/117).
+2. [#118 — Política de verificação](https://github.com/JakeSelby/agent-harness/issues/118).
+3. [#119 — Autorização de ação externa](https://github.com/JakeSelby/agent-harness/issues/119).
+4. [#120 — Topologia de delegação](https://github.com/JakeSelby/agent-harness/issues/120).
+5. [#121 — Interação de decisão](https://github.com/JakeSelby/agent-harness/issues/121).
+6. [#122 — Documentação e histórico](https://github.com/JakeSelby/agent-harness/issues/122).
+7. [#123 — Ciclo de vida de contexto e orçamentos](https://github.com/JakeSelby/agent-harness/issues/123).
+8. [#124 — Profundidade e independência de review](https://github.com/JakeSelby/agent-harness/issues/124).
+9. [#125 — Alternativas build-versus-buy](https://github.com/JakeSelby/agent-harness/issues/125).
+10. [#126 — Escopo de mudança](https://github.com/JakeSelby/agent-harness/issues/126).
+11. [#127 — Profundidade de pesquisa](https://github.com/JakeSelby/agent-harness/issues/127).
+12. [#128 — Controles de observabilidade](https://github.com/JakeSelby/agent-harness/issues/128).
+13. [#129 — Comportamento de gate](https://github.com/JakeSelby/agent-harness/issues/129).
+14. [#130 — Cobertura, migração e documentação](https://github.com/JakeSelby/agent-harness/issues/130).
 
-## Step 2 — Selection contract
+## Passo 2 — Contrato de seleção
 
-Use four policy classes:
+Use quatro classes de política:
 
-- **Invariants:** truthful results, uncertainty, secret protection, authorization and native restrictions.
-- **Stances:** meaningful behavioral alternatives a reasonable user might prefer.
-- **Settings:** bounds, durations, retention and execution mechanics.
-- **Presets:** documented starting selections, never locks that override explicit user settings.
+- **Invariantes:** resultados verdadeiros, incerteza, proteção de segredo, autorização e
+  restrições nativas.
+- **Posturas:** alternativas comportamentais significativas que um usuário razoável poderia
+  preferir.
+- **Configurações:** limites, durações, retenção e mecânica de execução.
+- **Predefinições:** seleções iniciais documentadas, nunca travas que sobrescrevem configurações
+  explícitas do usuário.
 
-Author in `primitives/` on the pending foundation, using `lib/harness_core/catalog.py` and the
-existing configuration resolver. Do not build a second stance catalog in `claude/` or Codex files.
-`policy/hooks/` and `lib/harness_core/lifecycle.py` own runtime behavior; adapters project it.
-Before editing, re-read those paths at the selected base because the pending stack may change them.
+Escreva em `primitives/` sobre a fundação pendente, usando `lib/harness_core/catalog.py` e o
+resolvedor de configuração existente. Não construa um segundo catálogo de postura em `claude/` ou
+em arquivos do Codex. `policy/hooks/` e `lib/harness_core/lifecycle.py` possuem o comportamento de
+runtime; adaptadores o projetam. Antes de editar, releia esses caminhos na base selecionada porque
+a pilha pendente pode alterá-los.
 
-Keep default → user → explicitly selected project → session precedence for stance choices.
-Retain the existing restriction that project configuration can select stances, not permission,
-identity or runtime targets. New operational settings belong in user configuration initially;
-session overrides must be explicitly whitelisted and validated. Cost supplies numeric defaults,
-then explicit settings override them. No task/session value may persist into another session.
+Mantenha a precedência padrão → usuário → projeto explicitamente selecionado → sessão para
+escolhas de postura. Retenha a restrição existente de que a configuração de projeto pode
+selecionar posturas, não permissão, identidade ou alvos de runtime. Novas configurações
+operacionais pertencem inicialmente à configuração de usuário; sobrescritas de sessão precisam
+estar explicitamente na lista de permissões e validadas. Custo fornece padrões numéricos, depois
+configurações explícitas os sobrescrevem. Nenhum valor de tarefa/sessão pode persistir para outra
+sessão.
 
-Define `off` per dimension: it removes the harness preference, not higher-priority constraints.
-Preserve and restore user-owned values during ownership transitions; never simply delete a user's
-output style because the harness stops managing it. Unknown selections fail before mutation.
+Defina `off` por dimensão: isso remove a preferência do harness, não restrições de prioridade mais
+alta. Preserve e restaure valores possuídos pelo usuário durante transições de posse; nunca
+simplesmente apague o estilo de saída de um usuário porque o harness parou de gerenciá-lo.
+Seleções desconhecidas falham antes de qualquer mutação.
 
-The ownership record for every policy names six surfaces: rule text, skills, workflows, settings,
-hooks and detectors. Mark inapplicable surfaces explicitly. Test behavior, not only file existence.
+O registro de posse de toda política nomeia seis superfícies: texto de regra, skills, workflows,
+configurações, hooks e detectores. Marque superfícies não aplicáveis explicitamente. Teste
+comportamento, não apenas existência de arquivo.
 
-## Step 3 — Existing opinions
+## Passo 3 — Opiniões existentes
 
-The proposed selections and migration defaults are:
+As seleções propostas e os padrões de migração são:
 
-- **Verification:** `local-first` (default), `ci-authoritative`, `hybrid`; independent of test-writing requirements.
-- **Integration tests:** `fixtures-only` (default), `explicit-live`, `repo-native`; no implied endpoint authorization.
-- **External actions:** `draft-first` (default), `explicit-request`, `scoped-standing-authority`.
-- **Delegation writes:** `serial` (default), `isolated-worktrees`; `max_delegation_depth=1` means root-to-child only.
-- **Decision interface:** `prose` (default), `structured`, `adaptive`; preserve explicit approval regardless of UI.
-- **Documentation:** `concise-reference` (default), `explanatory`, `repo-native`.
-- **Document history:** `append-only` (default), `living`; applied migrations and audit evidence stay protected.
+- **Verificação:** `local-first` (padrão), `ci-authoritative`, `hybrid`; independente de
+  requisitos de escrita de teste.
+- **Testes de integração:** `fixtures-only` (padrão), `explicit-live`, `repo-native`; nenhuma
+  autorização de endpoint implícita.
+- **Ações externas:** `draft-first` (padrão), `explicit-request`, `scoped-standing-authority`.
+- **Escritas de delegação:** `serial` (padrão), `isolated-worktrees`;
+  `max_delegation_depth=1` significa só de raiz para filho.
+- **Interface de decisão:** `prose` (padrão), `structured`, `adaptive`; preserve a aprovação
+  explícita independentemente da interface.
+- **Documentação:** `concise-reference` (padrão), `explanatory`, `repo-native`.
+- **Histórico de documento:** `append-only` (padrão), `living`; migrações aplicadas e evidência de
+  auditoria continuam protegidas.
 
-External-action scopes name action, destination and expiration/revocation. Do not use a prose stance
-as proof of runtime enforcement or as a bypass for a native denial. Constrained workers remain
-unable to redelegate; any future worker contract change needs its own confinement evidence.
+Escopos de ação externa nomeiam ação, destino e expiração/revogação. Não use uma postura em prosa
+como prova de aplicação em runtime nem como um jeito de contornar uma negação nativa. Workers
+confinados continuam incapazes de redelegar; qualquer mudança futura de contrato de worker precisa
+de sua própria evidência de confinamento.
 
-Adjust all consuming skills and workflows, including authoring, plan, build and review. Separate
-public-facing document requirements from private engineering references. Respect repository PR
-templates without imposing one universal amount of prose.
+Ajuste todas as skills e workflows consumidores, incluindo autoria, plan, build e review. Separe
+requisitos de documento voltado ao público de referências de engenharia privadas. Respeite
+templates de PR do repositório sem impor uma quantidade única e universal de prosa.
 
-## Step 4 — New choices
+## Passo 4 — Novas escolhas
 
-- **Review:** `scope-and-quality` (default), `self-check`, `independent`, `risk-adaptive`.
-- **Review independence:** `fresh-context` (default), `different-family`; report unavailable independence explicitly.
-- **Build versus buy:** retain `capability-ceiling` as default and `off`; add `delivery-speed`, `operational-maturity`, `balanced`.
-- **Change scope:** `minimal-diff` (default), `local-cleanup`, `systemic-fix`; none permits unrelated work.
-- **Research:** `source-led` (default), `quick-check`, `exhaustive`; all retain attribution and uncertainty.
+- **Review:** `scope-and-quality` (padrão), `self-check`, `independent`, `risk-adaptive`.
+- **Independência de review:** `fresh-context` (padrão), `different-family`; relate
+  indisponibilidade de independência explicitamente.
+- **Build versus buy:** retenha `capability-ceiling` como padrão e `off`; adicione
+  `delivery-speed`, `operational-maturity`, `balanced`.
+- **Escopo de mudança:** `minimal-diff` (padrão), `local-cleanup`, `systemic-fix`; nenhuma
+  permite trabalho não relacionado.
+- **Pesquisa:** `source-led` (padrão), `quick-check`, `exhaustive`; todas retêm atribuição e
+  incerteza.
 
-The explicit fresh-context default resolves the old ambiguous rule combining family and context;
-record this as a policy clarification in migration notes rather than claiming byte-identical behavior.
-When delegation is off, do not silently launch a reviewer. Report that independent review remains
-unperformed, or use self-check only when the selected policy/user allows it.
+O novo padrão explícito de fresh-context resolve a antiga regra ambígua que combinava família e
+contexto; registre isso como um esclarecimento de política nas notas de migração em vez de alegar
+comportamento idêntico byte a byte. Quando a delegação está desligada, não lance silenciosamente um
+revisor. Relate que a review independente permanece não realizada, ou use self-check apenas quando
+a política/usuário selecionado permitir.
 
-Risk-adaptive review must publish deterministic selection criteria before implementation: trivial
-presentation-only edits may self-check; logic changes require independent review; authorization,
-secrets, persistence and migration changes require separate scope and quality review. Missing
-capabilities cannot silently downgrade the required review.
+Review risk-adaptive precisa publicar critérios de seleção determinísticos antes da implementação:
+edições triviais só de apresentação podem se autoavaliar; mudanças de lógica exigem review
+independente; mudanças de autorização, segredos, persistência e migração exigem review de escopo e
+qualidade separado. Capacidades ausentes não podem rebaixar silenciosamente a review exigida.
 
-## Step 5 — Settings and runtime behavior
+## Passo 5 — Configurações e comportamento de runtime
 
-- **Context:** `cost-default` (default), `preserve-cache`, `adaptive`, `handoff`.
-- **Budgets:** gather/digest word caps, search count, fan-out and review rounds; preserve 400/600 return defaults.
-- **Telemetry:** `observability.enabled=true`, `retention_days=0`, `include_repo=true`, `include_branch=true`.
-- **Gates:** `gates.mode=blocking`, `gates.max_blocks=8`, `gates.timeout_seconds=240`; add `advisory` mode.
+- **Contexto:** `cost-default` (padrão), `preserve-cache`, `adaptive`, `handoff`.
+- **Orçamentos:** limites de palavra de gather/digest, contagem de busca, fan-out e rodadas de
+  review; preserve os padrões de retorno 400/600.
+- **Telemetria:** `observability.enabled=true`, `retention_days=0`, `include_repo=true`,
+  `include_branch=true`.
+- **Gates:** `gates.mode=blocking`, `gates.max_blocks=8`, `gates.timeout_seconds=240`; adicione o
+  modo `advisory`.
 
-Retention zero means no automatic expiry, preserving current stored history. Opting out of metadata
-affects new records; purging existing records is a separate explicit operation. Disabled telemetry
-must stop detached workers and rescans as well as hook installation. Never add command or message
-bodies to usage records. Test concurrent writers and UTC expiry boundaries.
+Retenção zero significa nenhuma expiração automática, preservando o histórico armazenado atual.
+Optar por sair de metadados afeta registros novos; purgar registros existentes é uma operação
+explícita separada. Telemetria desabilitada precisa parar workers destacados e novas varreduras,
+além da instalação de hook. Nunca adicione corpos de comando ou mensagem aos registros de uso.
+Teste escritores concorrentes e limites de expiração em UTC.
 
-Numeric schemas must reject booleans masquerading as integers, malformed values and invalid bounds.
-Publish allowed ranges and provider hard-limit behavior before exposing each setting. A larger user
-budget never overrides a provider limit. Do not hard-code current vendor limits as universal facts.
+Schemas numéricos precisam rejeitar booleanos disfarçados de inteiros, valores malformados e
+limites inválidos. Publique os intervalos permitidos e o comportamento de limite rígido de
+provedor antes de expor cada configuração. Um orçamento de usuário maior nunca sobrescreve um
+limite de provedor. Não fixe no código limites de fornecedor atuais como fatos universais.
 
-Advisory and exhausted blocking gates may release a turn; neither outcome proves the gate passed.
-Preserve dirty-tree identity, trust, cancellation and error distinctions from the runtime foundation.
+Gates consultivos e de bloqueio esgotados podem liberar um turno; nenhum dos dois resultados prova
+que o gate passou. Preserve distinções de identidade de árvore suja, confiança, cancelamento e erro
+da fundação de runtime.
 
-## Step 6 — Verification and migration
+## Passo 6 — Verificação e migração
 
-Read the current `.github/workflows/ci.yml` and `AGENTS.md` at the selected checkout before running
-gates. The current plan branch requires:
+Leia o `.github/workflows/ci.yml` e o `AGENTS.md` atuais no checkout selecionado antes de rodar os
+gates. A branch de plano atual exige:
 
 ```sh
 python3 bin/harness lint
@@ -186,40 +242,45 @@ python3 -m unittest discover -s tests -v
 python3 bin/harness sync --dry-run
 ```
 
-For dry-run, run a subprocess with a temporary home containing only a copy of `config.example.json`;
-do not overwrite the real configuration or install a candidate into the live harness. Preserve the
-normal session environment outside that subprocess. No formatter is configured in the inspected CI;
-check for new formatter requirements if the base changes.
+Para o dry-run, rode um subprocesso com um diretório home temporário contendo apenas uma cópia de
+`config.example.json`; não sobrescreva a configuração real nem instale um candidato no harness ao
+vivo. Preserve o ambiente de sessão normal fora desse subprocesso. Nenhum formatador está
+configurado na CI inspecionada; verifique por novos requisitos de formatador se a base mudar.
 
-On the shared-primitives foundation, also run `python3 bin/harness generate --check`. Run the test
-suite under Python 3.9 and the current supported Python before implementation merges. Successful
-source tests do not qualify native clients; exercise available adapters and explicitly report any
-blocked native probe. Do not remove a native qualification gate to ship this work.
+Na fundação de primitivos compartilhados, também rode `python3 bin/harness generate --check`. Rode
+a suíte de teste sob o Python 3.9 e o Python atual suportado antes de a implementação ser
+mesclada. Testes de fonte bem-sucedidos não qualificam clientes nativos; exercite adaptadores
+disponíveis e relate explicitamente qualquer sondagem nativa bloqueada. Não remova um gate de
+qualificação nativa para lançar este trabalho.
 
-Required interaction coverage includes cost/context, voice/style ownership, review/delegation,
-testing/verification/gates and autonomy/external-actions. Cover every variant individually plus
-these meaningful pairs; do not claim an exhaustive Cartesian product was exercised. Include old
-configuration migration, repeated sync, uninstall restoration, invalid combinations, session scope
-and custom stances introduced by the foundation.
+A cobertura de interação exigida inclui custo/contexto, posse de voice/style, review/delegação,
+testes/verificação/gates e autonomy/ações externas. Cubra cada variante individualmente mais estes
+pares significativos; não alegue que um produto cartesiano exaustivo foi exercitado. Inclua
+migração de configuração antiga, sincronização repetida, restauração de desinstalação, combinações
+inválidas, escopo de sessão e posturas personalizadas introduzidas pela fundação.
 
-Keep the always-loaded context budget: extract rationale into skills/docs, measure the longest
-variant in each dimension and avoid raising the cap merely to fit more switches. Offer presets
-and an optional advanced configuration path; do not ask every new question on every initialization.
+Mantenha o orçamento de contexto sempre carregado: extraia justificativa para skills/docs, meça a
+variante mais longa em cada dimensão e evite elevar o limite só para caber mais switches. Ofereça
+predefinições e um caminho de configuração avançada opcional; não faça toda pergunta nova em toda
+inicialização.
 
-## Step 7 — Delivery
+## Passo 7 — Entrega
 
-Use one issue-scoped implementation commit/PR per child where practical, in dependency order.
-Keep writes single-threaded under the current policy. Use isolated worktrees and leave unrelated
-work untouched. The current plan PR contains only this document and references the epic without
-closing it. It may merge after local checks and required remote checks pass.
+Use um commit/PR de implementação por issue, quando prático, em ordem de dependência. Mantenha
+escritas de thread único sob a política atual. Use worktrees isoladas e deixe trabalho não
+relacionado intocado. O PR do plano atual contém apenas este documento e referencia o épico sem
+fechá-lo. Ele pode ser mesclado depois que as verificações locais e os checks remotos obrigatórios
+passarem.
 
-For implementation, run gates on committed HEAD in the checkout being pushed. Fill every PR
-template section and reference its issue. Inspect check status after the last push; squash merge
-through repository protection without administrative bypass. Recheck the merge result and issue
-status. If the approved base is stacked, merge only after the existing dependencies land, then
-refresh and rerun the gates on the resulting main-based diff.
+Para a implementação, rode os gates no HEAD commitado no checkout sendo enviado (push). Preencha
+toda seção do template de PR e referencie sua issue. Inspecione o status dos checks depois do
+último push; faça squash merge através da proteção do repositório sem bypass administrativo.
+Reverifique o resultado do merge e o status da issue. Se a base aprovada estiver empilhada, mescle
+somente depois que as dependências existentes entrarem, depois atualize e rode de novo os gates no
+diff resultante baseado na main.
 
-Update documentation to say: “Strong defaults, explicit trade-offs, and configurable workflow
-preferences.” Describe support separately as guidance, source-tested enforcement or native-tested
-enforcement. Retain evidence and limitations rather than claiming all preferences are equally
-enforceable on every client. Close the epic only when all child acceptance criteria are satisfied.
+Atualize a documentação para dizer: "Padrões fortes, trade-offs explícitos, e preferências de
+workflow configuráveis." Descreva o suporte separadamente como orientação, aplicação testada por
+fonte ou aplicação testada nativamente. Retenha evidência e limitações em vez de alegar que todas
+as preferências são igualmente aplicáveis em todo cliente. Feche o épico somente quando todos os
+critérios de aceitação das issues filhas estiverem satisfeitos.

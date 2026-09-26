@@ -1,4 +1,4 @@
-"""Normalize lifecycle events and compose shared policies before native encoding."""
+"""Normaliza eventos de ciclo de vida e compõe políticas compartilhadas antes da codificação nativa."""
 import contextlib
 import difflib
 import fnmatch
@@ -16,20 +16,21 @@ POLICIES = ROOT / "policy" / "hooks"
 ALIASES = {"exec_command": "Bash", "shell_command": "Bash", "shell": "Bash",
            "spawn_agent": "Agent", "write_file": "Write", "edit_file": "Edit"}
 BASE_EVENTS = ("PreToolUse", "PostToolUse", "SessionStart", "Stop", "SessionEnd")
-# The usage feed's own events. Only Claude Code carries them; `adapters/codex/capabilities.json`
-# declares the gap rather than registering an event that runtime does not raise.
+# Os próprios eventos do feed de uso. Só o Claude Code os carrega; `adapters/codex/capabilities.json`
+# declara a lacuna em vez de registrar um evento que aquele runtime não dispara.
 FEED_EVENTS = ("UserPromptSubmit", "SubagentStart", "SubagentStop")
 EVENTS = {"claude-code": BASE_EVENTS + FEED_EVENTS, "codex": BASE_EVENTS}
-# The tools that write a file by path, after `ALIASES`; `apply_patch` names its paths in the patch.
+# As ferramentas que escrevem um arquivo por caminho, depois de `ALIASES`; `apply_patch` nomeia
+# seus caminhos dentro do patch.
 FILE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit", "apply_patch")
 ROLE_NAME = re.compile(r"[a-z][a-z0-9-]*")
-# A brief may declare the role it belongs to. The line stands alone so the declaration cannot be
-# produced by prose that happens to mention a role, and it travels with the text: a brief pasted
-# into an unnamed spawn still carries it, which is the whole point.
+# Um brief pode declarar o papel ao qual pertence. A linha fica isolada para que a declaração não
+# possa ser produzida por prosa que por acaso menciona um papel, e ela viaja com o texto: um
+# brief colado num disparo sem nome ainda a carrega, que é todo o ponto disso.
 ROLE_MARKER = re.compile(r"^[ \t]*harness-role:[ \t]*([a-z][a-z0-9-]*)[ \t]*$", re.M)
-# What a session remembers about a spawn it refused, and how a later spawn is matched against it.
-# Bounded on both axes: 32 entries of 2,000 normalised characters is far past any real fan-out,
-# and a session record is not a place to accumulate transcript.
+# O que uma sessão lembra sobre um disparo que recusou, e como um disparo posterior é comparado
+# contra ele. Limitado em ambos os eixos: 32 entradas de 2.000 caracteres normalizados está muito
+# além de qualquer fan-out real, e um registro de sessão não é lugar para acumular transcript.
 DENIED_KEY = "denied_spawns"
 NOTICED_KEY = "session_notices"
 DENIED_MAX = 32
@@ -49,10 +50,10 @@ _DECISIONS = []
 
 
 def decisions():
-    """The decision log, or None when it cannot be loaded. Loaded once per process.
+    """O log de decisão, ou None quando não pode ser carregado. Carregado uma vez por processo.
 
-    Every caller treats None as "this decision is not logged" and carries on: the log records
-    what the harness decided and must never be able to change it.
+    Todo chamador trata None como "esta decisão não é registrada" e continua: o log registra o
+    que o harness decidiu e nunca pode ser capaz de mudar isso.
     """
     if not _DECISIONS:
         try:
@@ -84,16 +85,16 @@ def normalize(payload):
     return event
 
 
-# The hooks selection for the dispatch in progress, so one event resolves the ladder once.
+# A seleção de hooks para o despacho em andamento, para que um evento resolva a escada uma única vez.
 _SWITCHES = []
 
 
 def switches():
-    """`{hook id: "on"|"off"}` from the selection, resolved as a hook resolves it: not strictly.
+    """`{hook id: "on"|"off"}` a partir da seleção, resolvida como um hook a resolve: não estritamente.
 
-    A selection that will not resolve leaves every hook on, and a core hook switched off without
-    its acknowledgement resolves `on` (`posture.core_refusals`), so a broken file never turns
-    enforcement off.
+    Uma seleção que não resolve deixa todo hook ligado, e um hook essencial desligado sem seu
+    reconhecimento resolve `on` (`posture.core_refusals`), então um arquivo quebrado nunca
+    desliga a imposição.
     """
     if _SWITCHES:
         return _SWITCHES[-1]
@@ -104,12 +105,12 @@ def switches():
 
 
 def enabled(name):
-    """Whether hook id `name` is on. Ids are `catalog.HOOK_IDS`, the same on every runtime."""
+    """Se o hook de id `name` está ligado. Os ids são `catalog.HOOK_IDS`, os mesmos em toda runtime."""
     return switches().get(name) != "off"
 
 
 def invoke(name, event):
-    """Run policy module `name` on `event`; `{}`, without loading it, when its id is off."""
+    """Roda o módulo de política `name` sobre `event`; `{}`, sem carregá-lo, quando seu id está desligado."""
     if not enabled(name):
         return {}
     module = load(name)

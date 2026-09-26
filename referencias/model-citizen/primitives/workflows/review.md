@@ -5,31 +5,34 @@ argument-hint: [base ref, default main] [optional spec: issue number, plan path 
 
 # Review
 
-Read {{arguments}} as a base ref and a spec source. The base is a ref, `main` when absent. The spec
-is an issue number, a path to a plan file, or a pull request number; when none is given, pass
-`infer` and let the scope pass fall back to the branch name and the last commit message.
+Leia {{arguments}} como uma referência base e uma fonte de especificação. A base é uma
+referência, `main` quando ausente. A especificação é um número de issue, um caminho para um
+arquivo de plano, ou um número de pull request; quando nenhuma é dada, passe `infer` e deixe a
+passada de escopo recorrer ao nome do branch e à última mensagem de commit.
 
-1. **Establish the diff, before spawning anything.** Run `git diff --stat <base>...HEAD` and
-   `git diff <base>...HEAD`. If the base does not resolve, say so and stop rather than review
-   against the wrong tree. Outside a git repository there is no diff at all: say so, and offer to
-   review named files or a pasted patch instead.
-2. **Spawn `spec-reviewer` first**, in its own fresh context, with the base and the spec source.
-   It reports only what the diff does that nothing asked for, what was asked for and is missing,
-   and which stated acceptance criteria the diff does not prove. Tell it to leave every
-   correctness, style and test-quality question to the second pass.
-3. **Then spawn `reviewer`**, in a second fresh context that has seen neither the work nor the
-   scope pass. Brief it for findings only: no restatement of what it read, no summary of the
-   change, no praise. Each finding carries a severity, a `file:line`, what is wrong and why it
-   matters. Tell it to treat a missing test or an untested error path as a finding.
-4. **Relay nothing verbatim.** Check every finding from either pass against the code yourself
-   before it reaches the user and drop the ones that do not hold. Where you disagree, say so
-   with your reasoning rather than passing the finding through.
-5. **Report two sections** — **Scope** first, then **Quality** — each a list ranked by severity,
-   each item a bold-led bullet carrying its `file:line`. State the verdict first. A section with
-   nothing surviving is a single line saying so.
+1. **Estabeleça o diff, antes de gerar qualquer coisa.** Rode `git diff --stat <base>...HEAD` e
+   `git diff <base>...HEAD`. Se a base não resolve, diga isso e pare em vez de revisar contra a
+   árvore errada. Fora de um repositório git não há diff algum: diga isso, e ofereça revisar
+   arquivos nomeados ou um patch colado em vez disso.
+2. **Gere `spec-reviewer` primeiro**, em seu próprio contexto novo, com a base e a fonte de
+   especificação. Ele relata apenas o que o diff faz que ninguém pediu, o que foi pedido e está
+   faltando, e quais critérios de aceitação declarados o diff não comprova. Diga a ele para
+   deixar toda questão de correção, estilo e qualidade de teste para a segunda passada.
+3. **Depois gere `reviewer`**, num segundo contexto novo que não viu nem o trabalho nem a passada
+   de escopo. Instrua-o para apenas achados: sem reafirmar o que leu, sem resumo da mudança, sem
+   elogio. Cada achado carrega uma severidade, um `file:line`, o que está errado e por que
+   importa. Diga a ele para tratar um teste faltando ou um caminho de erro não testado como um
+   achado.
+4. **Não retransmita nada literalmente.** Verifique todo achado de cada passada contra o código
+   você mesmo antes que chegue ao usuário e descarte os que não se sustentam. Onde você discorda,
+   diga isso com seu raciocínio em vez de passar o achado adiante.
+5. **Relate duas seções** — **Escopo** primeiro, depois **Qualidade** — cada uma uma lista
+   ranqueada por severidade, cada item um marcador liderado por negrito carregando seu
+   `file:line`. Declare o veredito primeiro. Uma seção sem nada sobrevivendo é uma única linha
+   dizendo isso.
 
-Two contexts is the point: a reviewer that has just read the code for bugs rationalizes scope
-creep, so the scope pass runs before it and never sees what it found.
+Dois contextos são o ponto: um revisor que acabou de ler o código atrás de bugs racionaliza fuga
+de escopo, então a passada de escopo roda antes dele e nunca vê o que ele encontrou.
 
-Make no edits. This command reads, it does not fix. Hand the findings over and let the user
-decide which ones to act on — `/build` is where changes happen.
+Não faça edições. Este comando lê, não conserta. Entregue os achados e deixe o usuário decidir
+quais ações tomar — `/build` é onde as mudanças acontecem.

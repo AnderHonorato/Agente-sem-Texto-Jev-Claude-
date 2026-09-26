@@ -170,7 +170,7 @@ def run(root=ROOT, python=sys.executable):
         archive = work / "baseline.tar"
         archive_baseline(root, archive, data)
         with tarfile.open(archive) as stream:
-            # This archive was produced locally from the pinned Git object and verified above.
+            # Este arquivo foi produzido localmente a partir do objeto Git fixado e verificado acima.
             stream.extractall(work / "baseline")
         prior = work / "baseline" / data["archive"]["prefix"].rstrip("/")
         cases = []

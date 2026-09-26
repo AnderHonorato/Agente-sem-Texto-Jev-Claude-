@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Progress for background Workflow runs, reconstructed from the run journal.
+Progresso de execuções de Workflow em segundo plano, reconstruído a partir do diário da execução.
 
-`/workflows` is a terminal-only view; this reads the same underlying data so it works
-anywhere (VS Code, web, a piped shell). It deliberately never reads a full agent
-transcript — those run to megabytes — only the journal plus the first line of each
-agent's transcript, which carries its prompt and is enough to name it.
+`/workflows` é uma visão apenas de terminal; isto lê os mesmos dados subjacentes, então funciona
+em qualquer lugar (VS Code, web, um shell encanado). Deliberadamente nunca lê uma transcrição
+completa de agente — elas rotineiramente chegam a megabytes — apenas o diário mais a primeira
+linha da transcrição de cada agente, que carrega seu prompt e é suficiente para nomeá-lo.
 
-Usage:
-    status.py                 # most recent run
-    status.py --all           # every run found, newest first
-    status.py --run wf_abc123 # a specific run
-    status.py --limit 5       # cap how many runs are shown
+Uso:
+    status.py                 # execução mais recente
+    status.py --all           # toda execução encontrada, mais nova primeiro
+    status.py --run wf_abc123 # uma execução específica
+    status.py --limit 5       # limita quantas execuções são mostradas
 """
 
 from __future__ import annotations
@@ -28,13 +28,13 @@ SCRIPTS_GLOB = "workflows/scripts/*.js"
 
 
 def find_runs() -> list[Path]:
-    """Every workflow run directory on this machine, newest first."""
+    """Todo diretório de execução de workflow nesta máquina, mais novo primeiro."""
     runs = [p for p in PROJECTS.glob("*/*/subagents/workflows/wf_*") if p.is_dir()]
     return sorted(runs, key=lambda p: p.stat().st_mtime, reverse=True)
 
 
 def read_journal(run: Path) -> tuple[list[str], dict[str, int]]:
-    """Returns (started keys in order, {key: result length})."""
+    """Retorna (chaves iniciadas em ordem, {chave: tamanho do resultado})."""
     journal = run / "journal.jsonl"
     if not journal.exists():
         return [], {}
@@ -60,10 +60,11 @@ def read_journal(run: Path) -> tuple[list[str], dict[str, int]]:
 
 def agent_identity(path: Path) -> str:
     """
-    A short human label for an agent, taken from the first line of its transcript.
+    Um rótulo curto e legível para um agente, tirado da primeira linha de sua transcrição.
 
-    The workflow's `label` option is not persisted, so the prompt is the best available
-    identity. We look for an explicit marker first, then fall back to the opening words.
+    A opção `label` do workflow não é persistida, então o prompt é a melhor identidade
+    disponível. Primeiro procuramos por um marcador explícito, depois recorremos às
+    palavras de abertura.
     """
     try:
         with path.open(errors="replace") as handle:
@@ -80,9 +81,9 @@ def agent_identity(path: Path) -> str:
         return "(unreadable)"
 
     text = text.strip()
-    # Identity comes from the OPENING of the prompt only. Later phases receive earlier phases'
-    # output appended wholesale, so searching the whole body would label every downstream agent
-    # with whatever marker happened to lead the digest it was handed.
+    # A identidade vem APENAS DA ABERTURA do prompt. Fases posteriores recebem a saída de fases
+    # anteriores anexada por completo, então buscar no corpo inteiro rotularia todo agente
+    # posterior com qualquer marcador que por acaso liderasse o resumo que lhe foi passado.
     head = re.sub(r"\s+", " ", text[:400]).strip()
 
     marker = re.match(r"=====\s*[A-Z]+:\s*([\w-]+)", head)
@@ -94,7 +95,7 @@ def agent_identity(path: Path) -> str:
 
 
 def phases_from_script(run_id: str) -> list[str]:
-    """Phase titles declared in the run's persisted script, when it can be found."""
+    """Títulos de fase declarados no script persistido da execução, quando pode ser encontrado."""
     for script in PROJECTS.glob(f"*/*/{SCRIPTS_GLOB}"):
         if run_id in script.name:
             text = script.read_text(errors="replace")
@@ -137,7 +138,7 @@ def report(run: Path) -> None:
     for path in agents:
         size = path.stat().st_size
         age = now - path.stat().st_mtime
-        # An agent whose transcript has been quiet for a while has almost certainly returned.
+        # Um agente cuja transcrição está quieta há um tempo quase certamente já retornou.
         finished = age > 45
         mark = "\033[32m✓\033[0m" if finished else "\033[33m•\033[0m"
         status = "done" if finished else f"active {human_age(age)} ago"

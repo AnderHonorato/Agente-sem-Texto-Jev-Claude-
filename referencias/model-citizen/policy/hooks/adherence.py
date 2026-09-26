@@ -175,11 +175,12 @@ def read_rows(target):
 
 
 def prompts_by(ts, session, observed):
-    """The session's observed prompts stamped no later than `ts`, or 0 when `ts` is unreadable.
+    """Os prompts observados da sessão carimbados não mais tarde que `ts`, ou 0 quando `ts` é ilegível.
 
-    The feed's own count can fall behind the ledger's, when it skips a prompt it could not lock
-    or resets a state file it could not read, and a turn that lags would close the window early.
-    The next prompt cannot arrive before the emitting one's hook has run, so none is counted here.
+    A própria contagem do feed pode ficar atrás da do ledger, quando ele pula um prompt que não
+    conseguiu travar ou reseta um arquivo de estado que não conseguiu ler, e um turno atrasado
+    fecharia a janela cedo demais. O próximo prompt não pode chegar antes de o hook do emissor
+    ter rodado, então nenhum é contado aqui.
     """
     moment = parse_ts(ts)
     if moment is None:
@@ -194,10 +195,11 @@ def prompts_by(ts, session, observed):
 
 
 def respond(row, observed):
-    """`(outcome, reason, turns_after)` for one emission against the session's observation rows.
+    """`(outcome, reason, turns_after)` para uma emissão contra as linhas de observação da sessão.
 
-    `observed` is the observation ledger's rows in file order; only `event`, `session_id` and
-    `ts` are read. `turns_after` counts the prompts seen after the emitting one, capped at the window.
+    `observed` são as linhas do ledger de observação na ordem do arquivo; só `event`,
+    `session_id` e `ts` são lidos. `turns_after` conta os prompts vistos após o emissor, limitado
+    pela janela.
     """
     spec = KINDS.get(row.get("recommendation"))
     turn, session = row.get("turn"), row.get("session_id")
@@ -221,7 +223,7 @@ def respond(row, observed):
 
 
 def responses(rows):
-    """The first response to each emission, by `adherence_id`. A second one is a duplicate."""
+    """A primeira resposta a cada emissão, por `adherence_id`. Uma segunda é uma duplicata."""
     out = {}
     for row in rows:
         if row.get("kind") == "response" and isinstance(row.get("adherence_id"), str):
@@ -230,10 +232,10 @@ def responses(rows):
 
 
 def settle(env=None, now=None):
-    """Append a response for every emission a reading can now answer, and return those rows.
+    """Acrescenta uma resposta para toda emissão que uma leitura já consegue responder, e retorna essas linhas.
 
-    A followed or not-followed reading is final when it is made. An unknown one is only written
-    once the emission is `UNKNOWN_AFTER` old; before that it is left for a later reading.
+    Uma leitura seguida ou não seguida é final quando é feita. Uma desconhecida só é escrita
+    quando a emissão tem `UNKNOWN_AFTER` de idade; antes disso é deixada para uma leitura posterior.
     """
     now = datetime.datetime.now(datetime.timezone.utc).timestamp() if now is None else now
     rows = read_rows(path(env))
@@ -263,10 +265,11 @@ def settle(env=None, now=None):
 
 
 def rates(rows):
-    """Per recommendation: emitted, each outcome, pending, and the rate followed of those judged.
+    """Por recomendação: emitidas, cada resultado, pendentes, e a taxa seguida das já julgadas.
 
-    `rate` is followed over followed plus not followed, and None while neither has happened: an
-    unknown is neither, and counting it as either would invent an answer the ledger never gave.
+    `rate` é seguida sobre seguida mais não seguida, e None enquanto nenhuma das duas aconteceu:
+    uma desconhecida não é nenhuma das duas, e contá-la como qualquer uma delas inventaria uma
+    resposta que o ledger nunca deu.
     """
     answered = responses(rows)
     out = {}

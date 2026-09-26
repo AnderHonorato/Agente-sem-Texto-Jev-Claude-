@@ -1,16 +1,18 @@
-# Interchangeable architecture viewers
+# Visualizadores de arquitetura intercambiáveis
 
-Viewer implementation, agent runtime, and model provider are independent choices. The
-architecture-viewer integration resolves a distribution's builtin adapter by default. A custom
-adapter is an explicit user selection. Installation and sync never start a viewer.
+A implementação do visualizador, o runtime do agente e o provedor de modelo são escolhas
+independentes. A integração de visualizador de arquitetura resolve o adaptador embutido de uma
+distribuição por padrão. Um adaptador personalizado é uma seleção explícita do usuário. A
+instalação e a sincronização nunca iniciam um visualizador.
 
-This distribution currently has no builtin viewer adapter. Inspection reports it unavailable;
-the selector does not substitute a custom viewer. A builtin adapter uses the same contract below,
-installed at integrations/architecture-viewer/builtin.json with an explicit id.
+Esta distribuição atualmente não tem nenhum adaptador de visualizador embutido. A inspeção relata
+que ele está indisponível; o seletor não substitui por um visualizador personalizado. Um adaptador
+embutido usa o mesmo contrato abaixo, instalado em `integrations/architecture-viewer/builtin.json`
+com um id explícito.
 
-## Select an implementation
+## Selecione uma implementação
 
-Register a JSON descriptor with id, capability, contract_version, argv, and optional settings:
+Registre um descritor JSON com id, capability, contract_version, argv, e configurações opcionais:
 
 ~~~json
 {
@@ -26,9 +28,9 @@ Register a JSON descriptor with id, capability, contract_version, argv, and opti
 }
 ~~~
 
-Use an installed standalone uml-viewer candidate exposing protocol 1. Java belongs to that
-optional viewer, not the harness. Existing versions without the public client are incompatible.
-No upstream source or dependencies are bundled here.
+Use um candidato uml-viewer standalone instalado que exponha o protocolo 1. Java pertence a esse
+visualizador opcional, não ao harness. Versões existentes sem o cliente público são incompatíveis.
+Nenhuma fonte upstream ou dependência é empacotada aqui.
 
 ~~~sh
 citizen integrations register --file adapter.json
@@ -39,21 +41,22 @@ citizen integrations doctor architecture-viewer
 citizen config set integrations.architecture-viewer.implementation builtin
 ~~~
 
-Registration preserves the current selection. show inspects configuration and executable
-availability without execution; doctor explicitly calls the adapter's describe operation.
-Neither result qualifies a native runtime or establishes live model parity.
+O registro preserva a seleção atual. `show` inspeciona a configuração e a disponibilidade do
+executável sem execução; `doctor` chama explicitamente a operação `describe` do adaptador. Nenhum
+dos dois resultados qualifica um runtime nativo ou estabelece paridade de modelo ao vivo.
 
-Precedence is distribution default, user configuration, then invocation override. Project
-configuration remains stance-only: a repository cannot nominate an executable adapter.
-Selecting an external executable authorizes ordinary local execution; descriptors are not a
-sandbox. argv is a literal argument array, never a shell command. Descriptors and pinned session
-records store settings, so settings must not contain credentials; adapters read secrets from the
-environment or an operating-system secret store when needed.
+A precedência é padrão de distribuição, configuração de usuário, depois sobrescrita de invocação.
+A configuração de projeto continua sendo só de postura: um repositório não pode nomear um
+adaptador executável. Selecionar um executável externo autoriza execução local comum; descritores
+não são um sandbox. `argv` é um array de argumentos literal, nunca um comando de shell.
+Descritores e registros de sessão fixados armazenam configurações, então as configurações não
+devem conter credenciais; adaptadores leem segredos do ambiente ou de um cofre de segredos do
+sistema operacional quando necessário.
 
-## Invoke and continue
+## Invoque e continue
 
-The authoritative procedure is the architecture-viewer skill, shared by all runtime bindings.
-Each command accepts an operation input JSON file. For the upstream adapter:
+O procedimento autoritativo é a skill architecture-viewer, compartilhada por todas as ligações de
+runtime. Cada comando aceita um arquivo JSON de entrada de operação. Para o adaptador upstream:
 
 ~~~json
 {
@@ -67,10 +70,10 @@ Each command accepts an operation input JSON file. For the upstream adapter:
 }
 ~~~
 
-The profile and every source, metrics, or output root must resolve inside project_root. A user can
-pre-authorize another existing directory in the adapter's settings.allowed_roots. Resolution
-rejects `..`, missing paths, and symlinks that escape those roots before the adapter reads the
-profile or invokes the viewer.
+O profile e toda raiz de fonte, métrica ou saída devem resolver dentro de `project_root`. Um
+usuário pode pré-autorizar outro diretório existente em `settings.allowed_roots` do adaptador. A
+resolução rejeita `..`, caminhos ausentes, e symlinks que escapam dessas raízes antes de o
+adaptador ler o profile ou invocar o visualizador.
 
 ~~~sh
 citizen viewer validate --input open.json
@@ -80,91 +83,104 @@ citizen viewer replace-document --session UUID --input replacement.json --reques
 citizen viewer close --session UUID
 ~~~
 
-Replacement input includes document and a nonnegative expected_revision from the latest
-acknowledgement. Publish a new immutable snapshot before submitting. The upstream public client
-owns digest checking, revision conflicts, receipts, retries and cancellation; the harness does
-not reproduce its session coordinator.
+A entrada de substituição inclui `document` e um `expected_revision` não negativo, vindo do último
+reconhecimento. Publique um novo snapshot imutável antes de submeter. O cliente público upstream
+possui a verificação de digest, os conflitos de revisão, os recibos, as novas tentativas e o
+cancelamento; o harness não reproduz o coordenador de sessão dele.
 
-An opened reference pins the adapter executable, settings and opaque session identity. Changing
-defaults or registrations cannot redirect status, update or close. A timeout after mutation is
-indeterminate: inspect the recorded session and upstream receipt before retrying the identical
-request. Never automatically replay generation or reopen an uncertain session.
+Uma referência aberta fixa o executável do adaptador, as configurações e a identidade opaca de
+sessão. Mudar padrões ou registros não consegue redirecionar status, atualização ou fechamento. Um
+timeout depois de uma mutação é indeterminado: inspecione a sessão registrada e o recibo upstream
+antes de tentar de novo com a requisição idêntica. Nunca reproduza automaticamente uma geração nem
+reabra uma sessão incerta.
 
-Session operations persist their request ID before dispatch; indeterminate CLI errors include
-that ID for an identical retry. Known acknowledgements survive local observation-write errors,
-which appear separately as persistence_warning. If open returns reference_persisted: false,
-retain its complete acknowledgement and repair local storage before relying on that reference.
-Pinned records contain minimal continuation metadata and are bounded to 4 MiB, independently of
-the 1 MiB limit on each adapter request and response.
+Operações de sessão persistem seu ID de requisição antes do despacho; erros indeterminados de CLI
+incluem esse ID para uma nova tentativa idêntica. Reconhecimentos conhecidos sobrevivem a erros
+locais de escrita de observação, que aparecem separadamente como `persistence_warning`. Se `open`
+retornar `reference_persisted: false`, mantenha seu reconhecimento completo e repare o
+armazenamento local antes de confiar nessa referência. Registros fixados contêm metadados mínimos
+de continuação e têm um teto de 4 MiB, independentemente do limite de 1 MiB em cada requisição e
+resposta de adaptador.
 
-References and observations are private data under the harness state directory. Put their paths,
-source/document identities and latest acknowledged revision in a neutral task handoff's artifacts
-and verification fields. They transfer no approvals or native permissions. Uninstall preserves
-user configuration, adapter registrations, references and external viewer installations.
+Referências e observações são dados privados sob o diretório de estado do harness. Coloque seus
+caminhos, identidades de fonte/documento e a última revisão reconhecida nos campos de artefatos e
+verificação de um handoff de tarefa neutro. Eles não transferem aprovações nem permissões nativas.
+A desinstalação preserva a configuração do usuário, os registros de adaptador, as referências e as
+instalações de visualizador externo.
 
-## Adapter contract 1
+## Contrato de adaptador 1
 
-An adapter reads one bounded JSON object on stdin and writes one JSON result on stdout, exiting.
-Required request keys are contract_version, request_id (canonical UUID), operation, implementation
-(registered id), settings, and input. The result repeats the first four keys, adds status
-(ok, error, or indeterminate), and supplies result (object) or error (object with code).
-Success requires exit zero. Inputs and outputs are bounded to 1 MiB; calls have a deadline.
+Um adaptador lê um objeto JSON limitado na stdin e escreve um resultado JSON na stdout, saindo em
+seguida. As chaves de requisição obrigatórias são `contract_version`, `request_id` (UUID
+canônico), `operation`, `implementation` (id registrado), `settings`, e `input`. O resultado
+repete as quatro primeiras chaves, adiciona `status` (ok, error, ou indeterminate), e fornece
+`result` (objeto) ou `error` (objeto com `code`). O sucesso exige saída zero. Entradas e saídas têm
+um teto de 1 MiB; chamadas têm um prazo.
 
-Required operations are describe, validate, open, replace-document, status, and close. describe
-reports capabilities as an array of names. open returns result.session as an opaque nonempty
-object, plus the viewer's document identity, epoch/revision/digest and actual capabilities.
-Session operations receive that object in input.session. Failed results must not invent an
-acknowledgement. Unsupported required capabilities fail before open.
+As operações obrigatórias são `describe`, `validate`, `open`, `replace-document`, `status`, e
+`close`. `describe` relata capacidades como um array de nomes. `open` retorna `result.session` como
+um objeto opaco não vazio, mais a identidade de documento do visualizador, epoch/revision/digest e
+capacidades reais. Operações de sessão recebem esse objeto em `input.session`. Resultados falhos
+não podem inventar um reconhecimento. Capacidades obrigatórias não suportadas falham antes de
+`open`.
 
-Optional request-regeneration, claim-regeneration, complete-generation and cancel-generation
-operations require regeneration-request capability. They use consumer, regeneration_id and
-claim_id where appropriate. cancel takes target_request_id and requires cancel capability.
-A request records intent for the current authorized workflow owner; it never authorizes source
-edits or launches an agent. Incomplete, expired and stale work stays explicit.
+As operações opcionais `request-regeneration`, `claim-regeneration`, `complete-generation` e
+`cancel-generation` exigem a capacidade `regeneration-request`. Elas usam `consumer`,
+`regeneration_id` e `claim_id` quando aplicável. `cancel` recebe `target_request_id` e exige a
+capacidade `cancel`. Uma requisição registra a intenção do dono autorizado atual do workflow;
+nunca autoriza edições de fonte nem inicia um agente. Trabalho incompleto, expirado ou obsoleto
+permanece explícito.
 
-The upstream adapter calls only the installed public describe/validate/open/status/control CLI.
-It sends JSON envelopes to that client and emits EDN projection files. It does not parse EDN,
-import private viewer namespaces, compute layout or own document revisions.
+O adaptador upstream chama apenas a CLI pública instalada de describe/validate/open/status/control.
+Ele envia envelopes JSON para esse cliente e emite arquivos de projeção EDN. Não analisa EDN, não
+importa namespaces privados de visualizador, não calcula layout nem possui as revisões de
+documento.
 
-## Architecture-diagram profile 1
+## Profile de diagrama de arquitetura 1
 
-The profile is deliberately narrower than a review snapshot. Required envelope fields are
-profile: architecture-diagram, schema_version: 1, and document_id. Arrays nodes, relations and
-packages may be empty. title is optional. Unknown required fields are rejected; optional
-objects carry explicitly omittable data and every omission is reported.
+O profile é deliberadamente mais estreito que um snapshot de revisão. Os campos de envelope
+obrigatórios são `profile: architecture-diagram`, `schema_version: 1`, e `document_id`. Os arrays
+`nodes`, `relations` e `packages` podem estar vazios. `title` é opcional. Campos obrigatórios
+desconhecidos são rejeitados; objetos opcionais carregam dados explicitamente omissíveis e toda
+omissão é relatada.
 
-- Nodes have id, kind and label; optional package_id, source, metrics and optional. Supported
-  kinds are class, module, interface, abstract, enum and external.
-- Packages have id and label. Nested package membership is unsupported and rejected.
-- Relations have id, from, to and kind, with optional label. Supported kinds are association,
-  dependency, aggregation, composition, inheritance and implements.
-- Source locators have repository-relative path, optional positive line and Clojure namespace.
-  Namespace navigation uses the authorized source roots. Generic path/line navigation is not
-  advertised; the locator survives in the mapping artifact with an omission diagnostic.
-- Metrics are coverage (0–1), cc, crap, killed and survived. Each is an object with availability
-  and, only when measured, value. Missing/unsupported/failed observations remain absent from the
-  rendering. Nonfinite, negative and fractional count values reject.
+- Nós têm `id`, `kind` e `label`; opcionalmente `package_id`, `source`, `metrics` e `optional`. Os
+  tipos suportados são class, module, interface, abstract, enum e external.
+- Pacotes têm `id` e `label`. Filiação de pacote aninhada não é suportada e é rejeitada.
+- Relações têm `id`, `from`, `to` e `kind`, com `label` opcional. Os tipos suportados são
+  association, dependency, aggregation, composition, inheritance e implements.
+- Localizadores de fonte têm um caminho relativo ao repositório, uma linha positiva opcional e um
+  namespace Clojure. A navegação por namespace usa as raízes de fonte autorizadas. A navegação
+  genérica por caminho/linha não é anunciada; o localizador sobrevive no artefato de mapeamento com
+  um diagnóstico de omissão.
+- Métricas são coverage (0–1), cc, crap, killed e survived. Cada uma é um objeto com
+  disponibilidade e, somente quando medido, valor. Observações ausentes/não suportadas/falhas
+  permanecem ausentes na renderização. Valores de contagem não finitos, negativos e fracionários
+  são rejeitados.
 
-Mapping version 1 hashes exact node and package identities into stable EDN keyword IDs, preserving
-case distinctions and identity through label changes. Relation IDs map to their projected
-endpoints/kind/index. Package membership is direct; namespace is a source locator, not an invented
-hierarchy. Mapping artifacts preserve original source locators. Authored metrics retain their
-units; missing metrics never become zeros. Evidence, intent and review acceptance remain in the
-original richer snapshot and are not inferred from the diagram.
+O mapeamento versão 1 gera hash das identidades exatas de nó e pacote em IDs de palavra-chave EDN
+estáveis, preservando distinções de maiúsculas/minúsculas e identidade através de mudanças de
+rótulo. IDs de relação mapeiam para seus extremos/tipo/índice projetados. A filiação de pacote é
+direta; namespace é um localizador de fonte, não uma hierarquia inventada. Artefatos de mapeamento
+preservam os localizadores de fonte originais. Métricas de autoria mantêm suas unidades; métricas
+ausentes nunca viram zeros. Evidência, intenção e aceitação de revisão permanecem no snapshot mais
+rico original e não são inferidas do diagrama.
 
-## Verification boundaries
+## Limites de verificação
 
-Unit and process contract tests run without any model account. Native skill discovery and actual
-viewer interaction require separate tests in each runtime. Cross-viewer conformance compares
-identities and acknowledged outcomes, not pixels or identical feature sets. xAI-backed Grok
-parity additionally requires authenticated inference access; offline tests cannot establish it.
+Testes unitários e de contrato de processo rodam sem nenhuma conta de modelo. A descoberta nativa
+de skill e a interação real com o visualizador exigem testes separados em cada runtime. A
+conformidade entre visualizadores compara identidades e resultados reconhecidos, não pixels ou
+conjuntos de funcionalidades idênticos. A paridade do Grok apoiado em xAI exige adicionalmente
+acesso de inferência autenticado; testes offline não conseguem estabelecê-la.
 
-Run the optional installed-candidate check with Java available and a graphical desktop:
+Rode a verificação opcional de candidato instalado com Java disponível e um desktop gráfico:
 
 ~~~sh
 python3 scripts/viewer_acceptance.py --viewer /absolute/path/to/uml-viewer --evidence /tmp/viewer-result.json
 ~~~
 
-It opens a real window in isolated state, tests replacement, identical retry, stale revision,
-pinned continuation after configuration changes, and close. It does not change live configuration
-or qualify an agent runtime. The ordinary unit suite neither starts a viewer nor calls a model.
+Ela abre uma janela real em estado isolado, testa substituição, nova tentativa idêntica, revisão
+obsoleta, continuação fixada depois de mudanças de configuração, e fechamento. Ela não muda a
+configuração ao vivo nem qualifica um runtime de agente. A suíte unitária comum nem inicia um
+visualizador nem chama um modelo.

@@ -1,6 +1,6 @@
 ---
 name: code-quality-instruments
-description: Measure whether a test suite is any good, not only that it passes: branch coverage, mutation score, complexity-times-coverage risk, duplication. Use when adding or reviewing tests on a change that matters, a suite passes but a bug still shipped, coverage is high and confidence is not, or before promising a module is well tested.
+description: Measure whether a test suite is any good, not only that it passes: branch coverage, mutation score, complexity-times-coverage risk, duplication. Use when adding or reviewing tests on a change that matters, a suite passes but a bug still shipped, coverage is high and confidence is not, or before promising a module is well tested. (Meça se uma suíte de testes é boa, não só se ela passa: cobertura de branch, pontuação de mutação, risco de complexidade-vezes-cobertura, duplicação. Use ao adicionar ou revisar testes numa mudança que importa, quando uma suíte passa mas um bug ainda foi lançado, a cobertura é alta e a confiança não, ou antes de prometer que um módulo está bem testado.)
 ---
 
 A postura (stance) `testing` diz se testes são obrigatórios. Isto é como você descobre se os que

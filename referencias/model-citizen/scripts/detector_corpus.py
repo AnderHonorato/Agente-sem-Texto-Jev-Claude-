@@ -162,16 +162,16 @@ def main(argv=None):
             recorded_floor, pair = record[0], (round(record[1], 2), round(record[2], 2))
             now = measured(scores.get(detector_id))
             if now != pair:
-                stale.append("%s measures p=%.2f r=%.2f, not the recorded p=%.2f r=%.2f"
+                stale.append("%s mede p=%.2f r=%.2f, não o registrado p=%.2f r=%.2f"
                              % ((detector_id,) + now + pair))
             elif now[0] >= recorded_floor and now[1] >= recorded_floor:
-                stale.append("%s is recorded as below a %.2f floor and is not"
+                stale.append("%s está registrado como abaixo de um piso de %.2f e não está"
                              % (detector_id, recorded_floor))
             elif detector_id in failing:
                 waived.append("%s p=%.2f r=%.2f" % ((detector_id,) + now))
             else:
-                dormant.append("%s is recorded below %.2f, which the %.2f floor in force does "
-                               "not ask about" % (detector_id, recorded_floor, floor))
+                dormant.append("%s está registrado abaixo de %.2f, o que o piso de %.2f em vigor "
+                               "não pergunta" % (detector_id, recorded_floor, floor))
     except CorpusRecordError as exc:
         sys.stderr.write("corpus: %s\n" % exc)
         return 2
@@ -186,19 +186,19 @@ def main(argv=None):
         print(json.dumps(data, indent=2, sort_keys=True))
     else:
         print("\n\n".join(tables))
-        print("\nboth corpora, %d detectors" % len(scores))
+        print("\nos dois corpora, %d detectores" % len(scores))
         print(validity_table(scores, floor))
         for line in waived:
-            print("\nknown below the %.2f floor, and recorded as such: %s" % (floor, line))
+            print("\nconhecido abaixo do piso de %.2f, e registrado como tal: %s" % (floor, line))
         for line in dormant:
             print("\n%s" % line)
         if unscored:
-            print("\n%d detector(s) with no labelled example: %s"
+            print("\n%d detector(es) sem exemplo rotulado: %s"
                   % (len(unscored), ", ".join(unscored)))
         for line in stale:
-            print("\nthe known_below_floor entry is out of date: %s" % line)
+            print("\na entrada de known_below_floor está desatualizada: %s" % line)
         if failed:
-            print("\n%d detector(s) under the %.2f floor: %s"
+            print("\n%d detector(es) abaixo do piso de %.2f: %s"
                   % (len(failed), floor, ", ".join(failed)))
     return 1 if failed or unscored or stale else 0
 

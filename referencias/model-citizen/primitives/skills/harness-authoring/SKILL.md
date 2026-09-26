@@ -1,6 +1,6 @@
 ---
 name: harness-authoring
-description: Decide where an instruction belongs and write it there, then sync and lint. Use when asked to add, change or remove a rule, skill, instruction, hook, setting or CLAUDE.md line, to "remember" something that should persist beyond this session, or when a correction should apply to future sessions.
+description: Decide where an instruction belongs and write it there, then sync and lint. Use when asked to add, change or remove a rule, skill, instruction, hook, setting or CLAUDE.md line, to "remember" something that should persist beyond this session, or when a correction should apply to future sessions. (Decida onde uma instrução pertence e escreva-a lá, depois sincronize e faça lint. Use quando pedido para adicionar, mudar ou remover uma regra, skill, instrução, hook, configuração ou linha do CLAUDE.md, para "lembrar" de algo que deve persistir além desta sessão, ou quando uma correção deve se aplicar a sessões futuras.)
 ---
 
 # Autoria do harness

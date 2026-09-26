@@ -1,6 +1,6 @@
 ---
 name: api-verification
-description: Prove a search, filter or API answer is real before relying on it, and budget web search across a fan-out. Use when querying an unfamiliar API, a filter returns suspiciously clean results, a per-item error may have been swallowed, or briefing research agents.
+description: Prove a search, filter or API answer is real before relying on it, and budget web search across a fan-out. Use when querying an unfamiliar API, a filter returns suspiciously clean results, a per-item error may have been swallowed, or briefing research agents. (Prove que uma resposta de busca, filtro ou API é real antes de confiar nela, e orce a busca web num fan-out. Use ao consultar uma API desconhecida, quando um filtro retorna resultados suspeitosamente limpos, um erro por item pode ter sido engolido, ou ao instruir agentes de pesquisa.)
 ---
 
 # Pesquisa e verificação de API

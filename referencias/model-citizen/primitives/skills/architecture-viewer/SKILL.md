@@ -1,6 +1,6 @@
 ---
 name: architecture-viewer
-description: Open or update an architecture diagram with the selected builtin or custom viewer, preserving a neutral session handoff. Use when asked to inspect architecture interactively or continue an existing diagram session.
+description: Open or update an architecture diagram with the selected builtin or custom viewer, preserving a neutral session handoff. Use when asked to inspect architecture interactively or continue an existing diagram session. (Abra ou atualize um diagrama de arquitetura com o visualizador nativo ou personalizado selecionado, preservando um handoff de sessão neutro. Use quando pedido para inspecionar arquitetura interativamente ou continuar uma sessão de diagrama existente.)
 ---
 
 # Visualizador de arquitetura

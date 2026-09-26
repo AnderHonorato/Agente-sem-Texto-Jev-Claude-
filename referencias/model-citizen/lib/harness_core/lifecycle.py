@@ -208,18 +208,19 @@ CONFINEMENT_SENTENCE = ("A read-only role runs through `citizen role run <role>`
 
 
 def harness_command():
-    """The CLI by the absolute path of this checkout, quoted for a shell.
+    """A CLI pelo caminho absoluto deste checkout, entre aspas para um shell.
 
-    No documented install puts `harness` on `PATH`, so a bare name in the refusal is a command the
-    refused client cannot run (issue #761). The checkout the hook runs from is the one that answers.
+    Nenhuma instalação documentada coloca `harness` no `PATH`, então um nome nu na recusa é um
+    comando que o cliente recusado não consegue rodar (issue #761). O checkout de onde o hook
+    roda é o que responde.
     """
     return shlex.quote(str(ROOT / "bin" / "harness"))
 
 
 def role_instruction(runtime, name, fields):
-    """How this role is actually run, ending in the sentence the stance and the roles also carry."""
+    """Como este papel de fato roda, terminando na frase que a stance e os papéis também carregam."""
     from . import catalog
-    # The role's class picks the model; the session's is the fallback, never the default.
+    # A classe do papel escolhe o modelo; o da sessão é o fallback, nunca o padrão.
     mapped = (fields is not None and not fields.get("unresolved")
               and "model" in catalog.role_binding(ROOT, runtime, fields))
     return ("Use " + harness_command() + " role run " + name + " --runtime " + runtime
@@ -230,7 +231,7 @@ def role_instruction(runtime, name, fields):
 
 
 def role_deny(runtime, name, fields, origin=None):
-    """The refusal a constrained role's spawn gets. `origin` says what the harness recognised."""
+    """A recusa que o disparo de um papel restrito recebe. `origin` diz o que o harness reconheceu."""
     reason = ("This constrained harness role requires an isolated worker. "
               + role_instruction(runtime, name, fields))
     return {"hookSpecificOutput": {"permissionDecision": "deny",
@@ -238,13 +239,13 @@ def role_deny(runtime, name, fields, origin=None):
 
 
 def confinement_deny(runtime, session_id, name, fields, prompt, recognised):
-    """`role_deny`, with the decision-log row every confinement refusal writes.
+    """`role_deny`, com a linha de log de decisão que toda recusa de confinamento escreve.
 
-    `recognised` is what named the role: the spawn's `subagent_type`, or a `harness-role:` line
-    in its brief. The row's input leads with the role and that signal, then the brief's
-    fingerprint, so a refusal is countable by role without a second field on the row, and a
-    refused spawn is never mistaken for a spawn that ran: the usage ledger's own rule for that
-    is in `usage-log.py`.
+    `recognised` é o que nomeou o papel: o `subagent_type` do disparo, ou uma linha `harness-role:`
+    em seu brief. A entrada da linha começa com o papel e esse sinal, depois a fingerprint do
+    brief, para que uma recusa seja contável por papel sem um segundo campo na linha, e um
+    disparo recusado nunca seja confundido com um disparo que rodou: a própria regra do ledger de
+    uso para isso está em `usage-log.py`.
     """
     module = decisions()
     if module is not None:
@@ -255,10 +256,11 @@ def confinement_deny(runtime, session_id, name, fields, prompt, recognised):
 
 
 def marker_role(prompt):
-    """`(name, fields)` for a brief that declares its role on a `harness-role:` line, else None.
+    """`(name, fields)` para um brief que declara seu papel numa linha `harness-role:`, senão None.
 
-    A marker naming something that is not a constrained shared role says nothing: the guard is a
-    declaration the harness can verify, not a word the model can use to refuse arbitrary work.
+    Um marcador nomeando algo que não é um papel compartilhado restrito não diz nada: a proteção
+    é uma declaração que o harness consegue verificar, não uma palavra que o modelo pode usar para
+    recusar trabalho arbitrário.
     """
     if not isinstance(prompt, str):
         return None

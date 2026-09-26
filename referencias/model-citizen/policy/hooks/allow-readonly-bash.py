@@ -1,39 +1,40 @@
 #!/usr/bin/env python3
-"""PreToolUse hook: approve read-only Bash commands that Claude Code's built-in
-read-only set misses, so plan mode and Manual mode stop prompting for them.
+"""Hook de PreToolUse: aprova comandos Bash somente leitura que o conjunto somente-leitura
+embutido do Claude Code não pega, para que o modo plano e o modo Manual parem de pedir
+confirmação para eles.
 
-Why a hook and not allow rules: `git -C <dir> status`, `gh repo view`, `npm view`
-and friends cannot be expressed as a prefix rule without a wildcard before the
-subcommand, which Claude Code warns about and which would also match writes.
+Por que um hook e não regras de allow: `git -C <dir> status`, `gh repo view`, `npm view`
+e afins não podem ser expressos como uma regra de prefixo sem um wildcard antes do
+subcomando, sobre o qual o Claude Code avisa e que também combinaria com escritas.
 
-Behaviour:
-  - Approves only when EVERY command that would run is read-only under the grammar
-    below. Compound commands are decomposed first: pipelines and `;`/`&&`/`||`
-    sequences, newlines, `for`/`while`/`until`/`if` blocks, subshell `( ... )` and
-    group `{ ...; }`, and command substitutions `$(...)` / backticks / `<(...)` are
-    each verified, recursively, and the whole thing is approved only if every part
-    is. Anything the grammar cannot prove read-only returns no decision and falls
-    through to the normal permission flow. This hook never denies.
-  - Output redirections to a file (`>`, `>>`, `>|`, `&>`, `>&`, `<>`) are never
-    approved here; `/dev/null` and fd duplication (`2>&1`) are. Heredocs and
-    backslash continuations are not modelled and fall through. A `#` comment ends
-    at its line, as it does for bash, so nothing after a comment is hidden from
-    the check.
-  - Subshells that run a write, `bash -c`, `eval`, `xargs`, `sudo`, `find -exec`
-    and `find -delete`, and a command built from a substitution's output are never
-    approved here; nor are the write or exec flags of otherwise read-only tools
-    (`sort -o`, `fd -x`, `rg --pre`, `sed w`, awk's `system()`), a program run by
-    path outside the system bin directories, or an environment assignment that
-    steers a later command (`PATH`, `GIT_*`, `NODE_OPTIONS` and the like).
+Comportamento:
+  - Aprova só quando TODO comando que rodaria é somente leitura sob a gramática
+    abaixo. Comandos compostos são decompostos primeiro: pipelines e sequências
+    `;`/`&&`/`||`, quebras de linha, blocos `for`/`while`/`until`/`if`, subshell `( ... )` e
+    grupo `{ ...; }`, e substituições de comando `$(...)` / crase / `<(...)` são
+    cada uma verificada, recursivamente, e o conjunto todo só é aprovado se cada parte
+    for. Qualquer coisa que a gramática não consiga provar somente leitura não retorna
+    decisão nenhuma e cai no fluxo de permissão normal. Este hook nunca nega.
+  - Redirecionamentos de saída para um arquivo (`>`, `>>`, `>|`, `&>`, `>&`, `<>`) nunca
+    são aprovados aqui; `/dev/null` e duplicação de fd (`2>&1`) são. Heredocs e
+    continuações de barra invertida não são modelados e caem no fluxo normal. Um comentário `#`
+    termina na sua linha, como faz para o bash, então nada depois de um comentário fica escondido
+    da checagem.
+  - Subshells que rodam uma escrita, `bash -c`, `eval`, `xargs`, `sudo`, `find -exec`
+    e `find -delete`, e um comando construído a partir da saída de uma substituição nunca são
+    aprovados aqui; nem as flags de escrita ou execução de ferramentas de outra forma somente
+    leitura (`sort -o`, `fd -x`, `rg --pre`, `sed w`, o `system()` do awk), um programa rodado
+    por caminho fora dos diretórios bin do sistema, ou uma atribuição de ambiente que
+    direciona um comando posterior (`PATH`, `GIT_*`, `NODE_OPTIONS` e afins).
 
-Test: echo '{"tool_name":"Bash","tool_input":{"command":"git -C /x status"}}' | python3 allow-readonly-bash.py
+Teste: echo '{"tool_name":"Bash","tool_input":{"command":"git -C /x status"}}' | python3 allow-readonly-bash.py
 """
 import json
 import re
 import sys
 
-# Commands that are read-only regardless of arguments. Claude Code still checks
-# redirect targets on its own; we refuse file redirects below anyway.
+# Comandos que são somente leitura independentemente dos argumentos. O Claude Code ainda checa
+# os alvos de redirecionamento por conta própria; recusamos redirecionamentos de arquivo abaixo de qualquer forma.
 PLAIN = {
     "ls", "cat", "head", "tail", "wc", "grep", "egrep", "fgrep", "find",
     "stat", "du", "df", "pwd", "echo", "printf", "true", "false",
@@ -45,8 +46,8 @@ PLAIN = {
     "read", "fold", "paste", "join", "look", "hexdump", "base64", "cksum",
 }
 
-# Read-only unless one of these flags appears: a long option matched by prefix, or a
-# letter anywhere in a short-option cluster, so `-Hx` is caught the same as `-x`.
+# Somente leitura a menos que uma dessas flags apareça: uma opção longa combinada por prefixo, ou
+# uma letra em qualquer lugar num agrupamento de opções curtas, então `-Hx` é pego do mesmo jeito que `-x`.
 FLAGGED = {
     "sort": (("--output", "--compress-program"), "o"),
     "tree": ((), "o"),

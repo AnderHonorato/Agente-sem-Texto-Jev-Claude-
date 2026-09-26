@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""PreToolUse hook: approve WebFetch while in plan mode, so gathering context for a
-plan does not prompt for every documentation or reference URL.
+"""Hook de PreToolUse: aprova WebFetch enquanto em modo plano, para que reunir contexto para um
+plano não peça confirmação para toda URL de documentação ou referência.
 
-Scope is deliberately narrow: only when `permission_mode` is `plan`, and only for
-`http`/`https` URLs. Every other mode keeps its normal permission flow, so this
-changes nothing outside planning. This hook never denies.
+O escopo é deliberadamente estreito: só quando `permission_mode` é `plan`, e só para URLs
+`http`/`https`. Todo outro modo mantém seu fluxo de permissão normal, então isso não muda nada
+fora do planejamento. Este hook nunca nega.
 
-Why this is safe enough to allow: plan mode already blocks edits, so the fetch
-cannot change anything, and the `neutralize-tool-output` hook still scans the
-fetched text for instruction-shaped content before it reaches the model. It does
-not make fetched pages trusted; it removes the prompt for read-only research.
+Por que isso é seguro o bastante para permitir: o modo plano já bloqueia edições, então a busca
+não pode mudar nada, e o hook `neutralize-tool-output` ainda escaneia o texto buscado em busca de
+conteúdo em forma de instrução antes que alcance o modelo. Não torna as páginas buscadas
+confiáveis; remove o prompt para pesquisa somente leitura.
 
-Test: echo '{"tool_name":"WebFetch","permission_mode":"plan","tool_input":{"url":"https://example.com"}}' | python3 allow-plan-webfetch.py
+Teste: echo '{"tool_name":"WebFetch","permission_mode":"plan","tool_input":{"url":"https://example.com"}}' | python3 allow-plan-webfetch.py
 """
 import json
 import sys

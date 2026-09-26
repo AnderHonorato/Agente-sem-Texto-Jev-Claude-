@@ -1,22 +1,23 @@
 # SPDX-License-Identifier: MIT
-"""Whether this host can start each qualification target it is asked about, answered before a round.
+"""Se este host consegue iniciar cada alvo de qualificação sobre o qual é perguntado, respondido antes de uma rodada.
 
-A target runs either here, when its platform is this host's, or in the Linux container the
-qualification runbook builds, when it is a Linux target and this host is not Linux. What must
-exist differs by case, and each missing piece otherwise surfaces part-way through a paid round:
+Um alvo roda aqui mesmo, quando sua plataforma é a deste host, ou no container Linux que o
+runbook de qualificação constrói, quando é um alvo Linux e este host não é Linux. O que precisa
+existir difere por caso, e cada peça ausente de outra forma aparece no meio de uma rodada paga:
 
-- a target that runs here needs its client on `PATH`, and a credential the client can use — for
-  Codex a ChatGPT session login in its configuration home or `OPENAI_API_KEY`, for Claude Code the
-  answer `credentials.reachable` gives;
-- a Linux target on a host that is not Linux needs `docker` on `PATH` and a daemon that answers;
-  its client and login are checked by this same probe run inside the container;
-- a macOS target cannot run anywhere but a Mac. Named explicitly off a Mac, it is a failure; left
-  to the default list, it is skipped with that reason, so the default never fails a host for a
-  target it could not run.
+- um alvo que roda aqui precisa do seu cliente no `PATH`, e uma credencial que o cliente possa
+  usar — para o Codex, um login de sessão ChatGPT na sua home de configuração ou
+  `OPENAI_API_KEY`, para o Claude Code a resposta que `credentials.reachable` dá;
+- um alvo Linux num host que não é Linux precisa de `docker` no `PATH` e um daemon que responda;
+  seu cliente e login são checados por essa mesma sondagem rodando dentro do container;
+- um alvo macOS não consegue rodar em lugar nenhum além de um Mac. Nomeado explicitamente fora de
+  um Mac, é uma falha; deixado para a lista padrão, é pulado com esse motivo, então o padrão nunca
+  reprova um host por um alvo que não conseguiria rodar.
 
-No value is read or printed. The Docker question is the only subprocess, bounded by a timeout, and
-it is asked once however many targets need it. The provisioning contract these checks follow is
-in docs/compatibility.md and the commands are in docs/qualification-runbook.md.
+Nenhum valor é lido ou impresso. A pergunta sobre o Docker é o único subprocesso, limitado por um
+timeout, e é feita uma vez, não importa quantos alvos precisem dela. O contrato de provisionamento
+que essas checagens seguem está em docs/compatibility.md e os comandos estão em
+docs/qualification-runbook.md.
 """
 import argparse
 import os
@@ -29,8 +30,8 @@ from pathlib import Path
 from harness_core import credentials
 
 RUNTIMES = {"claude-code-cli-": ("claude-code", "claude"), "codex-cli-": ("codex", "codex")}
-# The acceptance runner's CLI targets, the default when no target is named. A test holds this to
-# the runner's own table, which this module cannot import from `scripts/`.
+# Os alvos de CLI do executor de aceitação, o padrão quando nenhum alvo é nomeado. Um teste
+# mantém isso alinhado com a própria tabela do executor, que este módulo não pode importar de `scripts/`.
 DEFAULT_TARGETS = ("claude-code-cli-linux", "claude-code-cli-macos", "codex-cli-linux",
                    "codex-cli-macos")
 PLATFORMS = {"Darwin": "macos", "Linux": "linux"}
@@ -39,13 +40,13 @@ DOCKER_TIMEOUT = 15
 
 
 class Unready(Exception):
-    """A target this host was asked to run cannot start here."""
+    """Um alvo que este host foi solicitado a rodar não consegue iniciar aqui."""
 
 
 def describe(target):
-    """``(runtime, command, platform)`` for a CLI target id such as ``codex-cli-linux``.
+    """``(runtime, command, platform)`` para um id de alvo de CLI como ``codex-cli-linux``.
 
-    Only the CLI surfaces run headlessly; an editor, desktop or marketplace surface is refused.
+    Só as superfícies de CLI rodam sem interface; uma superfície de editor, desktop ou marketplace é recusada.
     """
     for prefix, (runtime, command) in RUNTIMES.items():
         if target.startswith(prefix) and target[len(prefix):] in PLATFORMS.values():

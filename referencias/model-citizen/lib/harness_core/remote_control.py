@@ -640,16 +640,16 @@ def disconnected_sessions(rows, environment_ids):
 
 
 def reattach_command(session, permission_mode="default"):
-    """The manual recovery line for one lost session. Printed for the user to run, not run."""
+    """A linha de recuperação manual para uma sessão perdida. Impressa para o usuário rodar, não rodada aqui."""
     return (f"claude remote-control --session-id {session.get('id')} "
             f"--permission-mode {permission_mode}")
 
 
 def is_host_process(command):
-    """Whether a `ps -o command=` line is the `claude` host itself, not its caffeinate wrapper.
+    """Se uma linha `ps -o command=` é o próprio host `claude`, não seu wrapper caffeinate.
 
-    `keep_awake` makes the launchd job pid caffeinate's, and signalling that leaves the host
-    running, so the signal has to find the child.
+    `keep_awake` faz o pid do job launchd ser o do caffeinate, e sinalizar isso deixa o host
+    rodando, então o sinal precisa encontrar o filho.
     """
     parts = (command or "").split()
     return bool(parts) and Path(parts[0]).name != "caffeinate" and "remote-control" in parts

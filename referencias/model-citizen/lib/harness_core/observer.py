@@ -119,13 +119,13 @@ def parse_args(argv):
 
 
 def main(runtime=None, argv=None, stdin=None):
-    """Record the event on stdin. Returns 0 on every path, and never writes stdout or stderr."""
+    """Registra o evento recebido no stdin. Retorna 0 em todo caminho, e nunca escreve em stdout ou stderr."""
     try:
         named, profile = parse_args(sys.argv[1:] if argv is None else argv)
         runtime = runtime or named or "unknown"
         raw = (sys.stdin if stdin is None else stdin).read()
         record(json.loads(raw), runtime, profile)
-    except BaseException as error:  # noqa: BLE001 - observation fails open and silent, always.
+    except BaseException as error:  # noqa: BLE001 - a observação falha aberta e silenciosa, sempre.
         note_error(runtime or "unknown", error)
     return 0
 

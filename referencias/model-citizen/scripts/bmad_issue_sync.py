@@ -39,7 +39,7 @@ TEMPLATE = {
     "task": "task",
     "chore": "task",
 }
-# The sections `audit --delivery` requires to hold content once placeholder comments are stripped.
+# As seções que `audit --delivery` exige que tenham conteúdo depois que os comentários de espaço reservado são removidos.
 REQUIRED = {
     "story": ("Story", "Acceptance criteria", "Design", "Tasks", "Dev notes"),
     "bug": ("Reproduction", "Root cause", "Acceptance criteria", "Design", "Dev notes"),

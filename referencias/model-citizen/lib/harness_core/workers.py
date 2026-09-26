@@ -551,11 +551,11 @@ def process_start(pid):
 
 
 def running(pid, token):
-    """True if the recorded process still runs, False if it is gone, None if it cannot be told.
+    """True se o processo registrado ainda roda, False se se foi, None se não pode ser dito.
 
-    None is every case the harness cannot decide — a record from a release that stored no pid, a
-    platform that reports no start time, a stat call refused — and the caller must read it as the
-    status already on file rather than as a terminal state.
+    None é todo caso que o harness não consegue decidir — um registro de um lançamento que não
+    guardou pid, uma plataforma que não reporta horário de início, uma chamada stat recusada — e
+    o chamador deve lê-lo como o status já no arquivo, não como um estado terminal.
     """
     if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
         return None
@@ -574,12 +574,13 @@ def running(pid, token):
 
 
 def orphaned(record, run_dir):
-    """Report a run whose supervising process died without a result as the terminal `orphaned`.
+    """Reporta uma execução cujo processo supervisor morreu sem resultado como o terminal `orphaned`.
 
-    Only the live statuses are reclassified, and only when nothing was reported: a result on disk
-    means the run spoke for itself even if the process died before its final write. The new state
-    is persisted into `status.json` alone, every other key and every other file left as they are,
-    and a state directory that cannot be written still reports honestly to this caller.
+    Só os status vivos são reclassificados, e só quando nada foi reportado: um resultado em disco
+    significa que a execução falou por si mesma mesmo que o processo tenha morrido antes de sua
+    escrita final. O novo estado é persistido só em `status.json`, toda outra chave e todo outro
+    arquivo deixados como estão, e um diretório de estado que não pode ser escrito ainda reporta
+    honestamente a este chamador.
     """
     if record.get("status") not in LIVE:
         return record

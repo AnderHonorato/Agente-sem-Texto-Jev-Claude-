@@ -553,15 +553,15 @@ def event_time(row):
 
 
 def descending_by_event(rows):
-    """Whether a page is newest-first by `last_event_at`, the field the server orders by.
+    """Se uma página é mais-nova-primeiro por `last_event_at`, o campo pelo qual o servidor ordena.
 
-    Measured against a live account on 2026-09-22: a 50-row page is descending by `last_event_at`
-    with no violations, while `updated_at` goes backwards seven times within it and `created_at`
-    twenty-two, so `last_event_at` is the only field the cap can be read under.
+    Medido contra uma conta real em 2026-09-22: uma página de 50 linhas é descendente por
+    `last_event_at` sem violações, enquanto `updated_at` anda para trás sete vezes dentro dela e
+    `created_at` vinte e duas, então `last_event_at` é o único campo sob o qual o teto pode ser lido.
 
-    A page of more than one row holding a row with no readable timestamp is not descending: its
-    order cannot be read, and under a cap an order that cannot be read is refused rather than
-    assumed.
+    Uma página com mais de uma linha contendo uma linha sem timestamp legível não é descendente:
+    sua ordem não pode ser lida, e sob um teto uma ordem que não pode ser lida é recusada em vez
+    de assumida.
     """
     times = [event_time(row) for row in rows]
     if len(times) < 2:
@@ -572,11 +572,12 @@ def descending_by_event(rows):
 
 
 class SessionPage(object):
-    """One capped read of the sessions endpoint: what came back, or why nothing did.
+    """Uma leitura limitada do endpoint de sessões: o que voltou, ou por que nada voltou.
 
-    The three statuses are kept apart because a caller must never print one as another — a
-    refused page is not an account with no lost sessions. `truncated` is whether the account
-    holds more sessions than this page, which is as far as a capped read can honestly speak.
+    Os três status são mantidos separados porque um chamador nunca deve imprimir um como o
+    outro — uma página recusada não é uma conta sem sessões perdidas. `truncated` é se a conta
+    guarda mais sessões do que esta página, que é o mais longe que uma leitura limitada pode
+    honestamente falar.
     """
 
     FAILED, REFUSED, OK = "failed", "refused", "ok"
@@ -594,23 +595,23 @@ class SessionPage(object):
         return SessionPage(self.status, rows, self.truncated)
 
     def scope(self):
-        """What the count on this page may claim: the account, or only the newest `PAGE_LIMIT`."""
+        """O que a contagem nesta página pode alegar: a conta, ou só as `PAGE_LIMIT` mais novas."""
         return " in the newest %d" % PAGE_LIMIT if self.truncated else ""
 
 
 def fetch_sessions(token, opener=None):
-    """One page of the account's recent Remote Control sessions, newest first.
+    """Uma página das sessões recentes de Remote Control da conta, mais nova primeiro.
 
-    A page that did not arrive newest-first is refused rather than read, because under a cap the
-    rows such a page dropped are unknown rather than merely old.
+    Uma página que não chegou mais-nova-primeiro é recusada em vez de lida, porque sob um teto as
+    linhas que tal página descartou são desconhecidas em vez de meramente antigas.
 
-    A failure here is a report line, never an exit code: the supervisor's other work does not
-    depend on the network.
+    Uma falha aqui é uma linha de relatório, nunca um código de saída: o resto do trabalho do
+    supervisor não depende da rede.
     """
     try:
         with (opener or urlopen)(sessions_request(token), timeout=20) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except Exception:  # noqa: BLE001 - any network or parse failure reads the same to the caller
+    except Exception:  # noqa: BLE001 - qualquer falha de rede ou parse lê o mesmo para o chamador
         return SessionPage(SessionPage.FAILED)
     rows = session_rows(payload)
     if rows is None:
@@ -621,11 +622,11 @@ def fetch_sessions(token, opener=None):
 
 
 def disconnected_sessions(rows, environment_ids):
-    """Sessions still `active` whose bridge is `disconnected`, on an environment this Mac ran.
+    """Sessões ainda `active` cuja ponte é `disconnected`, num ambiente que este Mac rodou.
 
-    An archived session is past recovery and one on another device's environment is not ours,
-    so both are left out. The page's own order is kept: it has already been checked newest-first
-    by `last_event_at`, and re-sorting on `updated_at` would scramble it.
+    Uma sessão arquivada já passou do ponto de recuperação e uma no ambiente de outro
+    dispositivo não é nossa, então ambas ficam de fora. A própria ordem da página é mantida: ela
+    já foi checada mais-nova-primeiro por `last_event_at`, e reordenar por `updated_at` a embaralharia.
     """
     wanted = {str(e) for e in (environment_ids or [])}
     out = []

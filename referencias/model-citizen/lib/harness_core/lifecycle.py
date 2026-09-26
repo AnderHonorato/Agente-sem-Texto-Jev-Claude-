@@ -558,8 +558,8 @@ def evasion_deny(runtime, session_id, prompt):
             name = entry.get("role") if isinstance(entry.get("role"), str) else ""
             module = decisions()
             if module is not None:
-                # The fingerprint, not the brief: it is what the comparison actually ran on,
-                # and a matched refusal is the one judgment here worth a label.
+                # A fingerprint, não o brief: é sobre o que a comparação de fato rodou, e uma
+                # recusa correspondida é o único julgamento aqui que vale um rótulo.
                 module.record("evasion-deny", "deny", text, {"session_id": session_id}, runtime)
             return {"hookSpecificOutput": {"permissionDecision": "deny",
                     "permissionDecisionReason": "This work was refused as a native " + name
@@ -569,21 +569,21 @@ def evasion_deny(runtime, session_id, prompt):
 
 
 def log_bash_decision(runtime, event, results, command=None, confirmed=False):
-    """Record the permission answer the harness gave this command, when it gave one.
+    """Registra a resposta de permissão que o harness deu a este comando, quando deu uma.
 
-    Only `ask` and `deny` are graded rows. An approval is the harness declining to interrupt,
-    and "it ran" says nothing about whether declining was right; a refusal or a prompt is the
-    judgment a later label can grade. The row is written here rather than in `grade-bash.py`
-    because this is where the answer is composed: the grader's threshold, the permission mode
-    and plan-mode investigation all fold together into one answer, and only one is given.
+    Só `ask` e `deny` são linhas avaliadas. Uma aprovação é o harness optando por não interromper,
+    e "rodou" não diz nada sobre se não interromper foi certo; uma recusa ou um prompt é o
+    julgamento que um rótulo posterior pode avaliar. A linha é escrita aqui em vez de em
+    `grade-bash.py` porque é aqui que a resposta é composta: o limiar do avaliador, o modo de
+    permissão e a investigação de modo plano se combinam numa única resposta, e só uma é dada.
 
-    An allowed command goes to `record_allowed`, which keeps one in twenty of them as an
-    ungraded negative — but only where the harness gave the allow *and the runtime was told*.
-    A command the harness said nothing about is the runtime's own to answer and may still be
-    prompted on or refused, and on Codex a plain approval is dropped from the output for the
-    reason `_encode_pre` gives, so neither is evidence that anything was allowed. A confirmed
-    command is not one either: it reached here because the user answered a prompt the harness
-    raised, so it belongs to the earlier `ask` row.
+    Um comando permitido vai para `record_allowed`, que mantém um em cada vinte como um negativo
+    não avaliado — mas só onde o harness deu o allow *e o runtime foi avisado*. Um comando sobre o
+    qual o harness não disse nada é responsabilidade do próprio runtime e ainda pode receber
+    prompt ou ser recusado, e no Codex uma aprovação simples é descartada da saída pela razão que
+    `_encode_pre` dá, então nenhum dos dois é evidência de que algo foi permitido. Um comando
+    confirmado também não é um: chegou aqui porque o usuário respondeu a um prompt que o harness
+    levantou, então pertence à linha `ask` anterior.
     """
     module = decisions()
     if module is None:
@@ -601,12 +601,12 @@ def log_bash_decision(runtime, event, results, command=None, confirmed=False):
 
 
 def log_bash_outcome(runtime, event):
-    """Join `ran` to the decision this completed command belongs to, when there was one.
+    """Junta `ran` à decisão a que este comando concluído pertence, quando havia uma.
 
-    The tool ran, so whatever the harness asked, the user let it through. A command nothing was
-    asked about has no decision in the log and gets no record; a command that was asked about
-    and never came back is closed as `not_run` at SessionEnd, because an outright refusal and
-    an interrupted turn look identical from here.
+    A ferramenta rodou, então seja lá o que o harness perguntou, o usuário deixou passar. Um
+    comando sobre o qual nada foi perguntado não tem decisão no log e não recebe registro; um
+    comando sobre o qual se perguntou e que nunca voltou é fechado como `not_run` no SessionEnd,
+    porque uma recusa direta e um turno interrompido parecem idênticos daqui.
     """
     module = decisions()
     if module is None:
@@ -620,7 +620,7 @@ def log_bash_outcome(runtime, event):
 
 def encode_pre(runtime, original, normalized, results):
     encoded = _encode_pre(runtime, original, normalized, results)
-    # A policy's notice is the only trace of a rewrite the user would otherwise never see.
+    # O aviso de uma política é o único rastro de uma reescrita que o usuário de outra forma nunca veria.
     notices = [r["systemMessage"] for r in results if isinstance(r.get("systemMessage"), str) and r["systemMessage"]]
     if notices and runtime == "claude-code":
         encoded = dict(encoded, systemMessage="\n".join(notices))
@@ -633,8 +633,8 @@ def _encode_pre(runtime, original, normalized, results):
     reasons = [r.get("hookSpecificOutput", {}).get("permissionDecisionReason", "") for r in results]
     reason = "\n".join(x for x in reasons if x)
     fields = {"hookEventName": "PreToolUse"}
-    # A Codex client rejects the whole hook output when it carries an unsupported `allow`, so a
-    # plain approval says nothing and lets that runtime's own default stand.
+    # Um cliente Codex rejeita toda a saída do hook quando ela carrega um `allow` não suportado,
+    # então uma aprovação simples não diz nada e deixa o padrão próprio daquele runtime valer.
     if strongest and not (runtime == "codex" and strongest == "allow"):
         fields["permissionDecision"] = "deny" if runtime == "codex" and strongest == "ask" else strongest
         fields["permissionDecisionReason"] = reason
@@ -658,7 +658,7 @@ def _encode_pre(runtime, original, normalized, results):
             elif key == "subagent_type" and "agent_type" in updated:
                 native_key = "agent_type"
             updated[native_key] = value
-        # Codex requires allow for rewrites. Do not manufacture an approval to format output.
+        # O Codex exige allow para reescritas. Não fabrique uma aprovação só para formatar a saída.
         can_rewrite = runtime == "claude-code" or strongest == "allow" or normalized["tool_name"] == "Agent"
         if can_rewrite and updated != original.get("tool_input"):
             fields["updatedInput"] = updated

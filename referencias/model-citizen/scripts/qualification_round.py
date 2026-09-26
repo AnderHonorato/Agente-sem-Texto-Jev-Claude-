@@ -93,11 +93,11 @@ def nothing_observed(reason):
 
 
 def target_argv(clone, client, model, out, confirmed, routing):
-    """The runner's own argv for one target; confirmation is passed through per target only.
+    """O próprio argv do runner para um alvo; a confirmação é repassada só por alvo.
 
-    Without an operator's `--model` the target's routed execution model is passed, so the runner
-    executes on the model the round declares; only a target whose class the adapter leaves
-    unmapped reaches the runner's own default.
+    Sem um `--model` do operador, o modelo de execução roteado do alvo é passado, então o runner
+    executa no modelo que a rodada declara; só um alvo cuja classe o adaptador deixa sem
+    mapeamento alcança o padrão do próprio runner.
     """
     argv = [sys.executable, str(Path(clone) / "scripts" / RUNNER), "--client", client,
             "--out", str(out), "--execution-class", routing["execution_class"],
@@ -112,10 +112,10 @@ def target_argv(clone, client, model, out, confirmed, routing):
 
 
 def routing(targets, execution, assessment):
-    """One class pair per target, resolved before anything is launched.
+    """Um par de classes por alvo, resolvido antes de qualquer coisa ser lançada.
 
-    A refused pair stops the whole round rather than the target that asked for it: the round's
-    record would otherwise say two different things about who read its evidence.
+    Um par recusado para a rodada inteira em vez do alvo que o pediu: o registro da rodada, senão,
+    diria duas coisas diferentes sobre quem leu sua evidência.
     """
     try:
         executes = qualification.parse_class_map(execution, targets,
@@ -132,17 +132,18 @@ def routing(targets, execution, assessment):
 
 
 def with_models(tier_routing, model):
-    """Each target's routing restated with the model its runner will be passed.
+    """O roteamento de cada alvo reafirmado com o modelo que será passado ao seu runner.
 
-    The runner restates its own routing by the same rule, `native_acceptance.executed_by`, from
-    the `--model` this round passes it, so the round record and the target's record agree.
+    O runner reafirma seu próprio roteamento pela mesma regra, `native_acceptance.executed_by`, a
+    partir do `--model` que esta rodada lhe passa, para que o registro da rodada e o registro do
+    alvo concordem.
     """
     return dict((client, executed_by(routes, model or routes.get("execution_model"))[1])
                 for client, routes in tier_routing.items())
 
 
 def where(client):
-    """Where a target's cases run, read from the same comparison the runner refuses on."""
+    """Onde os casos de um alvo rodam, lido a partir da mesma comparação em que o runner recusa."""
     if not host_mismatch(client):
         return "runs on this host"
     if CLIENTS[client]["platform"] == "linux":
@@ -151,7 +152,7 @@ def where(client):
 
 
 def summarise(records):
-    """One line per target and case, in the order a reviewer reads them: worst first."""
+    """Uma linha por alvo e caso, na ordem em que um revisor os lê: o pior primeiro."""
     lines = []
     for client in sorted(records):
         data = records[client]
@@ -167,10 +168,10 @@ def summarise(records):
 
 
 def write_round(round_dir, result):
-    """The round record as it stands, rewritten as each target finishes.
+    """O registro da rodada como está, reescrito conforme cada alvo termina.
 
-    It is written before the smoke tier runs, so a round killed part way through still names the
-    classes that were executing and whatever targets had finished.
+    É escrito antes de o nível de fumaça rodar, para que uma rodada morta no meio do caminho ainda
+    nomeie as classes que estavam executando e quaisquer alvos que tivessem terminado.
     """
     (Path(round_dir) / "round.json").write_text(json.dumps(result, indent=2, sort_keys=True)
                                                 + "\n")
@@ -184,7 +185,7 @@ def run_round(round_dir, targets, model, confirmed, skip_smoke=False, tier_routi
     records_dir = Path(report["records"])
     records_dir.mkdir(parents=True, exist_ok=True)
     env = environment(report)
-    # A round killed mid-tier must not read as a deliberate skip.
+    # Uma rodada morta no meio do nível não pode ser lida como um pulo deliberado.
     result = {"source_commit": report.get("source_commit"),
               "smoke": SKIPPED if skip_smoke else RUNNING, "targets": {},
               "tier_routing": tier_routing}
@@ -201,9 +202,9 @@ def run_round(round_dir, targets, model, confirmed, skip_smoke=False, tier_routi
     for client in targets:
         out = records_dir / (client + ".json")
         note = unobserved_note(client, confirmed)
-        # Move any earlier record aside before the runner is launched. A runner that exits
-        # before writing `--out` would otherwise leave the previous round's file in place and
-        # this round would report its passes as its own.
+        # Move qualquer registro anterior para o lado antes de o runner ser lançado. Um runner que
+        # sai antes de escrever `--out` senão deixaria o arquivo da rodada anterior no lugar e
+        # esta rodada relataria as aprovações dele como suas próprias.
         if out.exists():
             out.replace(out.with_suffix(".json.previous"))
         failure = ""
@@ -212,8 +213,8 @@ def run_round(round_dir, targets, model, confirmed, skip_smoke=False, tier_routi
                                        tier_routing[client]),
                            cwd=str(clone), env=env, check=False, timeout=ROUND_TIMEOUT)
         except subprocess.TimeoutExpired:
-            # Reported and carried, not raised: a round collects every target's defects, and a
-            # target that ran past the deadline must not cost the targets after it.
+            # Relatado e carregado, não levantado: uma rodada coleta os defeitos de todo alvo, e
+            # um alvo que passou do prazo não pode custar os alvos depois dele.
             failure = "the target ran past the round deadline of %ss" % ROUND_TIMEOUT
         try:
             data = json.loads(out.read_text())
@@ -230,24 +231,25 @@ def run_round(round_dir, targets, model, confirmed, skip_smoke=False, tier_routi
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--round", type=Path, required=True, help="the provisioned round directory")
+    parser.add_argument("--round", type=Path, required=True, help="o diretório da rodada provisionado")
     parser.add_argument("--targets", default=",".join(sorted(CLIENTS)))
-    parser.add_argument("--model", help="the model every target runs on, overriding each "
-                                        "target's routed execution model")
+    parser.add_argument("--model", help="o modelo em que todo alvo roda, sobrepondo o modelo de "
+                                        "execução roteado de cada alvo")
     parser.add_argument("--home-confirmed", action="append", default=[], metavar="CLIENT",
-                        help="a client whose configuration home was compared against a hand run; "
-                             "repeat for each, and never for a surface nobody compared")
+                        help="um cliente cujo home de configuração foi comparado contra uma "
+                             "execução manual; repita para cada um, e nunca para uma superfície "
+                             "que ninguém comparou")
     parser.add_argument("--skip-smoke", action="store_true",
-                        help="the smoke tier already passed at this commit; recorded as "
-                             "skipped, and every target runs")
+                        help="o nível de fumaça já passou neste commit; registrado como "
+                             "skipped, e todo alvo roda")
     parser.add_argument("--execution-class", action="append", metavar="[TARGET=]CLASS",
-                        help="capability class running the cases (default %s, per target with "
+                        help="classe de capacidade que roda os casos (padrão %s, por alvo com "
                              "TARGET=CLASS)" % qualification.EXECUTION_DEFAULT)
     parser.add_argument("--assessment-class", action="append", metavar="[TARGET=]CLASS",
-                        help="capability class assessing the observations (default %s)"
+                        help="classe de capacidade que avalia as observações (padrão %s)"
                              % qualification.ASSESSMENT_DEFAULT)
     parser.add_argument("--plan", action="store_true",
-                        help="print what the round would run, launching nothing")
+                        help="imprime o que a rodada rodaria, sem lançar nada")
     args = parser.parse_args(argv)
     targets = [name.strip() for name in args.targets.split(",") if name.strip()]
     unknown = [name for name in targets if name not in CLIENTS]

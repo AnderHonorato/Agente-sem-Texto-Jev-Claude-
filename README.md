@@ -1,0 +1,1 @@
+# Agente-sem-Texto-Jev-Claude-

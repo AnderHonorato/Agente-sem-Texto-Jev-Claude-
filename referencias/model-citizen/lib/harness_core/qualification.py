@@ -1,20 +1,22 @@
-"""Which capability class executes a qualification target, and which class reads what it wrote.
+"""Qual classe de capacidade executa um alvo de qualificação, e qual classe lê o que ele escreveu.
 
-Every required case is now a script (#336): a target's worker runs a script, reads
-JSON and writes findings, which is not work that needs the strong tier. What does need it is the
-assessment — the published procedure requires a reviewer to assess the observations, and a
-cheaper worker that produced the evidence must never be the only reader of it.
+Todo caso obrigatório agora é um script (#336): o worker de um alvo roda um script, lê
+JSON e escreve achados, o que não é trabalho que precise do nível forte. O que precisa dele é a
+avaliação — o procedimento publicado exige que um revisor avalie as observações, e um worker mais
+barato que produziu a evidência nunca pode ser o único leitor dela.
 
-So a round carries two classes per target, not one: an execution class, `standard` by default,
-and an assessment class, `strong`, which is a floor and not a preference. The pair is resolved
-through the target runtime's `adapters/<runtime>/bindings.json` and written into the evidence
-record, so the record says which class produced an observation and which class must read it.
-A cheap execution class that resolves to the assessment class's own model is refused rather than
-recorded: a round whose executor is its own reader buys the saving by dropping the reviewer.
+Então uma rodada carrega duas classes por alvo, não uma: uma classe de execução, `standard` por
+padrão, e uma classe de avaliação, `strong`, que é um piso e não uma preferência. O par é resolvido
+através do `adapters/<runtime>/bindings.json` do runtime do alvo e escrito no registro de
+evidência, então o registro diz qual classe produziu uma observação e qual classe deve lê-la.
+Uma classe de execução barata que resolve para o próprio modelo da classe de avaliação é recusada
+em vez de registrada: uma rodada cujo executor é seu próprio leitor compra a economia removendo o
+revisor.
 
-The resolution reads the adapter's own table. A personal `tiers.<runtime>` override in a user's
-configuration is not applied, because a round runs from a frozen clone and the record names the
-class alongside the adapter's model for it; pass `tiers` to lay an overlay on top.
+A resolução lê a própria tabela do adaptador. Um override pessoal de `tiers.<runtime>` na
+configuração de um usuário não é aplicado, porque uma rodada roda a partir de um clone congelado
+e o registro nomeia a classe ao lado do modelo do adaptador para ela; passe `tiers` para colocar
+uma sobreposição em cima.
 """
 import importlib.util
 import re
@@ -25,8 +27,9 @@ from . import catalog
 TIER_CLASSES = catalog.TIER_CLASSES
 EXECUTION_DEFAULT = "standard"
 ASSESSMENT_DEFAULT = "strong"
-# The weakest class allowed to assess a round's observations. `docs/compatibility.md` requires a
-# reviewer; #340's decision 6 keeps that reviewer strong-class while the executor gets cheaper.
+# A classe mais fraca autorizada a avaliar as observações de uma rodada. `docs/compatibility.md`
+# exige um revisor; a decisão 6 da #340 mantém esse revisor na classe strong enquanto o executor
+# fica mais barato.
 ASSESSMENT_FLOOR = "strong"
 UNMAPPED = ("the %s adapter maps no %s class, so the %s worker inherits the session model; "
             "the record names the class, not a model")
@@ -35,13 +38,13 @@ _NORMALISERS = {}
 
 
 def _normaliser(root):
-    """`pricing.normalise_model` from the checkout, or the fallback below.
+    """`pricing.normalise_model` do checkout, ou o fallback abaixo.
 
-    One spelling of a model id has a definition already, in the pricing hook; a second copy of
-    it would drift from the ledger's. The hook lives under two names, `policy/hooks` being the
-    real one and `claude/hooks` the projection, and a tree carrying only the projection still
-    resolves. A tree carrying neither falls back, because a missing hook must not turn the
-    same-model refusal off.
+    Uma grafia de id de modelo já tem uma definição, no hook de pricing; uma segunda cópia dela
+    divergiria da do ledger. O hook vive sob dois nomes, `policy/hooks` sendo o real e
+    `claude/hooks` a projeção, e uma árvore que carrega só a projeção ainda resolve. Uma árvore
+    que não carrega nenhum dos dois recai para o fallback, porque um hook ausente não deve
+    desligar a recusa de mesmo modelo.
     """
     key = str(root)
     if key not in _NORMALISERS:
@@ -64,7 +67,7 @@ def _loaded(root):
 
 
 def _normalise_model(model):
-    """The fallback spelling: lower case, no window bracket, no vendor prefix, no release suffix."""
+    """A grafia de fallback: minúsculas, sem colchete de janela, sem prefixo de fornecedor, sem sufixo de lançamento."""
     name = re.sub(r"\[[^\]]*\]", "", (model or "").strip().lower()).split("/")[-1]
     while True:
         head, dot, rest = name.partition(".")
@@ -84,14 +87,14 @@ def _words(name):
 
 
 def same_model(first, second, normalise=_normalise_model):
-    """Whether two adapter entries name one model, once spelling and aliasing are allowed for.
+    """Se duas entradas de adaptador nomeiam um único modelo, uma vez consideradas grafia e aliasing.
 
-    Two classes mapped to `opus` and to a dated `claude-opus-4-5-20260101` are one model bought
-    twice, and comparing the strings would miss it. So the ids are normalised the way the ledger
-    normalises them, and an alias — every word of one id appearing, in order and adjacent, in the
-    other — counts as the same model. The comparison guards a refusal, so it errs towards
-    refusing: `gpt-5` and `gpt-5.6-terra` are treated as one model, and an operator who means two
-    writes two ids that are not one another's prefix.
+    Duas classes mapeadas para `opus` e para um `claude-opus-4-5-20260101` datado são um modelo
+    comprado duas vezes, e comparar as strings perderia isso. Então os ids são normalizados do
+    jeito que o ledger os normaliza, e um alias — cada palavra de um id aparecendo, em ordem e
+    adjacente, no outro — conta como o mesmo modelo. A comparação protege uma recusa, então erra
+    a favor de recusar: `gpt-5` e `gpt-5.6-terra` são tratados como um único modelo, e um operador
+    que quer dizer dois escreve dois ids que não são prefixo um do outro.
     """
     left, right = normalise(first), normalise(second)
     if left == right:
@@ -113,13 +116,13 @@ def _checked(name, what):
 
 
 def parse_class_map(values, targets, default, flag="--execution-class", known=None):
-    """`CLASS` or `TARGET=CLASS` arguments, later ones winning, as one class per target.
+    """Argumentos `CLASS` ou `TARGET=CLASS`, os mais recentes vencendo, como uma classe por alvo.
 
-    A bare class moves every target the round is running; a qualified one moves the target it
-    names, so a Codex round can be executed at a different class from a Claude Code one without
-    two invocations. `known` is every target this runner has, which is what tells a client left
-    out of `--targets` from a client that does not exist: the first is a round the operator has
-    not asked for, the second is a typo, and they are different mistakes.
+    Uma classe nua move todo alvo que a rodada está rodando; uma qualificada move o alvo que
+    nomeia, então uma rodada Codex pode ser executada numa classe diferente de uma Claude Code
+    sem duas invocações. `known` é todo alvo que este executor possui, o que é o que diferencia um
+    cliente deixado de fora de `--targets` de um cliente que não existe: o primeiro é uma rodada
+    que o operador não pediu, o segundo é um erro de digitação, e são erros diferentes.
     """
     chosen = dict((target, default) for target in targets)
     for value in values or []:
@@ -149,17 +152,16 @@ def parse_class_map(values, targets, default, flag="--execution-class", known=No
 
 def resolve(root, runtime, execution=EXECUTION_DEFAULT, assessment=ASSESSMENT_DEFAULT,
             tiers=None):
-    """The round's routing for one target, or `ValueError` naming why it is refused.
+    """O roteamento da rodada para um alvo, ou `ValueError` nomeando por que é recusado.
 
-    The refusal is a cheap execution class that lands on the assessment class's own model,
-    however it came about — an adapter table mapping two classes to one identifier, two
-    spellings of one model, or a cheap class the table does not map at all, which resolves
-    upward. An assessor the table does not map while the executor is pinned is refused too: the
-    reader would inherit whatever model the session happens to be running, which is no named
-    reader at all. Executing at the floor or above is not refused: it buys no saving, and the
-    reviewer it asks for is the one the procedure already requires. What remains a disclosure
-    rather than a refusal is an unmapped *executor* beside a mapped assessor, which is what
-    asking for a class stronger than the assessor's does.
+    A recusa é uma classe de execução barata que pousa no próprio modelo da classe de avaliação,
+    seja lá como isso aconteça — uma tabela de adaptador mapeando duas classes para um
+    identificador, duas grafias de um modelo, ou uma classe barata que a tabela não mapeia de jeito
+    nenhum, o que resolve para cima. Um avaliador que a tabela não mapeia enquanto o executor está
+    fixado também é recusado: o leitor herdaria seja lá qual modelo a sessão estiver rodando por
+    acaso, que não é leitor nomeado nenhum. O que continua sendo uma divulgação em vez de uma
+    recusa é um *executor* não mapeado ao lado de um avaliador mapeado, que é o que pedir uma
+    classe mais forte que a do avaliador faz.
     """
     _checked(execution, "execution")
     _checked(assessment, "assessment")
@@ -195,7 +197,7 @@ def resolve(root, runtime, execution=EXECUTION_DEFAULT, assessment=ASSESSMENT_DE
 
 
 def describe(routing):
-    """One line an operator reads in a plan or a round summary."""
+    """Uma linha que um operador lê num plano ou num resumo de rodada."""
     return "execution %s (%s), assessment %s (%s)" % (
         routing["execution_class"], routing["execution_model"] or "session model",
         routing["assessment_class"], routing["assessment_model"] or "session model")

@@ -1,4 +1,4 @@
-"""Owned-file reconciliation with durable intent and conflict-preserving rollback."""
+"""Reconciliação de arquivos possuídos com intenção durável e rollback que preserva conflitos."""
 import contextlib
 import json
 import os
@@ -43,7 +43,7 @@ def lock(directory):
 
 
 def update_toml(text, wanted):
-    """Apply owned top-level keys; a `None` value means the harness no longer wants that key."""
+    """Aplica chaves de topo possuídas; um valor `None` significa que o harness não quer mais essa chave."""
     document = tomlkit.parse(text)
     for key, value in wanted.items():
         if value is None:
@@ -78,7 +78,7 @@ def assign(document, keys, item):
         node.pop(keys[-1], None)
 
 
-# Hook scripts earlier releases registered by name, before commands carried a marker.
+# Scripts de hook que lançamentos anteriores registravam por nome, antes de os comandos carregarem um marcador.
 HARNESS_HOOK_BASENAMES = [
     "validate-plan-card.py", "allow-readonly-bash.py", "harness-session.py",
     "neutralize-tool-output.py",
@@ -86,7 +86,7 @@ HARNESS_HOOK_BASENAMES = [
 
 
 def _commands(entry):
-    """The command strings of a hook entry; anything malformed has none, so it is the user's."""
+    """As strings de comando de uma entrada de hook; qualquer coisa malformada não tem nenhuma, então é do usuário."""
     hooks = entry.get("hooks") if isinstance(entry, dict) else None
     if not isinstance(hooks, list):
         return []
@@ -102,8 +102,8 @@ def hook_marker(entry):
 
 
 def is_harness_hook_entry(entry):
-    """An entry the harness registered: it carries a `# harness:` marker, or runs one of the
-    legacy scripts by name as a whole path component, so `my-harness-session.py` is not one."""
+    """Uma entrada que o harness registrou: carrega um marcador `# harness:`, ou roda um dos
+    scripts legados pelo nome como um componente de caminho inteiro, então `my-harness-session.py` não é uma."""
     if hook_marker(entry):
         return True
     return any(re.search(r"(?:^|[\s/'\"])" + re.escape(name) + r"(?:$|[\s'\"])", command)

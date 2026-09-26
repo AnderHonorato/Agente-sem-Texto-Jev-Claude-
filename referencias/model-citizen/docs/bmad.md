@@ -1,15 +1,15 @@
-# BMad in agent-harness and downstream repositories
+# BMad no agent-harness e em repositórios downstream
 
-The harness is framework-agnostic. This page records a pattern that keeps a self-hosted
-planning framework (the [BMad Method](https://github.com/bmad-code-org/BMAD-METHOD), MIT)
-installed in a code repo without polluting it, and without the harness redistributing any of
-the framework's files. Model Citizen itself follows the same runtime boundary but deliberately
-publishes its authored BMad corpus in this repository.
+O harness é agnóstico de framework. Esta página registra um padrão que mantém um framework de
+planejamento autogerenciado (o [BMad Method](https://github.com/bmad-code-org/BMAD-METHOD), MIT)
+instalado em um repositório de código sem poluí-lo, e sem o harness redistribuir nenhum dos
+arquivos do framework. O próprio Model Citizen segue o mesmo limite de runtime mas
+deliberadamente publica seu corpus BMad autoral neste repositório.
 
-## This repository's public planning system
+## O sistema de planejamento público deste repositório
 
-Model Citizen pins BMad Method 6.12.0 with the `bmm` module, Claude Code and Codex projections,
-and compatibility shims. Reproduce the local apparatus from the shared checkout:
+O Model Citizen fixa o BMad Method 6.12.0 com o módulo `bmm`, projeções para Claude Code e Codex,
+e ajustes de compatibilidade. Reproduza o aparato local a partir do checkout compartilhado:
 
 ```sh
 BMAD_VERSION=6.12.0
@@ -18,41 +18,43 @@ npx --yes bmad-method@"$BMAD_VERSION" install --directory . --modules bmm \
   --document-output-language English --output-folder _bmad-output --shims --yes
 ```
 
-Then run `python3 bin/harness integration check bmad .`. Planning workflows run from the shared checkout;
-implementation still happens in managed worktrees.
+Depois rode `python3 bin/harness integration check bmad .`. Workflows de planejamento rodam a
+partir do checkout compartilhado; a implementação ainda acontece em worktrees gerenciadas.
 
-The version-control boundary is intentional:
+O limite de controle de versão é intencional:
 
-### Commit
+### Commitar
 
-- `_bmad/custom/**`: repository configuration, workflow customizations, templates and policy
-  extensions.
-- `_bmad-output/planning-artifacts/**`: product brief, PRD, developer journey, architecture,
-  epics, decisions, source ledger and readiness reports.
-- `_bmad-output/implementation-artifacts/**`: stories, public sprint state, retrospectives and
-  clearly marked historical reconstructions.
-- The pinned install instructions, repository-owned validation/synchronization code and deliberate
-  test fixtures.
+- `_bmad/custom/**`: configuração de repositório, customizações de workflow, templates e
+  extensões de política.
+- `_bmad-output/planning-artifacts/**`: brief de produto, PRD, jornada de desenvolvedor,
+  arquitetura, épicos, decisões, ledger de origem e relatórios de prontidão.
+- `_bmad-output/implementation-artifacts/**`: histórias, estado de sprint público, retrospectivas
+  e reconstruções históricas claramente marcadas.
+- As instruções de instalação fixadas, código de validação/sincronização possuído pelo
+  repositório e fixtures de teste deliberadas.
 
-### Do not commit
+### Não commitar
 
-- The installed `_bmad` runtime outside `_bmad/custom`.
-- Generated `.agents/skills`, `.claude/skills` or `.github/agents` projections.
-- Installer caches, temporary renderings, local backups, logs or session state.
-- Raw conversations, memory exports or source-ingestion dumps.
-- Secrets, private absolute paths, machine-specific configuration or unsanitized personal data.
+- O runtime `_bmad` instalado fora de `_bmad/custom`.
+- Projeções geradas de `.agents/skills`, `.claude/skills` ou `.github/agents`.
+- Caches de instalador, renderizações temporárias, backups locais, logs ou estado de sessão.
+- Conversas brutas, exportações de memória ou despejos de ingestão de fonte.
+- Segredos, caminhos absolutos privados, configuração específica de máquina ou dados pessoais não
+  higienizados.
 
-Every published artifact must be authored or intentionally reconstructed, sanitized, and useful
-to a public contributor. `_bmad/custom/config.user.toml` and every `*.user.toml` remain local.
-A clean reinstall and customization resolution must leave tracked files unchanged.
+Todo artefato publicado precisa ser escrito ou intencionalmente reconstruído, higienizado, e útil
+para um contribuidor público. `_bmad/custom/config.user.toml` e todo `*.user.toml` permanecem
+locais. Uma reinstalação limpa e a resolução de customização precisam deixar os arquivos
+rastreados inalterados.
 
-## GitHub traceability
+## Rastreabilidade no GitHub
 
-GitHub owns delivery state, discussion, the summary and acceptance evidence. BMad supplies immutable
-typed IDs and the story files that carry the design. `_bmad-output/issue-map.json` records each
-mapping, primary parent and next ID; `_bmad-output/implementation-artifacts/AH-*.md` is the story
-file and links back to the issue. A generated Planning block in the issue links to the artifact on
-`main`.
+O GitHub possui o estado de entrega, a discussão, o resumo e a evidência de aceitação. O BMad
+fornece IDs tipados imutáveis e os arquivos de história que carregam o design.
+`_bmad-output/issue-map.json` registra cada mapeamento, pai primário e próximo ID;
+`_bmad-output/implementation-artifacts/AH-*.md` é o arquivo de história e linka de volta para a
+issue. Um bloco Planning gerado na issue linka para o artefato na `main`.
 
 ```sh
 python3 scripts/bmad_issue_sync.py audit
@@ -60,51 +62,54 @@ python3 scripts/bmad_issue_sync.py plan
 python3 scripts/bmad_issue_sync.py apply
 ```
 
-`audit` is local and non-mutating. `plan` compares the manifest with live GitHub state. `apply`
-refuses to run until every artifact exists on `main`, then idempotently maintains the Planning block,
-exact `type::*` label and primary parent. It never changes a title, state or comment. GitHub native
-issue types are [organization-managed](https://docs.github.com/issues/tracking-your-work-with-issues/using-issues/managing-issue-types-in-an-organization)
-and cannot be assigned in this personal-account repository, so the manifest records `labels-only`
-projection explicitly rather than reporting permanent false drift.
-File maintainer work already mapped, from the worktree that will deliver it, and reserve an ID
-for a community issue during triage before implementation ownership:
+`audit` é local e não mutante. `plan` compara o manifesto com o estado ao vivo do GitHub. `apply`
+recusa rodar até que todo artefato exista na `main`, depois mantém idempotentemente o bloco
+Planning, o rótulo `type::*` exato e o pai primário. Ele nunca muda um título, estado ou
+comentário. Tipos de issue nativos do GitHub são
+[gerenciados pela organização](https://docs.github.com/issues/tracking-your-work-with-issues/using-issues/managing-issue-types-in-an-organization)
+e não podem ser atribuídos neste repositório de conta pessoal, então o manifesto registra a
+projeção `labels-only` explicitamente em vez de relatar um desvio falso permanente.
+Registre trabalho de mantenedor já mapeado, a partir da worktree que vai entregá-lo, e reserve um
+ID para uma issue da comunidade durante a triagem antes da posse da implementação:
 
 ```sh
 python3 scripts/bmad_issue_sync.py new --title TITLE --kind story --body-file BODY.md --parent PARENT_NUMBER
 python3 scripts/bmad_issue_sync.py reserve --issue N --kind story --parent PARENT_NUMBER
 ```
 
-Both write the map and a new artifact in the current checkout; commit them in the pull request that
-delivers the issue. The required `issue-ownership` check refuses a pull request whose delivery
-issue is absent from the map, and `apply` adds the Planning block once the artifact is on `main`.
+Os dois escrevem o mapa e um novo artefato no checkout atual; faça commit deles no pull request
+que entrega a issue. O check obrigatório `issue-ownership` recusa um pull request cuja issue de
+entrega está ausente do mapa, e `apply` adiciona o bloco Planning assim que o artefato está na
+`main`.
 
-### Story files
+### Arquivos de história
 
-`new`, `reserve` and `bootstrap` write each story file from the template for its kind in
-`scripts/bmad_story_templates/`: story, bug, spike, decision, epic, and one shared by task and
-chore. The file opens with the nine linkage fields and `updated` as frontmatter, then the H1, then a
-managed block between `<!-- bmad-sync:begin -->` and `<!-- bmad-sync:end -->` holding the issue
-link, the parent, the state and the line that splits authority: the issue carries the summary,
-discussion and acceptance evidence, and the file carries the design. Those three parts belong to the
-tool. Everything after the end marker belongs to the people and agents who write the story, and the
-tool never rewrites it. The block counts only where it opens, on the first non-blank line after
-the H1, and it closes at the first end marker after that. The markers quoted anywhere else, in prose
-or in a code fence, are ordinary text. Blank lines and whole-line HTML comments between the
-frontmatter and the H1 are kept as they are; anything else there makes the file malformed. A
-leading byte-order mark and CRLF line endings are kept on every rewrite.
+`new`, `reserve` e `bootstrap` escrevem cada arquivo de história a partir do template do seu tipo
+em `scripts/bmad_story_templates/`: story, bug, spike, decision, epic, e um compartilhado por task
+e chore. O arquivo abre com os nove campos de ligação e `updated` como frontmatter, depois o H1,
+depois um bloco gerenciado entre `<!-- bmad-sync:begin -->` e `<!-- bmad-sync:end -->` guardando o
+link da issue, o pai, o estado e a linha que divide a autoridade: a issue carrega o resumo,
+discussão e evidência de aceitação, e o arquivo carrega o design. Essas três partes pertencem à
+ferramenta. Tudo depois do marcador final pertence às pessoas e agentes que escrevem a história, e
+a ferramenta nunca a reescreve. O bloco só conta onde abre, na primeira linha não vazia depois do
+H1, e fecha no primeiro marcador final depois disso. Os marcadores citados em qualquer outro
+lugar, em prosa ou em um bloco de código, são texto comum. Linhas em branco e comentários HTML de
+linha inteira entre o frontmatter e o H1 são mantidos como estão; qualquer outra coisa ali torna o
+arquivo malformado. Uma marca de ordem de byte no início e finais de linha CRLF são mantidos em
+toda reescrita.
 
-Each template section holds a placeholder, `<!-- fill: what goes here -->`. A section counts as
-filled when text remains once HTML comments, an unclosed one included, and `###` to `######`
-sub-headings are taken out; any level 1 or 2 heading, ATX or setext, outside a comment or fence
-ends a section, and
-a required heading that appears twice is a finding. These sections must be filled:
+Cada seção do template guarda um placeholder, `<!-- fill: what goes here -->`. Uma seção conta
+como preenchida quando resta texto depois que comentários HTML, um não fechado incluído, e
+subcabeçalhos de `###` a `######` são retirados; qualquer cabeçalho de nível 1 ou 2, ATX ou
+setext, fora de um comentário ou bloco, encerra uma seção, e um cabeçalho obrigatório que aparece
+duas vezes é um achado. Estas seções precisam estar preenchidas:
 
 - **story:** Story, Acceptance criteria, Design, Tasks, Dev notes
 - **bug:** Reproduction, Root cause, Acceptance criteria, Design, Dev notes
 - **spike:** Question, Experiment, Exit criterion, Result
 - **decision:** Context, Options, Decision, Consequences
 - **epic:** Goal, Scope and requirement coverage, Exit criteria
-- **task and chore:** Goal, Acceptance criteria, Tasks
+- **task e chore:** Goal, Acceptance criteria, Tasks
 
 ```sh
 python3 scripts/bmad_issue_sync.py audit --delivery N
@@ -112,246 +117,267 @@ python3 scripts/bmad_issue_sync.py upgrade --check
 python3 scripts/bmad_issue_sync.py upgrade --id AH-S123
 ```
 
-`audit --delivery N` checks only issue N's story, and fails while any section its kind requires is
-missing or unfilled. The required `issue-ownership` check runs it for the pull request's own
-delivery issue on pull request and merge queue runs alike, so an unenriched story elsewhere in the
-corpus never blocks an unrelated pull request.
+`audit --delivery N` verifica só a história da issue N, e falha enquanto qualquer seção que seu
+tipo exige estiver ausente ou não preenchida. O check obrigatório `issue-ownership` o roda para a
+própria issue de entrega do pull request tanto em execuções de pull request quanto de fila de
+merge, então uma história não enriquecida em outro lugar do corpus nunca bloqueia um pull request
+não relacionado.
 
-A legacy stub is a file from before typed templates that opens with exactly the stub the tool
-rendered for its item, ignoring `updated` and line endings; anything after that stub is carried
-amendment text. Any other file without a well-formed managed block is malformed: `audit` reports
-it, `refresh` refuses it, and `audit --delivery` fails it, so deleting a marker never skips the
-depth check. The depth check passes a legacy stub with a notice, and `refresh` keeps rendering it the old way. `upgrade` converts stubs to
-their kind's skeleton, carrying every byte after the old stub, such as `## Amendment` sections,
-over verbatim at the end of the file, in the file's own line endings. It refuses a stub that
-differs from the one the tool rendered, converts all the selected files or none, restoring any it
-already wrote when a write fails, leaves a file already in the typed format alone, and with
-`--check` reports without writing. It is applied batch by batch, together with the
-enrichment, so a skeleton full of placeholders never lands on `main` on its own.
+Um stub legado é um arquivo de antes dos templates tipados que abre com exatamente o stub que a
+ferramenta renderizou para seu item, ignorando `updated` e finais de linha; qualquer coisa depois
+desse stub é texto de emenda carregado. Qualquer outro arquivo sem um bloco gerenciado bem
+formado é malformado: `audit` o relata, `refresh` o recusa, e `audit --delivery` o falha, então
+apagar um marcador nunca pula a verificação de profundidade. A verificação de profundidade aprova
+um stub legado com um aviso, e `refresh` continua renderizando-o da forma antiga. `upgrade`
+converte stubs para o esqueleto do seu tipo, carregando cada byte depois do stub antigo, como
+seções `## Amendment`, ao final do arquivo sem alteração, nos próprios finais de linha do arquivo.
+Ele recusa um stub que difere do que a ferramenta renderizou, converte todos os arquivos
+selecionados ou nenhum, restaurando qualquer um que já tenha escrito quando uma escrita falha,
+deixa um arquivo já no formato tipado intacto, e com `--check` relata sem escrever. É aplicado
+lote por lote, junto com o enriquecimento, para que um esqueleto cheio de placeholders nunca
+aterrisse na `main` sozinho.
 
-Because `next_ids` lives in the map, it knows only what this checkout has seen. Before allocating,
-both commands survey every issue map this clone can reach — the working copy of each linked
-worktree, so an uncommitted reservation counts, and every local and remote-tracking branch — and
-refuse when the counter is not past every ID of that kind already in use, naming each one and where
-it was found. Rebasing onto the branch that took them is the usual answer; `--advance` skips them
-instead and says which IDs it leaves permanently unused. Heads `git ls-remote` advertises that this
-clone holds no object for are reported, so an incomplete survey is never read as a clean one.
+Como `next_ids` vive no mapa, ele só sabe o que este checkout já viu. Antes de alocar, os dois
+comandos pesquisam todo mapa de issue que este clone consegue alcançar — a cópia de trabalho de
+cada worktree linkada, então uma reserva não commitada conta, e toda branch local e de
+rastreamento remoto — e recusam quando o contador não passou de todo ID desse tipo já em uso,
+nomeando cada um e onde foi encontrado. Fazer rebase sobre a branch que os tomou é a resposta
+usual; `--advance` os pula em vez disso e diz quais IDs deixa permanentemente não usados. Heads que
+`git ls-remote` anuncia e para os quais este clone não guarda nenhum objeto são relatados, então
+uma pesquisa incompleta nunca é lida como uma limpa.
 
-### Sprint status
+### Status de sprint
 
-BMad's sprint and build workflows read `_bmad-output/implementation-artifacts/sprint-status.yaml`.
-Here it is rendered from the map and the story files, never edited, so it cannot drift from
-GitHub:
+Os workflows de sprint e build do BMad leem
+`_bmad-output/implementation-artifacts/sprint-status.yaml`. Aqui ele é renderizado a partir do
+mapa e dos arquivos de história, nunca editado, então não pode se desviar do GitHub:
 
 ```sh
 python3 scripts/bmad_issue_sync.py sprint-status
 python3 scripts/bmad_issue_sync.py sprint-status --check
 ```
 
-Each epic is listed by BMad ID, followed by the items whose nearest epic ancestor it is, in BMad ID
-order; items under no epic close the file. A key is the lower-case ID and a slug of the title.
-Status follows the lifecycle the map records, not GitHub directly; `refresh` is what copies
-GitHub's open or closed state into the map. An item the map records as completed is `done`; an
-active item whose story is typed and passes the depth check is `ready-for-dev`; any other active
-item is `backlog`. Epics follow the same rule for `done`; an open epic is `in-progress` when any
-child, child epics included, is done, ready or in progress, and otherwise `backlog`. `generated`
-is the newest `YYYY-MM-DD` date the map or a story records, not the clock, so an unchanged corpus
-renders byte for byte the same. The comparison ignores CRLF line endings.
+Cada épico é listado pelo ID BMad, seguido pelos itens cujo ancestral de épico mais próximo é ele,
+em ordem de ID BMad; itens sem nenhum épico fecham o arquivo. Uma chave é o ID em minúsculas e um
+slug do título. O status segue o ciclo de vida que o mapa registra, não o GitHub diretamente;
+`refresh` é o que copia o estado aberto ou fechado do GitHub para o mapa. Um item que o mapa
+registra como completo é `done`; um item ativo cuja história é tipada e passa na verificação de
+profundidade é `ready-for-dev`; qualquer outro item ativo é `backlog`. Épicos seguem a mesma regra
+para `done`; um épico aberto é `in-progress` quando qualquer filho, épicos filhos incluídos, está
+done, ready ou in progress, e caso contrário `backlog`. `generated` é a data `YYYY-MM-DD` mais
+nova que o mapa ou uma história registra, não o relógio, então um corpus inalterado renderiza byte
+a byte o mesmo. A comparação ignora finais de linha CRLF.
 
-`new`, `reserve`, `refresh`, `bootstrap` and `upgrade` regenerate the file whenever they write,
-and `audit` fails while it differs from a fresh render. Filling a story can move it to
-`ready-for-dev`, so run `sprint-status` in the same change. Two branches that both regenerate it
-conflict on merge; resolve by rerunning the command rather than editing either side.
+`new`, `reserve`, `refresh`, `bootstrap` e `upgrade` regeneram o arquivo sempre que escrevem, e
+`audit` falha enquanto ele difere de uma renderização nova. Preencher uma história pode movê-la
+para `ready-for-dev`, então rode `sprint-status` na mesma mudança. Duas branches que ambas o
+regeneram entram em conflito no merge; resolva rodando o comando de novo em vez de editar qualquer
+um dos lados.
 
-### Live verification
+### Verificação ao vivo
 
 ```sh
 python3 scripts/bmad_issue_sync.py audit --live
 python3 scripts/bmad_issue_sync.py refresh
 ```
 
-`audit --live` is read-only. It fails when a mapped issue's title or open/closed state differs from
-the manifest, when a mapped issue is missing or lacks its Planning block, label or parent, and when
-an issue a maintainer has accepted — filed by a maintainer, or carrying a milestone or a `type::*`
-label — has no BMad ID. A community issue still waiting for triage is a notice, not a finding, and
-so is an unmapped issue closed as not planned or as a duplicate.
+`audit --live` é somente leitura. Ele falha quando o título ou estado aberto/fechado de uma issue
+mapeada difere do manifesto, quando uma issue mapeada está ausente ou carece de seu bloco
+Planning, rótulo ou pai, e quando uma issue que um mantenedor aceitou — registrada por um
+mantenedor, ou carregando um marco ou um rótulo `type::*` — não tem nenhum ID BMad. Uma issue da
+comunidade ainda esperando triagem é um aviso, não um achado, e o mesmo vale para uma issue não
+mapeada fechada como não planejada ou como duplicata.
 
-The manifest owns the primary parent and `apply` projects it, so `audit --live` never tells you to
-apply a parent GitHub already records: it reports a mapped parent the manifest lacks as `run
-refresh`, an unmapped one as `run reserve for it first`, and a parent that differs on both sides as
-a conflict for you to settle.
+O manifesto possui o pai primário e `apply` o projeta, então `audit --live` nunca diz para você
+aplicar um pai que o GitHub já registra: ele relata um pai mapeado que o manifesto não tem como
+"rode refresh", um não mapeado como "rode reserve para ele primeiro", e um pai que difere nos dois
+lados como um conflito para você resolver.
 
-`refresh` copies GitHub's title and state into the manifest and its story files, and adopts
-a mapped parent the manifest records as none. In a typed story file it rewrites only the
-frontmatter, the H1 and the managed block, and keeps the rest byte for byte. It checks every
-drifted artifact before writing any of them, and refuses the whole run when a typed file's markers
-are missing or duplicated, or when a legacy stub carries amendments; run `upgrade` on such a stub
-first. It never touches GitHub, and it leaves an issue GitHub no longer returns for the audit to
-report as missing.
+`refresh` copia o título e o estado do GitHub para o manifesto e seus arquivos de história, e
+adota um pai mapeado que o manifesto registra como nenhum. Em um arquivo de história tipado, ele
+reescreve só o frontmatter, o H1 e o bloco gerenciado, e mantém o resto byte a byte. Ele verifica
+todo artefato desviado antes de escrever qualquer um deles, e recusa a execução inteira quando os
+marcadores de um arquivo tipado estão ausentes ou duplicados, ou quando um stub legado carrega
+emendas; rode `upgrade` em tal stub primeiro. Ele nunca toca no GitHub, e deixa uma issue que o
+GitHub não retorna mais para a auditoria relatar como ausente.
 
-Run the full live audit before a release and after any triage pass. The `bmad traceability`
-workflow runs it daily, on issue events and when the map changes, with `--ignore-lifecycle` and
-`--grace-days 2`: an issue closes before its map entry can follow it through a pull request, and a
-new issue gets two days to receive its ID. That workflow is not a required check.
+Rode a auditoria ao vivo completa antes de um lançamento e depois de qualquer passagem de
+triagem. O workflow `bmad traceability` a roda diariamente, em eventos de issue e quando o mapa
+muda, com `--ignore-lifecycle` e `--grace-days 2`: uma issue fecha antes que sua entrada de mapa
+consiga acompanhá-la através de um pull request, e uma issue nova ganha dois dias para receber seu
+ID. Esse workflow não é um check obrigatório.
 
-IDs are never reused and never encode hierarchy. Reparent the metadata rather than renaming the ID.
-Completed historical issues are marked `reconstructed`; the record never claims those artifacts
-existed during the original delivery.
+IDs nunca são reaproveitados e nunca codificam hierarquia. Reparenteie os metadados em vez de
+renomear o ID. Issues históricas completas são marcadas `reconstructed`; o registro nunca alega
+que esses artefatos existiam durante a entrega original.
 
-## The pattern
+## O padrão
 
-- **Install into the repo, commit only your overrides.** `.gitignore` carries
-  `/_bmad/*`, `!/_bmad/custom/`, `/.claude/skills/`, `/.agents/skills/`. The runtime and the
-  skill projections are installer-regenerable; only `_bmad/custom/` is yours.
-- **Choose the artifact authority explicitly.** In `_bmad/custom/config.toml`, point
-  `planning_artifacts`, `implementation_artifacts`, `project_knowledge` and `output_folder` at
-  the intended repository using `{project-root}`-relative paths. A separate planning repository
-  can keep a very large private corpus out of every worktree; public projects such as agent-harness
-  can instead commit a sanitized local corpus.
-- **Pin the install.** One command, with versions, in the repo's `AGENTS.md`, for example
-  `npx bmad-method@<version> install --directory <repo> --modules <list> --tools claude-code,codex --yes`.
-- **Record post-install repairs in one place.** Anything you patch in the installed runtime
-  must be re-applied after every reinstall; list each patch at the bottom of
-  `_bmad/custom/config.toml` with the date and the reason, and file it upstream so it can
-  disappear.
-- **Run it from the shared checkout only.** The framework resolves its scripts against the
-  working directory; a worktree has no `_bmad/scripts/`, halts, and that halt is the intended
-  guard. Do implementation work in worktrees; run planning skills from the checkout.
-- **Keep sibling installs at the same version.** Two repos in one workspace both project
-  skills into `.claude/skills/`; a name clash resolves silently, first wins. While the copies
-  are byte-identical it is harmless; the moment they drift, one version's skill calls the
-  other's scripts.
-- **Post-sprint hygiene.** Update the architecture document's status, the decisions ledger and
-  the changelog before moving on; the framework will not do it for you.
-- **Keep delivery output native.** Do not add generated attribution footers or internal runtime
-  paths to ordinary issues and PRs. Public documentation and planning artifacts may identify BMad
-  deliberately, and issues may link to their public story artifacts.
+- **Instale no repositório, faça commit só das suas sobrescritas.** `.gitignore` carrega
+  `/_bmad/*`, `!/_bmad/custom/`, `/.claude/skills/`, `/.agents/skills/`. O runtime e as projeções
+  de skill são regeneráveis pelo instalador; só `_bmad/custom/` é seu.
+- **Escolha a autoridade de artefato explicitamente.** Em `_bmad/custom/config.toml`, aponte
+  `planning_artifacts`, `implementation_artifacts`, `project_knowledge` e `output_folder` para o
+  repositório pretendido usando caminhos relativos a `{project-root}`. Um repositório de
+  planejamento separado pode manter um corpus privado muito grande fora de toda worktree; projetos
+  públicos como agent-harness podem em vez disso commitar um corpus local higienizado.
+- **Fixe a instalação.** Um único comando, com versões, no `AGENTS.md` do repositório, por
+  exemplo `npx bmad-method@<version> install --directory <repo> --modules <list> --tools claude-code,codex --yes`.
+- **Registre reparos pós-instalação em um único lugar.** Qualquer coisa que você corrija no
+  runtime instalado precisa ser reaplicada depois de toda reinstalação; liste cada patch no final
+  de `_bmad/custom/config.toml` com a data e o motivo, e o registre a montante para que possa
+  desaparecer.
+- **Rode-o só a partir do checkout compartilhado.** O framework resolve seus scripts contra o
+  diretório de trabalho; uma worktree não tem `_bmad/scripts/`, para, e essa parada é a guarda
+  pretendida. Faça o trabalho de implementação em worktrees; rode as skills de planejamento a
+  partir do checkout.
+- **Mantenha instalações irmãs na mesma versão.** Dois repositórios em um workspace ambos
+  projetam skills em `.claude/skills/`; uma colisão de nome resolve silenciosamente, o primeiro
+  vence. Enquanto as cópias forem idênticas byte a byte, é inofensivo; no momento em que se
+  desviam, a skill de uma versão chama os scripts da outra.
+- **Higiene pós-sprint.** Atualize o status do documento de arquitetura, o ledger de decisões e o
+  changelog antes de seguir adiante; o framework não fará isso por você.
+- **Mantenha a saída de entrega nativa.** Não adicione rodapés de atribuição gerados nem
+  caminhos de runtime internos a issues e PRs comuns. Documentação pública e artefatos de
+  planejamento podem identificar o BMad deliberadamente, e issues podem linkar para seus artefatos
+  de história públicos.
 
-## Spawn confinement is enforced, not requested
+## O confinamento de spawn é aplicado, não solicitado
 
-The override templates ask each review layer to run itself through `citizen role run`. That is a
-request in a prompt: a client that paraphrases the brief and names no role used to walk past a
-spawn guard that only read the name the model wrote (#291).
+Os templates de sobrescrita pedem a cada camada de review que rode a si mesma através de
+`citizen role run`. Isso é uma solicitação num prompt: um cliente que parafraseia o brief e não
+nomeia nenhum papel costumava passar por uma guarda de spawn que só lia o nome que o modelo
+escreveu (#291).
 
-So the framework declares itself, in `policy/integrations/bmad.json`, and the spawn hook
-classifies against that descriptor instead. A descriptor names the framework, the release it was
-read from, the layer-to-role mapping, the input roots a confined worker needs, and how a spawn is
-recognised:
+Então o framework se declara, em `policy/integrations/bmad.json`, e o hook de spawn classifica
+contra esse descritor em vez disso. Um descritor nomeia o framework, o lançamento do qual foi
+lido, o mapeamento de camada para papel, as raízes de entrada que um worker confinado precisa, e
+como um spawn é reconhecido:
 
-- **agents** — the spawn's `subagent_type` is one of the framework's own layer names. Nothing else
-  puts that name there, so it is enough on its own.
-- **identifiers** — a literal only the framework's routed text carries, such as the path of one of
-  its prompt files. Never enough alone, because a brief that edits the override templates quotes
-  the same path; an identifier counts only with a phrase beside it, or when a sentence tells the
-  subagent to follow or apply it. A client writing the brief itself keeps the prompt file, because
-  the subagent must read it, and drops the framework's sentences, so the directive is what
-  separates the layer's work from a brief that edits the file or reads it for another reason
-  (#739).
-- **phrases** — whole sentences of the framework's own prompt text. One is a coincidence;
-  `corroboration` of them, two by default, is not.
+- **agents** — o `subagent_type` do spawn é um dos próprios nomes de camada do framework. Nada
+  mais coloca esse nome ali, então é suficiente por si só.
+- **identifiers** — um literal que só o texto roteado do próprio framework carrega, como o
+  caminho de um dos seus arquivos de prompt. Nunca suficiente sozinho, porque um brief que edita
+  os templates de sobrescrita cita o mesmo caminho; um identificador só conta com uma frase ao
+  lado, ou quando uma sentença diz ao subagente para seguir ou aplicá-lo. Um cliente que escreve o
+  brief ele mesmo mantém o arquivo de prompt, porque o subagente precisa lê-lo, e descarta as
+  frases do framework, então a diretiva é o que separa o trabalho da camada de um brief que edita
+  o arquivo ou o lê por outro motivo (#739).
+- **phrases** — frases inteiras do próprio texto de prompt do framework. Uma é coincidência; a
+  `corroboration` delas, duas por padrão, não é.
 
-Generic nouns are not phrases. "unified diff" and "list of findings" are what the ordinary fix-up
-brief after a review says, and a descriptor that declared them would refuse the work the review
-asked for. The loader enforces that: a signal below the minimum length and word count, an
-identifier that is an input root or a bare directory under one, a spawn with no phrases at all, or
-a role the spawn guard would not constrain, and the descriptor is refused as a whole. A descriptor
-that will not parse or will not validate is announced once per session and recorded in the
-decision log, never dropped in silence.
+Substantivos genéricos não são frases. "unified diff" e "list of findings" são o que o brief comum
+de correção depois de uma review diz, e um descritor que os declarasse recusaria o próprio
+trabalho que a review pediu. O carregador aplica isso: um sinal abaixo do comprimento e contagem
+de palavra mínimos, um identificador que é uma raiz de entrada ou um diretório simples sob uma, um
+spawn sem nenhuma frase, ou um papel que a guarda de spawn não restringiria, e o descritor é
+recusado por inteiro. Um descritor que não analisa ou não valida é anunciado uma vez por sessão e
+registrado no log de decisões, nunca descartado em silêncio.
 
-A recognised spawn is refused with the same isolated-worker instruction a named role's spawn gets,
-and the refusal names the framework, the layer and the input roots the worker has to be given as
-read roots. Unlike a refusal the spawn declared by role name or `harness-role:` line, it is not
-written into the session's memory of refused work: that memory matches later briefs by prefix and
-similarity, so one wrong classification would go on refusing the corrected brief for the rest of
-the session. Each spawn is answered on its own evidence.
+Um spawn reconhecido é recusado com a mesma instrução de worker isolado que o spawn de um papel
+nomeado recebe, e a recusa nomeia o framework, a camada e as raízes de entrada que o worker precisa
+receber como raízes de leitura. Ao contrário de uma recusa que o spawn declarou por nome de papel
+ou linha `harness-role:`, ela não é escrita na memória de trabalho recusado da sessão: essa
+memória combina briefs posteriores por prefixo e semelhança, então uma classificação errada
+continuaria recusando o brief corrigido pelo resto da sessão. Cada spawn é respondido com base na
+sua própria evidência.
 
-The `harness-role:` line the templates carry is an optimisation on top: it is read by the marker
-guard, which requires it on a line of its own, and a descriptor must not restate it as loose text.
+A linha `harness-role:` que os templates carregam é uma otimização em cima disso: ela é lida pela
+guarda de marcador, que a exige em uma linha própria, e um descritor não pode reafirmá-la como
+texto solto.
 
-Another framework becomes a tenant by adding its own descriptor file; nothing in the hook is
-BMad-specific. Keep `version.pinned` equal to the release the repository installs — a mapping read
-from another release names layers that are not there.
+Outro framework se torna um inquilino adicionando seu próprio arquivo de descritor; nada no hook é
+específico do BMad. Mantenha `version.pinned` igual ao lançamento que o repositório instala — um
+mapeamento lido de outro lançamento nomeia camadas que não estão lá.
 
-## Shared roles and explicit installation
+## Papéis compartilhados e instalação explícita
 
-`templates/bmad/custom/` names harness roles: `builder`, `reviewer`, and `spec-reviewer`.
-The active runtime adapter supplies their model and effort; the framework's own skill text does
-not, and the spawn hook tiers a framework repository like any other.
+`templates/bmad/custom/` nomeia papéis do harness: `builder`, `reviewer`, e `spec-reviewer`. O
+adaptador de runtime ativo fornece seu modelo e esforço; o próprio texto de skill do framework não
+fornece, e o hook de spawn classifica um repositório de framework como qualquer outro.
 
-A framework spawn that names one of those roles is priced from that role's row in the active cost
-variant. A framework spawn that names no role at all — the "launch a subagent" a step file writes,
-which no override template reaches — is routed to the variant's default band worker and priced
-from that band's row instead, so its class, effort and soft budget come from the posture rather
-than from the recipe. Nothing in the framework's own templates changes. Constrained review roles use
-`citizen role run` with explicit input roots; builders retain their normal
-workflow. See [isolated role workers](role-workers.md). Each review layer is asked to launch only
-once the previous layer's worker has exited, because a worker still running reports no token count
-and a round whose spend is invisible cannot be held under its cap. Running four layers one after
-another is affordable because each is now mounted about 30,800 estimated tokens rather than the
-whole checkout; that figure is what is mounted, not what a layer reads. Recipes retain
-complete keyed review-layer records so BMad's replacement merge does not discard required fields.
-The assigned implementation worktree, framework checkout, artifact root, baseline commit and
-review diff must be separate explicit inputs; run framework scripts from the framework checkout.
+Um spawn de framework que nomeia um desses papéis é precificado a partir da linha desse papel na
+variante de custo ativa. Um spawn de framework que não nomeia nenhum papel de forma alguma — o
+"lance um subagente" que um arquivo de passo escreve, que nenhum template de sobrescrita alcança —
+é roteado para o worker de banda padrão da variante e precificado a partir da linha dessa banda em
+vez disso, então sua classe, esforço e orçamento flexível vêm da postura em vez da receita. Nada
+nos próprios templates do framework muda. Papéis de review restritos usam `citizen role run` com
+raízes de entrada explícitas; builders mantêm seu workflow normal. Veja
+[workers de papel isolados](role-workers.md). Cada camada de review é pedida para lançar somente
+depois que o worker da camada anterior saiu, porque um worker ainda em execução não relata nenhuma
+contagem de token e uma rodada cujo gasto é invisível não pode ser mantida sob seu teto. Rodar
+quatro camadas uma depois da outra é acessível porque cada uma agora tem cerca de 30.800 tokens
+estimados montados em vez do checkout inteiro; esse número é o que é montado, não o que uma camada
+lê. Receitas mantêm registros completos de camada de review indexados para que o merge de
+substituição do BMad não descarte campos obrigatórios. A worktree de implementação atribuída, o
+checkout do framework, a raiz de artefato, o commit de base e o diff de review precisam ser
+entradas explícitas separadas; rode scripts de framework a partir do checkout do framework.
 
-Run `citizen integration check bmad <framework-root>` before
-`citizen integration apply bmad <framework-root>`; `citizen bmad check|apply` is kept as an alias
-for both. The command reads `policy/integrations/bmad.json` for the template directory, the
-install destination and the skill surface, so the CLI names no framework of its own.
-Check resolves either `.agents/skills` or `.claude/skills`, refuses conflicting mirrors, and
-parses customization TOML structurally. It also compares mirrored Markdown/TOML sources and
-checks literal `Invoke via the … skill` dependencies in installed workflows; other forms of dynamic
-skill routing still require workflow acceptance. Apply writes only declared keys and existing layer ids;
-it preserves differing user overrides unless you explicitly pass `--force`. Session start only
-checks. It never silently installs configuration.
+Rode `citizen integration check bmad <framework-root>` antes de
+`citizen integration apply bmad <framework-root>`; `citizen bmad check|apply` é mantido como um
+alias para os dois. O comando lê `policy/integrations/bmad.json` para o diretório de template, o
+destino de instalação e a superfície de skill, então o CLI não nomeia nenhum framework próprio.
+`check` resolve `.agents/skills` ou `.claude/skills`, recusa espelhos conflitantes, e analisa TOML
+de customização estruturalmente. Também compara fontes espelhadas de Markdown/TOML e verifica
+dependências literais de `Invoke via the … skill` em workflows instalados; outras formas de
+roteamento dinâmico de skill ainda exigem aceitação de workflow. `apply` escreve só chaves
+declaradas e ids de camada existentes; preserva sobrescritas de usuário divergentes a menos que
+você passe explicitamente `--force`. O início de sessão só verifica. Nunca instala configuração
+silenciosamente.
 
-BMad uses two entry mechanisms: build skills render `workflow.md`, while code review resolves
-the `workflow` customization block with `resolve_customization.py`. A missing `workflow.md` in a
-resolver-based skill is not an installation defect. Test the entry mechanism its `SKILL.md` names.
+O BMad usa dois mecanismos de entrada: skills de build renderizam `workflow.md`, enquanto a
+review de código resolve o bloco de customização `workflow` com `resolve_customization.py`. Um
+`workflow.md` ausente em uma skill baseada em resolvedor não é um defeito de instalação. Teste o
+mecanismo de entrada que o `SKILL.md` dela nomeia.
 
-The inspected BMad 6.12.0 renderer supports `--project-root` and `--skill`. Do not invent an
-`--overrides` or `--set` flag from newer documentation. Use its `_bmad/custom/` seam. Renderer
-patches and absent GDS review shims are integration findings, not reasons to reinstall a framework
-inside an implementation worktree. Missing review skills must be restored through the framework's
-supported shim installation or an upstream fix before that workflow is qualified.
+O renderizador BMad 6.12.0 inspecionado suporta `--project-root` e `--skill`. Não invente uma flag
+`--overrides` ou `--set` de documentação mais nova. Use sua costura `_bmad/custom/`. Patches de
+renderizador e shims GDS de review ausentes são achados de integração, não motivos para
+reinstalar um framework dentro de uma worktree de implementação. Skills de review ausentes
+precisam ser restauradas através da instalação de shim suportada do framework ou uma correção
+upstream antes que esse workflow seja qualificado.
 
-BMad 6.12.0 provides `--shims` on its installer. GDS v0.7.2 still invokes the legacy
-`bmad-review-adversarial-general` and `bmad-review-edge-case-hunter` names; installations
-without their compatibility shims fail `citizen integration check bmad`. Re-run your recorded, version-pinned
-installation command with `--shims`, retaining the same modules, tools and module pins. Back up
-the installation first, restore any documented runtime patches and artifact-routing YAMLs,
-then check both skill projections and verify that existing customizations are unchanged.
-Keep `--shims` in the recorded reinstall command while these workflows require the legacy names.
-This repairs dependency discovery; a passing check still does not qualify workflow execution.
+O BMad 6.12.0 fornece `--shims` em seu instalador. O GDS v0.7.2 ainda invoca os nomes legados
+`bmad-review-adversarial-general` e `bmad-review-edge-case-hunter`; instalações sem seus shims de
+compatibilidade falham `citizen integration check bmad`. Rode de novo seu comando de instalação
+registrado e fixado por versão com `--shims`, mantendo os mesmos módulos, ferramentas e fixações
+de módulo. Faça backup da instalação primeiro, restaure quaisquer patches de runtime documentados
+e YAMLs de roteamento de artefato, depois verifique as duas projeções de skill e confirme que
+customizações existentes não mudaram. Mantenha `--shims` no comando de reinstalação registrado
+enquanto esses workflows exigirem os nomes legados. Isso repara a descoberta de dependência; uma
+verificação aprovada ainda não qualifica a execução de workflow.
 
-## Continue a task in either runtime
+## Continue uma tarefa em qualquer um dos dois runtimes
 
-Shared task continuation is a harness capability and names no planning framework, so it has its own page:
-[continue a task in either runtime](task-continuation.md). A handoff carries the
-framework checkout and the baseline commit when a framework owns the artifacts.
+A continuação de tarefa compartilhada é uma capacidade do harness e não nomeia nenhum framework de
+planejamento, então tem sua própria página:
+[continue uma tarefa em qualquer um dos dois runtimes](task-continuation.md). Um handoff carrega
+o checkout do framework e o commit de base quando um framework possui os artefatos.
 
-## The optional integration suite
+## A suíte de integração opcional
 
-This framework's own workflow is not run in a release qualification round. `required_cases` carries
-the generic `framework-spawn-routing` case instead, which drives the spawn hook against a fixture
-recipe and costs one cheap turn; what it proves and what it does not is in
-[compatibility](compatibility.md).
+O próprio workflow deste framework não é rodado em uma rodada de qualificação de lançamento.
+`required_cases` carrega o caso genérico `framework-spawn-routing` em vez disso, que conduz o hook
+de spawn contra uma receita fixa e custa um turno barato; o que ele prova e o que não prova está
+em [compatibility](compatibility.md).
 
-What stays in CI is cheap and offline: `tests/test_bmad_templates.py` and
-`tests/test_bmad_repository.py` pin the upstream surface against a fixture repository with no
-framework installed, and they are what actually catches a renamed key or layer id.
+O que permanece na CI é barato e offline: `tests/test_bmad_templates.py` e
+`tests/test_bmad_repository.py` fixam a superfície upstream contra um repositório fixo sem
+nenhum framework instalado, e são o que de fato captura uma chave ou id de camada renomeados.
 
-The native run is an optional suite, non-gating, run once per minor release on one target before
-the tag:
+A execução nativa é uma suíte opcional, não bloqueante, rodada uma vez por lançamento minor em um
+alvo antes da tag:
 
 ```sh
 BMAD_VERSION=6.12.0
 npx --yes bmad-method@"$BMAD_VERSION" install --directory <framework-root> --modules bmm \
   --tools claude-code,codex --output-folder _bmad-output --shims --yes
 python3 bin/harness integration apply bmad <framework-root>
-# then run the four-layer code review from the shared checkout against an assigned worktree,
-# and confirm each layer ran as an isolated worker rather than a native subagent.
+# depois rode a review de código de quatro camadas a partir do checkout compartilhado contra uma
+# worktree atribuída, e confirme que cada camada rodou como um worker isolado em vez de um
+# subagente nativo.
 ```
 
-Record the result in the release's pull request with the harness version, the framework version and
-the client it ran on. It gates nothing: a red result is an issue, not a blocked release, and the
-release claim says only that the pinned version is the one that was observed.
+Registre o resultado no pull request do lançamento com a versão do harness, a versão do framework
+e o cliente em que rodou. Não bloqueia nada: um resultado vermelho é uma issue, não um lançamento
+bloqueado, e a alegação de lançamento diz só que a versão fixada é a que foi observada.

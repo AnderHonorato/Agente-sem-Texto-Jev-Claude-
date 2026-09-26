@@ -157,12 +157,12 @@ def trusted(folder, claude_json):
 
 
 def trust_hint(folder):
-    """The one line that fixes an untrusted folder, named in `install` and in `status`."""
+    """A única linha que conserta uma pasta não confiável, nomeada em `install` e em `status`."""
     return f"workspace trust not accepted; run `bin/harness trust {folder}` then `claude` there once"
 
 
 def installed(agents_dir):
-    """Label -> plist path for every agent this module owns."""
+    """Rótulo -> caminho de plist para cada agente que este módulo possui."""
     agents_dir = Path(agents_dir)
     if not agents_dir.is_dir():
         return {}
@@ -170,9 +170,9 @@ def installed(agents_dir):
 
 
 def plan(opts, agents_dir, claude_json):
-    """Split the configured folders into those to serve and those to skip, and find stale agents.
+    """Divide as pastas configuradas entre as que servir e as que pular, e encontra agentes obsoletos.
 
-    Returns (serve, skipped, stale): folders; (folder, reason) pairs; labels no folder claims.
+    Retorna (serve, skipped, stale): pastas; pares (folder, reason); rótulos que nenhuma pasta reivindica.
     """
     serve, skipped = [], []
     for folder in opts["folders"]:
@@ -187,41 +187,42 @@ def plan(opts, agents_dir, claude_json):
     return serve, skipped, stale
 
 
-# --------------------------------------------------------------------------- bridge pointer
+# --------------------------------------------------------------------------- ponteiro de ponte
 
 HEAL_LABEL = "com.agent-harness.remote-control-heal"
 HEAL_INTERVAL_SECONDS = 60
 POINTER_NAME = "bridge-pointer.json"
-# Claude Code 2.1.278 reuses the environment in a pointer only while the file's mtime is inside
-# BRIDGE_POINTER_TTL_MS, so a pointer nobody rewrites expires and the next host registers fresh.
+# O Claude Code 2.1.278 reutiliza o ambiente num ponteiro só enquanto o mtime do arquivo está
+# dentro de BRIDGE_POINTER_TTL_MS, então um ponteiro que ninguém reescreve expira e o próximo
+# host se registra do zero.
 POINTER_TTL_SECONDS = 4 * 60 * 60
-# The reader's schema is closed: an unknown key fails validation and the file is deleted.
+# O schema do leitor é fechado: uma chave desconhecida falha a validação e o arquivo é apagado.
 POINTER_KEYS = ("sessionId", "environmentId", "source", "pid", "procStart",
                 "activeSessionIds", "activeSessionIdsPersistedAt",
                 "projectThreadSessionIds", "projectThreadSessionIdsPersistedAt",
-                # Added by 2.1.280.
+                # Adicionado pela 2.1.280.
                 "parkedProjectThreadSessionIds", "parkedProjectThreadSessionIdsPersistedAt")
 CARRIED_KEYS = POINTER_KEYS[5:]
 ENV_ID = re.compile(r"env_01[A-Za-z0-9]+")
-# The host prints its own error-budget age, so it is read rather than recomputed from the clock:
-# `[01:46:00] Connection error, retrying in 2m (541s elapsed): fetch failed`.
+# O host imprime sua própria idade de orçamento de erro, então ela é lida em vez de recalculada a
+# partir do relógio: `[01:46:00] Connection error, retrying in 2m (541s elapsed): fetch failed`.
 RETRY_LINE = re.compile(r"\[(\d{2}):(\d{2}):(\d{2})\][^\n]*Connection error, retrying")
 RETRY_ELAPSED = re.compile(r"Connection error, retrying[^\n]*?\((\d+)s elapsed\)")
-# `[bridge:work] Detected system sleep (312s gap), resetting error budget` — the host starts the
-# budget again on wake, so the supervisor must too or it would stop a host that is not failing.
+# `[bridge:work] Detected system sleep (312s gap), resetting error budget` — o host reinicia o
+# orçamento ao acordar, então o supervisor precisa também ou pararia um host que não está falhando.
 SLEEP_RESET = re.compile(r"Detected system sleep \((\d+)s gap\), resetting error budget")
 RECONNECTED = re.compile(r"Reconnected after (\d+)s")
 GAVE_UP = re.compile(r"Persistent errors for \d+ minutes?, giving up\.")
 SHUTTING_DOWN = re.compile(r"Shutting down (\d+) active session\(s\)")
 REMOVED_WORKTREE = re.compile(r"\[(\d{2}:\d{2}:\d{2})\]\s*removed worktree (\S.*?)\s*$")
-# `connGiveUpMs` is hardcoded at ten minutes and its path archives every session and deregisters
-# the environment; nine minutes leaves a minute to stop the host while a restart can still resume.
+# `connGiveUpMs` é fixo em dez minutos e seu caminho arquiva toda sessão e cancela o registro do
+# ambiente; nove minutos deixa um minuto para parar o host enquanto um reinício ainda pode retomar.
 GIVE_UP_SECONDS = 600
 STOP_AT_SECONDS = 540
 
 
 def project_slug(folder):
-    """Claude Code's per-directory key under `~/.claude/projects`: every other character a dash."""
+    """A chave por diretório do Claude Code sob `~/.claude/projects`: todo outro caractere vira um traço."""
     return re.sub(r"[^A-Za-z0-9]", "-", str(folder))
 
 

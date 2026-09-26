@@ -368,12 +368,13 @@ def temporary_roots():
 
 
 def broad_read_root(path):
-    """Why `path` is too broad to grant a worker, or None when it is narrow enough.
+    """Por que `path` é amplo demais para conceder a um worker, ou None quando é estreito o bastante.
 
-    A read root is everything a worker may open, so a shared root hands it every other run's
-    files: a blind review given `/tmp` could read the earlier report naming its planted defects
-    (issue #772). Refused are `/`, the home directory, each system temporary root, and any
-    directory above one of them; a dedicated subdirectory of any of these is accepted.
+    Uma raiz de leitura é tudo que um worker pode abrir, então uma raiz compartilhada entrega a
+    ele os arquivos de toda outra execução: uma revisão cega recebendo `/tmp` poderia ler o
+    relatório anterior nomeando seus defeitos plantados (issue #772). São recusados `/`, o
+    diretório home, cada raiz temporária do sistema, e qualquer diretório acima de um deles; um
+    subdiretório dedicado de qualquer um destes é aceito.
     """
     path = Path(path)
     home = Path.home().resolve()
@@ -389,7 +390,7 @@ def broad_read_root(path):
 
 
 def granted_roots(read_dirs):
-    """The caller's `--read-dir` values resolved, refusing any that is not a narrow directory."""
+    """Os valores de `--read-dir` do chamador resolvidos, recusando qualquer um que não seja um diretório estreito."""
     roots = [Path(path).resolve(strict=True) for path in read_dirs]
     for path in roots:
         if not path.is_dir():
@@ -423,8 +424,8 @@ def run(root, config, runtime, name, workspace, prompt, state_root, model=None, 
     if not executable:
         raise ValueError("native CLI is not installed: " + RUNTIMES[runtime])
     version = subprocess.check_output([executable, "--version"], text=True, timeout=15).strip()
-    # A client that cannot authenticate is refused here, before any record or directory exists,
-    # rather than launched to fail with the runtime's own login prompt (issue #759).
+    # Um cliente que não consegue autenticar é recusado aqui, antes que qualquer registro ou
+    # diretório exista, em vez de lançado para falhar no próprio prompt de login do runtime (issue #759).
     refusal = getattr(native, "refusal", None)
     reason = None
     if refusal:
@@ -440,19 +441,20 @@ def run(root, config, runtime, name, workspace, prompt, state_root, model=None, 
     run_dir.mkdir(mode=0o700)
     record = {"schema_version": 1, "id": run_dir.name, "role": name, "runtime": runtime,
               "runtime_version": version,
-              # The harness that launched this run, stamped now: the usage sweep that turns the
-              # status file into a ledger row may run long after this version was replaced.
+              # O harness que lançou esta execução, carimbado agora: a varredura de uso que
+              # transforma o arquivo de status numa linha de ledger pode rodar muito depois que
+              # esta versão foi substituída.
               "harness_version": harness_version(root),
               "profile_fingerprint": session_fingerprint(root),
               "model": bindings["model"], "workspace": str(workspace),
               "effort": bindings.get("model_reasoning_effort", bindings.get("effort")),
-              # The documents the policy cites are mounted as copies, so the roots recorded here
-              # are the ones that outlive the run: the workspace, the skills and the caller's.
+              # Os documentos que a política cita são montados como cópias, então as raízes
+              # registradas aqui são as que sobrevivem à execução: o workspace, as skills e as do chamador.
               "read_roots": [str(workspace)] + [str(p) for p in skills] + list(map(str, read_roots)),
               "context": ready["context"],
               "mode": "isolated-cli", "status": "starting", "started_at": time.time(),
-              # The runner supervising this worker, so a reader can tell a live run from one whose
-              # process died mid-flight; `orphaned()` decides, and never without the start token.
+              # O executor supervisionando este worker, para que um leitor consiga distinguir uma
+              # execução viva de uma cujo processo morreu no meio; `orphaned()` decide, e nunca sem o token de início.
               "pid": os.getpid(), "pid_start": process_start(os.getpid()),
               "stances": config["stances"], "selection": ready["selection"], "posture": ready["posture"],
               "policy_sha256": hashlib.sha256(instructions.encode()).hexdigest(),
@@ -469,9 +471,9 @@ def run(root, config, runtime, name, workspace, prompt, state_root, model=None, 
             cwd.mkdir()
             reference = policy_reference(work, docs)
             instructions += "\n\nProject to inspect (read-only): " + str(workspace)
-            # The skills and documents the policy above cites, and no other path into the
-            # checkout: a worker must be able to follow its own policy's pointers, and must not
-            # be able to spend a review layer on the corpus nobody asked about (issue #335).
+            # As skills e documentos que a política acima cita, e nenhum outro caminho para
+            # dentro do checkout: um worker precisa poder seguir os próprios ponteiros da sua
+            # política, e não pode gastar uma camada de revisão no corpus sobre o qual ninguém perguntou (issue #335).
             if skills:
                 instructions += ("\nSkill authority (read-only), the skills this role may read: "
                                  + ", ".join(str(p) for p in skills))

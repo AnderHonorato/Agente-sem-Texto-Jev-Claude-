@@ -55,7 +55,7 @@ def describe(target):
 
 
 def codex_login(env, home):
-    """Raise `Unready` unless a Codex client launched from `env` has a login to use."""
+    """Levanta `Unready` a menos que um cliente Codex lançado a partir de `env` tenha um login para usar."""
     if env.get("OPENAI_API_KEY"):
         return
     folder = env.get("CODEX_HOME") or str(Path(home) / ".codex")
@@ -66,7 +66,7 @@ def codex_login(env, home):
 
 
 def docker_daemon(which=shutil.which, run=subprocess.run):
-    """Raise `Unready` unless a Docker daemon answers within `DOCKER_TIMEOUT` seconds."""
+    """Levanta `Unready` a menos que um daemon Docker responda dentro de `DOCKER_TIMEOUT` segundos."""
     if not which("docker"):
         raise Unready("`docker` is not on PATH; a Linux target runs in a container on this host")
     try:
@@ -82,13 +82,13 @@ def docker_daemon(which=shutil.which, run=subprocess.run):
 
 
 def runnable(target, host):
-    """Whether `host` can run `target` at all: here, or in a container when it is a Linux target."""
+    """Se `host` consegue rodar `target` de algum jeito: aqui mesmo, ou num container quando é um alvo Linux."""
     where = describe(target)[2]
     return where == PLATFORMS.get(host) or where == "linux"
 
 
 def by_default(host):
-    """The default targets split into those this host can run and those skipped, with why."""
+    """Os alvos padrão divididos entre os que este host consegue rodar e os pulados, com o motivo."""
     run, skipped = [], []
     for target in DEFAULT_TARGETS:
         if runnable(target, host):
@@ -99,7 +99,7 @@ def by_default(host):
 
 
 def problems(targets, env, home, host, which=None, run=None):
-    """Each target that cannot start on this host, with why, in the order asked."""
+    """Cada alvo que não consegue iniciar neste host, com o motivo, na ordem perguntada."""
     which = which or shutil.which
     run = run or subprocess.run
     found = []

@@ -1,4 +1,4 @@
-"""Versioned task continuation data; never imports native permissions or memory."""
+"""Dados versionados de continuação de tarefa; nunca importa permissões nativas ou memória."""
 import json
 import subprocess
 from pathlib import Path
@@ -16,7 +16,7 @@ def repository(path):
 
 
 def fingerprint(root):
-    # Exclude only bookkeeping; plans and progress remain task inputs even when gitignored.
+    # Exclui só a contabilidade interna; planos e progresso continuam sendo entradas da tarefa mesmo se gitignorados.
     import hashlib
     import os
     bookkeeping = {".agent-harness/task.json", ".agent-harness/sync.lock"}

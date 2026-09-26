@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "harness_version": "0.13.1",
+  "summary": "Upgrade from v0.13.0 by reviewing the generated v0.13.1 projection before applying it: a patch release that changes only landing copy, the `product.json` source and the README hero rendered from it. It changes no runtime, configuration, hook, role, stance, skill or projection, and adds no files or local state. The architecture-viewer preview is inert until an external adapter is registered and selected.",
+  "actions": [
+    "Run `harness sync --dry-run` from the v0.13.1 checkout and inspect every proposed write, ownership change and conflict. Expect no changed rule, stance, skill, role, command, hook or settings content: the only source changes since v0.13.0 are landing copy that sync never installs.",
+    "Run `harness sync` only after resolving unmanaged-file and adoption conflicts.",
+    "No configuration key, command or opt-in changed; nothing in `~/.config/agent-harness/config.json` or `~/.local/state/agent-harness/` needs attention."
+  ],
+  "recovery": [
+    "Preserve reported conflicts, adopted backups, external viewer adapter descriptors and external viewer installations.",
+    "To return to v0.13.0, check out that tag and run `harness sync` once; no configuration or local state needs undoing, because v0.13.1 changes none.",
+    "Use `harness uninstall --dry-run` before uninstalling, and follow docs/runtime-installation.md for rollback and ownership recovery; use docs/task-continuation.md for task continuation."
+  ]
+}

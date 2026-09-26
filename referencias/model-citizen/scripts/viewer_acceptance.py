@@ -57,31 +57,31 @@ def main():
                 input_file = home / ("input-%d.json" % number)
                 input_file.write_text(json.dumps(payload))
                 inputs.append(str(input_file))
-            require(invoke("viewer", "validate", "--input", inputs[0])["status"] == "ok", "validation failed")
+            require(invoke("viewer", "validate", "--input", inputs[0])["status"] == "ok", "validação falhou")
             opened = invoke("viewer", "open", "--input", inputs[0])
-            require(opened["status"] == "ok", "open failed")
+            require(opened["status"] == "ok", "abertura falhou")
             reference = opened["session_reference"]
             try:
-                require(opened["result"]["revision"] == 0, "unexpected initial revision")
+                require(opened["result"]["revision"] == 0, "revisão inicial inesperada")
                 request = str(uuid.uuid4())
                 for _ in range(2):
                     result = invoke("viewer", "replace-document", "--session", reference, "--input", inputs[1], "--request-id", request)
-                    require(result["status"] == "ok" and result["result"]["revision"] == 1, "replacement or identical retry failed")
+                    require(result["status"] == "ok" and result["result"]["revision"] == 1, "substituição ou nova tentativa idêntica falhou")
                     require(result["result"]["sha256"] == result["result"]["projection"]["sha256"] and
-                            result["result"]["sha256"] != opened["result"]["sha256"], "replacement content identity did not change")
+                            result["result"]["sha256"] != opened["result"]["sha256"], "a identidade do conteúdo substituído não mudou")
                 stale = invoke("viewer", "replace-document", "--session", reference, "--input", inputs[1])
-                require(stale["status"] == "error" and stale["error"]["code"] == "stale-revision", "stale write was accepted")
+                require(stale["status"] == "error" and stale["error"]["code"] == "stale-revision", "escrita desatualizada foi aceita")
                 cfg["integrations"]["architecture-viewer"]["implementation"] = "builtin"
                 cfg["integration_adapters"] = {}
                 cfg_path.write_text(json.dumps(cfg))
                 observed = invoke("viewer", "status", "--session", reference)
-                require(observed["status"] == "ok" and observed["result"]["revision"] == 1, "pinned continuation failed")
+                require(observed["status"] == "ok" and observed["result"]["revision"] == 1, "continuação fixada falhou")
             finally:
                 close_id = str(uuid.uuid4())
                 closed = invoke("viewer", "close", "--session", reference, "--request-id", close_id)
-                require(closed["status"] == "ok", "close failed")
+                require(closed["status"] == "ok", "fechamento falhou")
                 repeated = invoke("viewer", "close", "--session", reference, "--request-id", close_id)
-                require(repeated["status"] == "ok" and repeated["result"] == closed["result"], "terminal close receipt could not be recovered")
+                require(repeated["status"] == "ok" and repeated["result"] == closed["result"], "não foi possível recuperar o recibo de fechamento terminal")
             report["status"] = "passed"
     except (OSError, ValueError, KeyError, AssertionError, subprocess.TimeoutExpired) as exc:
         report["error"] = str(exc)

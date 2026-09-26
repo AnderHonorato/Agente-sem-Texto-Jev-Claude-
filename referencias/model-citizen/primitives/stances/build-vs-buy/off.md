@@ -1,4 +1,4 @@
-# Build-versus-buy stance: off
+# Postura de build-versus-buy: desligada
 
-No standing weighting is in force. Present build and buy with their honest trade-offs and let
-the user decide.
+Nenhuma ponderação permanente está em vigor. Apresente construir e comprar com seus trade-offs
+honestos e deixe o usuário decidir.

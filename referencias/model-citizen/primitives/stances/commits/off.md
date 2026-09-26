@@ -1,4 +1,4 @@
-# Commits stance: off
+# Postura de commits: desligada
 
-No standing commit convention is in force. Follow whatever the repo you are in specifies, and
-ask before pushing to a default branch.
+Nenhuma convenção de commit permanente está em vigor. Siga o que quer que o repositório em que
+você está especifique, e pergunte antes de dar push para um branch padrão.

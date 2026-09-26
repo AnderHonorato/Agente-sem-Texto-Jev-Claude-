@@ -1,63 +1,67 @@
-# UI rubric
+# Rubrica de UI
 
-For web apps, iOS/Mac apps, landing pages, dashboards and standalone HTML documents.
+Para apps web, apps iOS/Mac, landing pages, dashboards e documentos HTML autônomos.
 
-## Scored axes — 10 total
+## Eixos pontuados — 10 no total
 
-### Hierarchy and composition (0-3)
+### Hierarquia e composição (0-3)
 
-Does the eye land on the most important thing first, and travel in the intended order? Judge
-spacing rhythm (is there a consistent scale, or arbitrary values), alignment (do edges actually
-line up, including optical alignment), density (is it cramped or is it floating in dead space),
-and grouping (does whitespace communicate relatedness).
+O olho pousa na coisa mais importante primeiro, e viaja na ordem pretendida? Julgue o ritmo de
+espaçamento (existe uma escala consistente, ou valores arbitrários), alinhamento (as bordas
+realmente se alinham, incluindo alinhamento óptico), densidade (está apertado ou está flutuando em
+espaço morto), e agrupamento (o espaço em branco comunica relação).
 
-Reaching for: a clear primary element, deliberate secondary and tertiary tiers, and nothing
-competing for the same rank.
+Buscando: um elemento primário claro, camadas secundária e terciária deliberadas, e nada
+competindo pelo mesmo posto.
 
-### Type and color (0-3)
+### Tipografia e cor (0-3)
 
-Type scale coherence — a real scale, not seven arbitrary sizes. Weight and size doing hierarchy
-work rather than color alone. Line length in a readable range and leading that matches the size.
+Coerência da escala tipográfica — uma escala real, não sete tamanhos arbitrários. Peso e tamanho
+fazendo o trabalho de hierarquia em vez de só a cor. Comprimento de linha numa faixa legível e
+entrelinha que combina com o tamanho.
 
-Palette discipline — a small committed set, not accumulated one-off values. Color carrying meaning
-consistently. Sufficient contrast between foreground, background and accent that the contrast gate
-passes on its own merits rather than by tweaking one value at the end.
+Disciplina de paleta — um conjunto pequeno e comprometido, não valores avulsos acumulados. Cor
+carregando significado consistentemente. Contraste suficiente entre primeiro plano, fundo e
+destaque de modo que o gate de contraste passe pelo próprio mérito em vez de ajustar um valor no
+final.
 
-### Surface and depth (0-2)
+### Superfície e profundidade (0-2)
 
-Elevation, borders, corner radii and shadows applied as a coherent system. Every surface at a
-given depth should look like it is at that depth. Shadows should match a single implied light
-source and be soft enough not to read as a dark rectangle.
+Elevação, bordas, raios de canto e sombras aplicados como um sistema coerente. Toda superfície numa
+dada profundidade deve parecer estar naquela profundidade. Sombras devem combinar com uma única
+fonte de luz implícita e ser suaves o bastante para não lerem como um retângulo escuro.
 
-Losing points: muddy layering, borders and shadows both doing the same job, radii that vary
-without reason, gradients that band.
+Perdendo pontos: camadas confusas, bordas e sombras ambas fazendo o mesmo trabalho, raios que
+variam sem razão, gradientes que bandeiam.
 
-### Detail and state (0-2)
+### Detalhe e estado (0-2)
 
-Go over it with a fine-toothed comb. Icon optical alignment and consistent stroke weight. No
-half-pixel edges, no ragged wrapping, no orphaned words, no clipped descenders.
+Passe um pente fino por tudo. Alinhamento óptico de ícones e peso de traço consistente. Sem bordas
+de meio pixel, sem quebra de linha desalinhada, sem palavras órfãs, sem descendentes cortados.
 
-Then the states that carry real product quality: **hover, focus, active, disabled, empty, loading,
-error**. A design that only looks good in its happy, fully-populated state is not finished. Empty
-and error states are where most UIs visibly fall apart.
+Depois os estados que carregam qualidade real de produto: **hover, foco, ativo, desabilitado,
+vazio, carregando, erro**. Um design que só parece bom no seu estado feliz e totalmente populado
+não está terminado. Estados vazios e de erro são onde a maioria das UIs visivelmente desmorona.
 
-## Hard gates — pass/fail, not scored
+## Gates obrigatórios — pass/fail, não pontuados
 
-- **Contrast meets WCAG AA.** 4.5:1 for body text, 3:1 for large text and meaningful UI borders.
-  Measure it; do not eyeball it. This is never traded for aesthetics.
-- **Focus is visible** on every interactive element, and keyboard order is sane.
-- **Design tokens and primitives are used**, not ad-hoc values. Whatever the project's token
-  package and primitive library are, use them. A beautiful screen built from hardcoded hex values
-  and magic numbers fails this gate.
-- **Responsive at the target breakpoints**, with no horizontal scroll and no overlap at the
-  narrowest supported width.
-- **Both themes correct**, where the surface supports light and dark.
-- **Content extremes do not break it** — longest realistic string, empty list, one item, many.
+- **Contraste atende WCAG AA.** 4,5:1 para texto do corpo, 3:1 para texto grande e bordas
+  significativas de UI. Meça isso; não estime a olho. Isso nunca é trocado por estética.
+- **Foco é visível** em todo elemento interativo, e a ordem de teclado é sensata.
+- **Tokens e primitivos de design são usados**, não valores ad-hoc. Seja qual for o pacote de
+  tokens e a biblioteca de primitivos do projeto, use-os. Uma tela bonita construída com valores
+  hex fixos no código e números mágicos falha este gate.
+- **Responsivo nos breakpoints alvo**, sem rolagem horizontal e sem sobreposição na largura
+  suportada mais estreita.
+- **Ambos os temas corretos**, onde a superfície suporta claro e escuro.
+- **Extremos de conteúdo não a quebram** — a string realista mais longa, lista vazia, um item,
+  muitos.
 
-## Notes
+## Notas
 
-The target does not outrank the design system. When a generated mockup wants something the tokens
-do not offer, **the system wins**; record the conflict rather than forking the palette.
+O alvo não supera o sistema de design em hierarquia. Quando uma maquete gerada quer algo que os
+tokens não oferecem, **o sistema vence**; registre o conflito em vez de bifurcar a paleta.
 
-For HTML documents meant to read as siblings of previously shipped ones, matching the existing
-family is itself a gate. Novel styling that looks good standalone but breaks the set has failed.
+Para documentos HTML destinados a lerem como irmãos dos entregues anteriormente, combinar com a
+família existente é, por si só, um gate. Estilização nova que parece boa isoladamente mas quebra o
+conjunto falhou.

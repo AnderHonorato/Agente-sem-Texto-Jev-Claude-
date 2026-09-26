@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""The one place a stance and the model ladder are resolved.
+"""O único lugar onde uma stance e a escada de modelos são resolvidas.
 
-Not a hook: nothing registers it, and it reads no event. It sits beside the hooks because
-they are standalone scripts run as subprocesses and share code by loading a sibling file
-(`rule-detectors.py` is the precedent); `lifecycle.py` loads this same file by path, so the
-dispatcher and the hooks cannot drift into two answers for one question.
+Não é um hook: nada o registra, e não lê evento algum. Fica ao lado dos hooks porque eles são
+scripts standalone rodados como subprocessos e compartilham código carregando um arquivo irmão
+(`rule-detectors.py` é o precedente); `lifecycle.py` carrega este mesmo arquivo por caminho, para
+que o dispatcher e os hooks não consigam divergir em duas respostas para uma pergunta.
 
-`selection(env)` resolves every unit of every kind over the selection ladder `docs/preferences.md`
-documents: built-in defaults, the selected mode, the user config under `HARNESS_HOME` or `$HOME`,
-the file `HARNESS_PROJECT_CONFIG` names, the file `HARNESS_SESSION_CONFIG` names, then the
-session's `HARNESS_MODE` and `HARNESS_STANCE_*`. `resolve(env)` and `selected()` read the same
-ladder for stances only. `strict` says what an unusable file means: the dispatcher wants the
-error, a hook wants the spawn to run anyway, so it passes `strict=False` and takes the layers it
-could read.
+`selection(env)` resolve toda unidade de todo tipo sobre a escada de seleção que
+`docs/preferences.md` documenta: padrões embutidos, o modo selecionado, a config do usuário sob
+`HARNESS_HOME` ou `$HOME`, o arquivo que `HARNESS_PROJECT_CONFIG` nomeia, o arquivo que
+`HARNESS_SESSION_CONFIG` nomeia, depois o `HARNESS_MODE` e `HARNESS_STANCE_*` da sessão.
+`resolve(env)` e `selected()` leem a mesma escada só para stances. `strict` diz o que um arquivo
+inutilizável significa: o dispatcher quer o erro, um hook quer que o disparo rode de qualquer
+forma, então passa `strict=False` e usa as camadas que conseguiu ler.
 
-`cost_table(env)`, and `resolve(env, table=True)`, additionally resolve the active `cost`
-variant's JSON sidecar — switches, per-role and per-band rows, the default band — over its
-`extends` chain. Schema and authoring: `docs/primitive-authoring.md`. It is opt-in because it
-reads more files than a stance question needs. No number lives here: an unusable sidecar yields
-the base variant's table and a warning, never a guessed default.
+`cost_table(env)`, e `resolve(env, table=True)`, resolvem adicionalmente o sidecar JSON da
+variante `cost` ativa — switches, linhas por papel e por banda, a banda padrão — sobre sua cadeia
+`extends`. Schema e autoria: `docs/primitive-authoring.md`. É opt-in porque lê mais arquivos do
+que uma pergunta de stance precisa. Nenhum número vive aqui: um sidecar inutilizável produz a
+tabela da variante base e um aviso, nunca um padrão chutado.
 
-`fingerprint(env)` digests the resolved selection into the profile fingerprint every new ledger
-row carries; see `FINGERPRINT_KEY`.
+`fingerprint(env)` faz o digest da seleção resolvida na fingerprint de perfil que toda nova
+linha de ledger carrega; veja `FINGERPRINT_KEY`.
 
-Import-cheap on purpose: no work at import, JSON reads only, because the dispatcher loads
-this on every tool call.
+Barato de importar de propósito: nenhum trabalho na importação, só leituras de JSON, porque o
+dispatcher carrega isto em toda chamada de ferramenta.
 """
 import hashlib
 import importlib.util
@@ -36,25 +36,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PREFIX = "HARNESS_STANCE_"
-# How long a session record is worth keeping. A session that has not started in a fortnight
-# will never spawn again, and its record is three fields nobody reads.
+# Por quanto tempo vale a pena manter um registro de sessão. Uma sessão que não começou em duas
+# semanas nunca mais vai disparar, e seu registro são três campos que ninguém lê.
 SESSION_TTL_DAYS = 14
 SESSION_ID_MAX = 128
-# How stale a record may get before a spawn that read it moves its mtime out of the sweep's way.
+# O quão obsoleto um registro pode ficar antes de um disparo que o leu mover seu mtime para fora do caminho da varredura.
 SESSION_REFRESH_SECONDS = 86400
-# The transcript attachment a session writes when the set of types it resolves changes, and how
-# much of the transcript's tail is read to find one. A reload is announced in the turn it is
-# noticed, so it is at the end of the file, and a bounded read keeps a spawn hook's cost flat.
+# O anexo de transcript que uma sessão escreve quando o conjunto de tipos que resolve muda, e
+# quanto do final do transcript é lido para encontrar um. Um recarregamento é anunciado no turno
+# em que é notado, então fica no fim do arquivo, e uma leitura limitada mantém o custo de um hook
+# de disparo constante.
 AGENT_LISTING = "agent_listing_delta"
 TRANSCRIPT_TAIL_BYTES = 256 * 1024
-# The user-config key naming tool-name globs plan mode may use, and the postures under which a
-# widened plan-mode authority is what the user already asked for everywhere else.
+# A chave de config do usuário que nomeia globs de nome de ferramenta que o modo plano pode usar,
+# e as posturas sob as quais uma autoridade de modo plano alargada é o que o usuário já pediu em
+# todo outro lugar.
 PLAN_TOOLS_KEY = "plan_allow_tools"
 OPEN_POSTURES = ("bypass", "auto")
 
-# The dimensions `bin/harness` resolves and the variant each falls back to, which is
-# `config.example.json`'s — the file the CLI layers the user config over, and a test holds the
-# two together.
+# As dimensões que `bin/harness` resolve e a variante para a qual cada uma recai, que é a de
+# `config.example.json` — o arquivo sobre o qual a CLI sobrepõe a config do usuário, e um teste
+# mantém os dois juntos.
 DEFAULT_STANCES = {
     "licensing": "permissive-commercial",
     "build-vs-buy": "capability-ceiling",
@@ -65,17 +67,17 @@ DEFAULT_STANCES = {
     "autonomy": "execute",
     "cost": "balanced", "voice": "scannable",
 }
-# Capability classes, strongest first; a test holds this equal to `catalog.TIER_CLASSES`, which
-# is the definition. Named here so a hook can order an adapter's table without importing the
-# library: a policy hook is a subprocess with no package on its path.
+# Classes de capacidade, mais forte primeiro; um teste mantém isto igual a `catalog.TIER_CLASSES`,
+# que é a definição. Nomeado aqui para que um hook possa ordenar a tabela de um adaptador sem
+# importar a biblioteca: um hook de política é um subprocesso sem pacote algum no seu path.
 TIER_CLASSES = ("frontier", "strong", "standard", "light")
 EFFORTS = ("low", "medium", "high")
 BANDS = ("A", "B", "C")
-# The role a band's row renders and reroutes to. A band classes the *work*, so it needs an agent
-# definition to carry its class and effort into a native spawn; these three are those definitions,
-# and this map is the only place the naming is written.
+# O papel que a linha de uma banda renderiza e para o qual reroteia. Uma banda classifica o
+# *trabalho*, então precisa de uma definição de agente para carregar sua classe e esforço para um
+# disparo nativo; estas três são essas definições, e este mapa é o único lugar onde a nomeação é escrita.
 BAND_ROLES = {band: "worker-" + band.lower() for band in BANDS}
-# The variant every other one falls back to, and the one a sidecar-less variant resolves to.
+# A variante para a qual toda outra recai, e aquela para a qual uma variante sem sidecar resolve.
 BASE_COST_VARIANT = DEFAULT_STANCES["cost"]
 SIDECAR_SCHEMA_VERSION = 1
 MAX_EXTENDS_DEPTH = 5
@@ -86,35 +88,38 @@ SWITCH_VALUES = {
     "turn_feed": ("off", "thresholds", "every-turn"),
 }
 BUDGET_KEYS = ("budget_output_tokens", "budget_tool_calls")
-# The unit each budgeted key is stated in, in the order the sentence states them.
+# A unidade em que cada chave de orçamento é declarada, na ordem em que a frase as declara.
 BUDGET_UNITS = dict(zip(BUDGET_KEYS, ("output tokens", "tool calls")))
-# Ceilings that only rule out a number no machine could mean. A budget is soft, so the cap is
-# about arithmetic that stays finite, not about an opinion on how much is too much.
+# Tetos que só descartam um número que máquina nenhuma poderia significar. Um orçamento é leve,
+# então o limite é sobre aritmética que permanece finita, não sobre uma opinião de quanto é demais.
 MAX_MULTIPLIER = 100
 MAX_BUDGET = 10 ** 9
 MAX_NUDGES = 8
 SIDECAR_KEYS = ("schema_version", "extends", "switches", "default_band", "rows")
-# The selection document: `mode`, then one object per kind in `catalog.KINDS`. `sources` and
-# `shadowed` are what `harness selection --json` prints beside them; they select nothing, and are
-# accepted so that the output reads back unchanged as a session file. Shape and precedence:
-# `docs/preferences.md`.
+# O documento de seleção: `mode`, depois um objeto por tipo em `catalog.KINDS`. `sources` e
+# `shadowed` são o que `harness selection --json` imprime ao lado deles; não selecionam nada, e
+# são aceitos para que a saída se releia inalterada como um arquivo de sessão. Forma e
+# precedência: `docs/preferences.md`.
 SELECTION_EXTRA_KEYS = ("mode", "sources", "shadowed")
 SWITCH_STATES = ("on", "off")
 MODE_VARIABLE = "HARNESS_MODE"
-# A mode file carries these beside its selection keys. Contract and shipped modes: `docs/modes.md`.
+# Um arquivo de modo carrega estas ao lado das suas chaves de seleção. Contrato e modos
+# embutidos: `docs/modes.md`.
 MODE_KEYS = ("schema_version", "description")
-# Hooks a layer, a mode included, may switch off only when the user configuration sets `CORE_ACK`
-# true (`core_refusals`). The same four ids as `catalog.CORE_HOOKS`, held here too because a hook
-# copied out of its checkout has no catalog; a test keeps the two equal.
+# Hooks que uma camada, um modo incluído, só pode desligar quando a configuração do usuário
+# define `CORE_ACK` como true (`core_refusals`). Os mesmos quatro ids de `catalog.CORE_HOOKS`,
+# mantidos aqui também porque um hook copiado para fora do seu checkout não tem catálogo; um
+# teste mantém os dois iguais.
 CORE_HOOKS = ("brief-guard", "grade-bash", "neutralize-tool-output", "stop-gate")
 CORE_ACK = "core_switches_acknowledged"
-# The user-configuration key naming, per kind, the units `harness init` wrote as defaults rather
-# than ones the user chose. Those resolve below the mode (AD-2); every other user key above it.
+# A chave de configuração do usuário que nomeia, por tipo, as unidades que `harness init`
+# escreveu como padrões em vez de escolhidas pelo usuário. Essas resolvem abaixo do modo (AD-2);
+# toda outra chave do usuário acima dele.
 INIT_DEFAULTS = "init_defaults"
 _KINDS = {}
-# A module's manifest (AD-22): what it claims to change, where it reaches the model, what measures
-# it, the one exclusive slot it takes, and the modules it needs or collides with. Authoring
-# contract and vocabulary: `docs/primitive-authoring.md`.
+# O manifesto de um módulo (AD-22): o que alega mudar, onde alcança o modelo, o que mede, o
+# único slot exclusivo que ocupa, e os módulos que precisa ou com os quais colide. Contrato de
+# autoria e vocabulário: `docs/primitive-authoring.md`.
 MANIFEST_FIELDS = ("claims", "surface", "instruments", "slot", "dependencies", "conflicts")
 MANIFEST_FILE = "manifests.json"
 SURFACES = ("resident-context", "on-demand-context", "hook-events")
@@ -130,10 +135,10 @@ def config_path(env=None):
 
 
 def user_agents_dir(env=None):
-    """Where the tool resolves a user-level agent definition; `CLAUDE_CONFIG_DIR` moves it.
+    """Onde a ferramenta resolve uma definição de agente em nível de usuário; `CLAUDE_CONFIG_DIR` a move.
 
-    The one place that rule is written, so the hook that reroutes a spawn and the hook that
-    records what a session can resolve are never looking at two different directories.
+    O único lugar onde essa regra é escrita, para que o hook que reroteia um disparo e o hook que
+    registra o que uma sessão consegue resolver nunca estejam olhando para dois diretórios diferentes.
     """
     env = os.environ if env is None else env
     config = env.get("CLAUDE_CONFIG_DIR")
@@ -141,7 +146,7 @@ def user_agents_dir(env=None):
 
 
 def installed_agents(env=None):
-    """The user-level agent definitions on disk now, sorted; `[]` when the directory is unreadable."""
+    """As definições de agente em nível de usuário em disco agora, ordenadas; `[]` quando o diretório é ilegível."""
     try:
         return sorted(path.stem for path in user_agents_dir(env).glob("*.md") if path.is_file())
     except OSError:
@@ -149,17 +154,18 @@ def installed_agents(env=None):
 
 
 def transcript_agents(transcript_path, limit=TRANSCRIPT_TAIL_BYTES):
-    """The types a reload announced to this session after it started, or None when none did.
+    """Os tipos que um recarregamento anunciou a esta sessão depois que começou, ou None quando nenhum anunciou.
 
-    Claude Code attaches an `agent_listing_delta` record to the transcript whenever the set of
-    types it can resolve changes: one with `isInitial` true at session start, and one more each
-    time the watcher picks a definition up. A later record is the runtime's own statement that
-    this session resolves the names it adds, which no directory listing can give — a headless
-    session reloads nothing and writes no later record, so this answers for the session that
-    asked rather than for the machine. Measured in `docs/spikes/2026-09-22-registry-reload.md`.
+    O Claude Code anexa um registro `agent_listing_delta` ao transcript sempre que o conjunto de
+    tipos que consegue resolver muda: um com `isInitial` true no início da sessão, e mais um a
+    cada vez que o observador pega uma definição. Um registro posterior é a própria declaração do
+    runtime de que esta sessão resolve os nomes que adiciona, o que nenhuma listagem de diretório
+    consegue dar — uma sessão headless não recarrega nada e não escreve registro posterior algum,
+    então isto responde pela sessão que perguntou em vez de pela máquina. Medido em
+    `docs/spikes/2026-09-22-registry-reload.md`.
 
-    Only the tail is read, so a long session costs what a short one does, and a listing that
-    has fallen out of it reads as None: unknown, which routes nothing.
+    Só o final é lido, então uma sessão longa custa o que uma curta custa, e uma listagem que
+    caiu para fora dele lê como None: desconhecido, que não roteia nada.
     """
     if not transcript_path:
         return None
@@ -173,8 +179,8 @@ def transcript_agents(transcript_path, limit=TRANSCRIPT_TAIL_BYTES):
     except OSError:
         return None
     names = None
-    # One record per line, so only `\n` ends one: a body holding a line separator of its own
-    # must not be read as two half-records.
+    # Um registro por linha, então só `\n` termina um: um corpo guardando um separador de linha
+    # próprio não deve ser lido como dois meio-registros.
     for line in tail.split("\n"):
         if AGENT_LISTING not in line:
             continue
@@ -188,8 +194,8 @@ def transcript_agents(transcript_path, limit=TRANSCRIPT_TAIL_BYTES):
         if not isinstance(listing, dict) or listing.get("type") != AGENT_LISTING:
             continue
         if listing.get("isInitial"):
-            # A listing a session starts from replaces everything before it, exactly as a
-            # `startup` replaces the record: what an earlier session resolved is not this one's.
+            # Uma listagem da qual uma sessão parte substitui tudo antes dela, exatamente como um
+            # `startup` substitui o registro: o que uma sessão anterior resolvia não é desta.
             names = None
             continue
         names = set() if names is None else names
@@ -207,20 +213,20 @@ def state_dir(env=None):
 
 
 def sessions_dir(env=None):
-    """The session registry: one record per session, written when its process started.
+    """O registro de sessões: um registro por sessão, escrito quando seu processo começou.
 
-    A definition on disk is not evidence that a running session can resolve the type it names:
-    an interactive session picks one up seconds after it appears, a headless one never does,
-    and rerouting to a type the session cannot resolve turns a spawn that would have worked
-    into one that fails. The SessionStart policy writes what the registry held; the spawn hook
-    reroutes to a name it finds there, or to one `transcript_agents` shows the session was
-    later told about.
+    Uma definição em disco não é evidência de que uma sessão em execução consegue resolver o tipo
+    que nomeia: uma sessão interativa pega uma segundos depois de aparecer, uma headless nunca
+    pega, e rerotear para um tipo que a sessão não consegue resolver transforma um disparo que
+    teria funcionado num que falha. A política de SessionStart escreve o que o registro guardava;
+    o hook de disparo reroteia para um nome que encontra lá, ou para um que `transcript_agents`
+    mostra que a sessão foi avisada depois.
     """
     return state_dir(env) / "sessions"
 
 
 def _session_id(value):
-    """A session identifier safe to make a file name of: no separator, no traversal, bounded."""
+    """Um identificador de sessão seguro para virar um nome de arquivo: sem separador, sem travessia, limitado."""
     return (isinstance(value, str) and value.isascii() and 0 < len(value) <= SESSION_ID_MAX
             and value[0].isalnum() and all(c.isalnum() or c in "._-" for c in value))
 
@@ -230,7 +236,7 @@ def session_record_path(session_id, env=None):
 
 
 def read_session_record(session_id, env=None):
-    """One session's record, or None for no record, an unreadable one, or anything but an object."""
+    """O registro de uma sessão, ou None para nenhum registro, um ilegível, ou qualquer coisa que não seja um objeto."""
     path = session_record_path(session_id, env)
     if path is None:
         return None
@@ -242,10 +248,10 @@ def read_session_record(session_id, env=None):
 
 
 def write_session_record(session_id, record, env=None):
-    """Replace one session's record atomically; `True` when it was written.
+    """Substitui o registro de uma sessão atomicamente; `True` quando foi escrito.
 
-    The directory is the session's own business and nobody else's, so it is 0700 and the file
-    is 0600 from the moment it exists rather than after a chmod a reader could race.
+    O diretório é assunto só da sessão e de mais ninguém, então é 0700 e o arquivo é 0600 desde o
+    momento em que existe em vez de depois de um chmod com o qual um leitor poderia competir.
     """
     path = session_record_path(session_id, env)
     if path is None or not isinstance(record, dict):
@@ -268,11 +274,11 @@ def write_session_record(session_id, record, env=None):
 
 
 def session_agents(session_id, env=None):
-    """The agent names this session's registry held, or None when nothing recorded them.
+    """Os nomes de agente que o registro desta sessão guardava, ou None quando nada os registrou.
 
-    An absent or unusable `agents` key is None, which every caller reads as unknown, and
-    unknown is never routable. That is what lets a record exist purely to remember a notice
-    without ever authorising a reroute.
+    Uma chave `agents` ausente ou inutilizável é None, que todo chamador lê como desconhecido, e
+    desconhecido nunca é roteável. É isso que permite que um registro exista puramente para
+    lembrar um aviso sem jamais autorizar um reroteamento.
     """
     record = read_session_record(session_id, env)
     names = record.get("agents") if record else None
@@ -280,20 +286,20 @@ def session_agents(session_id, env=None):
 
 
 def session_announced(session_id, env=None):
-    """The types a reload told this session about on an earlier spawn; `[]` when none did."""
+    """Os tipos sobre os quais um recarregamento avisou esta sessão num disparo anterior; `[]` quando nenhum avisou."""
     record = read_session_record(session_id, env)
     names = record.get("announced") if record else None
     return [name for name in names if isinstance(name, str)] if isinstance(names, list) else []
 
 
 def remember_agents(session_id, names, env=None):
-    """Keep what a reload announced, so routing outlives the transcript tail. `True` when written.
+    """Guarda o que um recarregamento anunciou, para que o roteamento sobreviva ao final do transcript. `True` quando escrito.
 
-    The transcript is where an announcement is discovered and the read of it is bounded, so a
-    long session pushes the delta out of the tail; routing that switched off there would be the
-    same defect again on a slower clock. The remembered set is replaced rather than merged,
-    because the reader's answer already accounts for every `removedTypes` in the tail, and a
-    merge would reinstate a worker the session has been told it no longer resolves.
+    O transcript é onde um anúncio é descoberto e sua leitura é limitada, então uma sessão longa
+    empurra o delta para fora do final; roteamento que se desligasse ali seria o mesmo defeito de
+    novo num relógio mais lento. O conjunto lembrado é substituído em vez de mesclado, porque a
+    resposta do leitor já contabiliza todo `removedTypes` no final, e uma mesclagem reinstauraria
+    um worker que a sessão já foi avisada que não resolve mais.
     """
     wanted = sorted({name for name in names if isinstance(name, str)}) if names else []
     record = read_session_record(session_id, env)
@@ -304,11 +310,11 @@ def remember_agents(session_id, names, env=None):
 
 
 def refresh_session_record(session_id, env=None, older_than=SESSION_REFRESH_SECONDS):
-    """Keep a session in use out of another session's sweep. `True` when the mtime was moved.
+    """Mantém uma sessão em uso fora da varredura de outra sessão. `True` quando o mtime foi movido.
 
-    A session open longer than the TTL would otherwise have its record pruned under it and stop
-    routing halfway through, so reading the record is evidence the session is alive. A day's
-    granularity, because this runs on a spawn and the sweep measures a fortnight.
+    Uma sessão aberta por mais tempo que o TTL de outra forma teria seu registro podado debaixo
+    dela e pararia de rotear na metade, então ler o registro é evidência de que a sessão está
+    viva. Granularidade de um dia, porque isto roda num disparo e a varredura mede duas semanas.
     """
     path = session_record_path(session_id, env)
     try:
@@ -321,13 +327,13 @@ def refresh_session_record(session_id, env=None, older_than=SESSION_REFRESH_SECO
 
 
 def note_once(session_id, key, env=None):
-    """`True` the first time this session is told `key`; `False` once anything remembers it.
+    """`True` na primeira vez que esta sessão é avisada de `key`; `False` assim que algo o lembra.
 
-    A session with no record is exactly the session these notices are for, so one is created
-    to hold the memory — with no `agents` key, which reads as unknown and can never authorise
-    a reroute. A hook is a process per event, so nothing but the record remembers: when it
-    cannot be written this says nothing at all, because a notice repeated on every spawn is a
-    worse failure than one never given.
+    Uma sessão sem registro é exatamente a sessão para a qual esses avisos existem, então um é
+    criado para guardar a memória — sem chave `agents`, que lê como desconhecido e nunca pode
+    autorizar um reroteamento. Um hook é um processo por evento, então nada além do registro
+    lembra: quando não pode ser escrito isto não diz nada de forma alguma, porque um aviso
+    repetido a cada disparo é uma falha pior do que um nunca dado.
     """
     record = read_session_record(session_id, env)
     if record is None:
@@ -340,7 +346,7 @@ def note_once(session_id, key, env=None):
 
 
 def prune_session_records(keep=None, days=SESSION_TTL_DAYS, env=None):
-    """Drop records older than `days`, never `keep`'s. Best effort: a sweep never fails a session."""
+    """Descarta registros mais antigos que `days`, nunca o de `keep`. Melhor esforço: uma varredura nunca falha uma sessão."""
     cutoff, removed = time.time() - days * 86400, 0
     try:
         paths = sorted(sessions_dir(env).glob("*.json"))
@@ -359,7 +365,7 @@ def prune_session_records(keep=None, days=SESSION_TTL_DAYS, env=None):
 
 
 def _stances_of(data):
-    """The usable `{dimension: variant}` pairs of one layer; anything else is not a selection."""
+    """Os pares `{dimension: variant}` utilizáveis de uma camada; qualquer outra coisa não é uma seleção."""
     stances = data.get("stances") if isinstance(data, dict) else None
     if not isinstance(stances, dict):
         return {}
@@ -368,10 +374,10 @@ def _stances_of(data):
 
 
 def _user_config(env, strict):
-    """The user's configuration. No file is the defaults; a file that cannot be read is not.
+    """A configuração do usuário. Nenhum arquivo são os padrões; um arquivo que não pode ser lido não é.
 
-    A config that exists but will not open or will not parse is a selection nobody can see, so
-    strict callers hear about it rather than running under defaults the user did not choose.
+    Uma config que existe mas não abre ou não parseia é uma seleção que ninguém consegue ver,
+    então chamadores estritos ouvem falar disso em vez de rodar sob padrões que o usuário não escolheu.
     """
     path = config_path(env)
     try:
@@ -385,11 +391,11 @@ def _user_config(env, strict):
 
 
 def selection_kinds(root=None):
-    """`{kind: catalog entry}` for every selectable kind, read from `catalog.KINDS` by file.
+    """`{kind: catalog entry}` para todo tipo selecionável, lido de `catalog.KINDS` por arquivo.
 
-    The catalog is the one definition of a kind, so a new kind is a new entry there and nothing
-    here. A hook copied out of its checkout has no catalog beside it and knows `stances` only,
-    which is the one kind whose defaults this file carries.
+    O catálogo é a única definição de um tipo, então um tipo novo é uma entrada nova lá e nada
+    aqui. Um hook copiado para fora do seu checkout não tem catálogo ao lado e conhece só
+    `stances`, que é o único tipo cujos padrões este arquivo carrega.
     """
     key = str(root or ROOT)
     if key not in _KINDS:
@@ -409,11 +415,11 @@ def selection_kinds(root=None):
 
 
 def _selection_file(env, variable, strict, root=None):
-    """The selection document an environment variable names; `{}` when it names none.
+    """O documento de seleção que uma variável de ambiente nomeia; `{}` quando não nomeia nenhum.
 
-    Carries selection keys only. Identity, permissions, runtime flags, `primitive_roots` and
-    telemetry keep their own validation in the user configuration, so a key outside the
-    selection is refused by name rather than ignored.
+    Carrega só chaves de seleção. Identidade, permissões, flags de runtime, `primitive_roots` e
+    telemetria mantêm sua própria validação na configuração do usuário, então uma chave fora da
+    seleção é recusada pelo nome em vez de ignorada.
     """
     named = env.get(variable)
     if not named:
@@ -423,8 +429,8 @@ def _selection_file(env, variable, strict, root=None):
         if not isinstance(data, dict):
             raise ValueError(variable + " names " + named + ", which is not a JSON object")
         refused(data, variable + " file " + named, root)
-        # A kind whose value is not an object is refused by `selection()` when strict and selects
-        # nothing otherwise; only a key the file may not set drops the whole file.
+        # Um tipo cujo valor não é um objeto é recusado por `selection()` quando estrito e não
+        # seleciona nada nos demais casos; só uma chave que o arquivo não pode definir descarta o arquivo inteiro.
         return data
     except (OSError, ValueError):
         if strict:
@@ -433,7 +439,7 @@ def _selection_file(env, variable, strict, root=None):
 
 
 def refused(data, where, root=None):
-    """Raise `ValueError` naming every key of `data` a selection document may not carry."""
+    """Levanta `ValueError` nomeando toda chave de `data` que um documento de seleção não pode carregar."""
     extra = sorted(set(data) - set(SELECTION_EXTRA_KEYS) - set(selection_kinds(root)))
     if extra:
         raise ValueError(where + " may carry selection keys only, not " +
@@ -451,7 +457,7 @@ def _session_config(env, strict, root=None):
 
 
 def overrides(env=None):
-    """The `{dimension: variant}` a session set through `HARNESS_STANCE_*`."""
+    """O `{dimension: variant}` que uma sessão define através de `HARNESS_STANCE_*`."""
     env = os.environ if env is None else env
     return {key[len(PREFIX):].lower().replace("_", "-"): value.strip()
             for key, value in env.items()
@@ -464,10 +470,11 @@ def _identifier(value):
 
 
 def _number(value, low, high, integer=False):
-    """A finite in-range number. `True` is not 1 here, and neither NaN nor an infinity is a value.
+    """Um número finito dentro do intervalo. `True` não é 1 aqui, e nem NaN nem um infinito é um valor.
 
-    JSON admits `Infinity` and `NaN`, and Python's `json` reads them, so a multiplier arriving
-    from a file can be either; both would raise out of the arithmetic below rather than warn.
+    O JSON admite `Infinity` e `NaN`, e o `json` do Python os lê, então um multiplicador chegando
+    de um arquivo pode ser qualquer um dos dois; ambos levantariam exceção fora da aritmética
+    abaixo em vez de apenas avisar.
     """
     if isinstance(value, bool) or not isinstance(value, int if integer else (int, float)):
         return False
@@ -477,10 +484,11 @@ def _number(value, low, high, integer=False):
 
 
 def _sizes(value):
-    """None when `value` is a usable list of context sizes, else the rule it breaks.
+    """None quando `value` é uma lista utilizável de tamanhos de contexto, senão a regra que quebra.
 
-    Specific, where every other switch reports "an unusable value", because this one is a list:
-    an author told eight numbers are unusable has to find which, against a rule written nowhere.
+    Específico, onde todo outro switch reporta "um valor inutilizável", porque este é uma lista:
+    um autor a quem se diz que oito números são inutilizáveis precisa descobrir quais, contra
+    uma regra escrita em lugar nenhum.
     """
     if not isinstance(value, list):
         return "is a list of whole positive token counts, smallest first"
@@ -499,14 +507,15 @@ def _sizes(value):
 
 
 def validate_sidecar(data, roles=None):
-    """`(usable copy, findings)` for one sidecar object; every finding drops the value it names.
+    """`(cópia utilizável, achados)` para um objeto de sidecar; todo achado descarta o valor que nomeia.
 
-    Findings are warnings to the resolver and failures to lint, which is the whole point: a
-    switch added in a later release must never break a variant somebody else authored, while a
-    shipped variant with an unknown key is a mistake nobody should have to discover at runtime.
+    Achados são avisos para o resolvedor e falhas para o lint, que é todo o ponto: um switch
+    adicionado num lançamento posterior nunca deve quebrar uma variante que outra pessoa
+    escreveu, enquanto uma variante embutida com uma chave desconhecida é um erro que ninguém
+    deveria ter que descobrir em tempo de execução.
 
-    `roles` is the role catalog when the caller has one, so a row naming no role and no band is
-    reported rather than silently applying to nothing.
+    `roles` é o catálogo de papéis quando o chamador tem um, para que uma linha que não nomeia
+    papel nem banda seja reportada em vez de aplicar-se silenciosamente a nada.
     """
     findings, clean = [], {}
     for key in sorted(data):
@@ -544,8 +553,8 @@ def validate_sidecar(data, roles=None):
             ok = (isinstance(value, list) and len(value) <= MAX_NUDGES
                   and all(_number(v, 0, MAX_MULTIPLIER) and v > 0 for v in value))
         elif key == "session_nudge_at":
-            # Context sizes, not multiples: whole tokens, because that is what a transcript
-            # counts in and a fractional token is a number nobody measured.
+            # Tamanhos de contexto, não múltiplos: tokens inteiros, porque é isso que um
+            # transcript conta e um token fracionário é um número que ninguém mediu.
             problem = _sizes(value)
             if problem:
                 findings.append("switch 'session_nudge_at' " + problem)
@@ -571,7 +580,7 @@ def validate_sidecar(data, roles=None):
             findings.append("row '" + str(name) + "' is a role name or a band")
             continue
         if roles is not None and name not in BANDS and name not in roles:
-            # A row naming nothing applies to nothing, which is a typo nobody would see.
+            # Uma linha que não nomeia nada se aplica a nada, que é um erro de digitação que ninguém veria.
             findings.append("row '" + name + "' names no role and no band")
             continue
         if not isinstance(row, dict):
@@ -581,8 +590,8 @@ def validate_sidecar(data, roles=None):
         for key in sorted(row):
             value = row[key]
             if key == "class":
-                # `frontier` is never reachable by request; the delegation stance decides that,
-                # and a variant is a request.
+                # `frontier` nunca é alcançável por pedido; a stance de delegação decide isso, e
+                # uma variante é um pedido.
                 ok = value in TIER_CLASSES[1:]
             elif key == "effort":
                 ok = value in EFFORTS
@@ -602,7 +611,7 @@ def validate_sidecar(data, roles=None):
 
 
 def stance_roots(config=None, root=None):
-    """The stance directories to search, the built-in one first, then a user's `primitive_roots`."""
+    """Os diretórios de stance a pesquisar, o embutido primeiro, depois os `primitive_roots` de um usuário."""
     roots = [(root or ROOT) / "primitives" / "stances"]
     entries = config.get("primitive_roots") if isinstance(config, dict) else None
     for entry in entries if isinstance(entries, list) else []:
@@ -614,7 +623,7 @@ def stance_roots(config=None, root=None):
 
 
 def primitive_roots(config=None, root=None, kind="stances"):
-    """The primitive directories of one kind, the built-in one first, then a user's roots."""
+    """Os diretórios de primitivas de um tipo, o embutido primeiro, depois as raízes de um usuário."""
     roots = [(root or ROOT) / "primitives" / kind]
     entries = config.get("primitive_roots") if isinstance(config, dict) else None
     for entry in entries if isinstance(entries, list) else []:
@@ -630,11 +639,12 @@ def stance_roots(config=None, root=None):
 
 
 def sidecar_path(variant, roots):
-    """The first root holding `cost/<variant>.json`, or None. Never reads outside a root.
+    """A primeira raiz guardando `cost/<variant>.json`, ou None. Nunca lê fora de uma raiz.
 
-    The variant name arrives from a config file or `HARNESS_STANCE_COST`, so it is held to the
-    same identifier rule as the `.md` it accompanies, and the file it names must still resolve
-    inside the root it was found in: a symlink out of the tree is a read nobody asked for.
+    O nome da variante chega de um arquivo de config ou `HARNESS_STANCE_COST`, então é mantido à
+    mesma regra de identificador que o `.md` que acompanha, e o arquivo que nomeia ainda precisa
+    resolver dentro da raiz em que foi encontrado: um symlink para fora da árvore é uma leitura
+    que ninguém pediu.
     """
     if not _identifier(variant):
         return None
@@ -652,7 +662,7 @@ def sidecar_path(variant, roots):
 
 
 def _load_sidecar(path, strict, warnings):
-    """The sidecar's object, or None with a warning; unreadable is an error only in strict mode."""
+    """O objeto do sidecar, ou None com um aviso; ilegível é um erro só no modo estrito."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
@@ -669,7 +679,7 @@ def _load_sidecar(path, strict, warnings):
 
 
 def _frontmatter(path):
-    """A role file's frontmatter fields, or `{}`; the same `key: value` shape `catalog` parses."""
+    """Os campos de frontmatter de um arquivo de papel, ou `{}`; a mesma forma `key: value` que `catalog` parseia."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -685,12 +695,13 @@ def _frontmatter(path):
 
 
 def role_catalog(config=None, root=None):
-    """`(every role name, the names whose frontmatter says `posture: fixed`)`.
+    """`(todo nome de papel, os nomes cujo frontmatter diz `posture: fixed`)`.
 
-    A verifier's class and effort are its contract, so a variant row may budget it but never
-    down-class it, and the role file is the one place that says so. Roles a user added through
-    `primitive_roots` count the same as shipped ones; a missing catalog is two empty sets, which
-    is how an installed hook with no checkout beside it behaves.
+    A classe e o esforço de um verificador são seu contrato, então uma linha de variante pode
+    orçá-lo mas nunca rebaixar sua classe, e o arquivo de papel é o único lugar que diz isso.
+    Papéis que um usuário adicionou através de `primitive_roots` contam igual aos embutidos; um
+    catálogo ausente são dois conjuntos vazios, que é como um hook instalado sem checkout ao
+    lado se comporta.
     """
     names, fixed = set(), set()
     for directory in primitive_roots(config, root, "roles"):
@@ -709,7 +720,7 @@ def fixed_roles(config=None, root=None):
 
 
 def _merge(base, layer):
-    """`layer` over `base`, one level into `switches` and two into `rows`."""
+    """`layer` sobre `base`, um nível dentro de `switches` e dois dentro de `rows`."""
     merged = dict(base)
     for key in ("extends", "default_band"):
         if key in layer:
@@ -727,12 +738,13 @@ def _round_to(value, step):
 
 
 def table_for(stances=None, config=None, strict=True, root=None):
-    """The active cost variant resolved: switches, rows, default band, chain and warnings.
+    """A variante de custo ativa resolvida: switches, linhas, banda padrão, cadeia e avisos.
 
-    Budgets carry both figures: `base_*` is what the variant wrote and `budget_*` is that times
-    the resolved `budget_multiplier`, so a reader never multiplies twice. A link that cannot be
-    followed — no sidecar, unreadable, a schema this release does not know, a name that is not
-    an identifier — resolves to the base variant rather than to an empty table.
+    Orçamentos carregam ambas as cifras: `base_*` é o que a variante escreveu e `budget_*` é isso
+    vezes o `budget_multiplier` resolvido, para que um leitor nunca multiplique duas vezes. Um
+    link que não pode ser seguido — nenhum sidecar, ilegível, um schema que este lançamento não
+    conhece, um nome que não é um identificador — resolve para a variante base em vez de para
+    uma tabela vazia.
     """
     stances = dict(DEFAULT_STANCES) if stances is None else stances
     variant = stances.get("cost") or BASE_COST_VARIANT
@@ -765,7 +777,7 @@ def table_for(stances=None, config=None, strict=True, root=None):
                     data = None
         if data is None:
             if name != BASE_COST_VARIANT and BASE_COST_VARIANT not in seen:
-                # An unusable link is the base variant's table, not an empty one.
+                # Um link inutilizável é a tabela da variante base, não uma vazia.
                 name = BASE_COST_VARIANT
                 continue
             break
@@ -783,7 +795,7 @@ def table_for(stances=None, config=None, strict=True, root=None):
     for row_name, cells in sorted(resolved.get("rows", {}).items()):
         row = {"class": cells.get("class"), "effort": cells.get("effort")}
         if row_name in fixed:
-            # The role keeps its frontmatter tier and its bindings effort; only budgets apply.
+            # O papel mantém seu nível de frontmatter e seu esforço de bindings; só orçamentos se aplicam.
             row["class"], row["effort"], row["posture"] = None, None, "fixed"
         for key, step in zip(BUDGET_KEYS, (100, 1)):
             base = cells.get(key)
@@ -801,10 +813,10 @@ def _mode_of(data):
 
 
 def modes(config=None, root=None):
-    """`({name: path}, [refusal])`: every `modes/<name>.json` in the primitive roots.
+    """`({name: path}, [refusal])`: cada `modes/<name>.json` nas raízes primitivas.
 
-    A name two roots both define is a refusal rather than first-wins, so a user root cannot
-    silently replace a shipped mode; the first definition is still returned for a hook.
+    Um nome que duas raízes definem é uma recusa em vez de primeiro-vence, para que uma raiz de usuário não
+    substitua silenciosamente um modo distribuído; a primeira definição ainda é retornada para um hook.
     """
     found, errors = {}, []
     for directory in primitive_roots(config, root, "modes"):
@@ -820,11 +832,11 @@ def modes(config=None, root=None):
 
 
 def validate_mode(name, data, config, root=None):
-    """Every refusal the mode file `data` earns, as messages; empty when it is sound.
+    """Toda recusa que o arquivo de modo `data` ganha, como mensagens; vazio quando é sólido.
 
-    A mode carries `schema_version` 1, a `description`, and selection keys naming installed
-    units only; a stance variant is checked where every layer's is, by `sync`. A core hook it
-    switches off is refused where every layer's is, by `core_refusals`.
+    Um modo carrega `schema_version` 1, uma `description`, e chaves de seleção nomeando apenas
+    unidades instaladas; uma variante de postura é checada onde a de toda camada é, por `sync`. Um hook central
+    que ele desliga é recusado onde o de toda camada é, por `core_refusals`.
     """
     where = "mode file " + name
     if not isinstance(data, dict):
@@ -863,11 +875,11 @@ def validate_mode(name, data, config, root=None):
 
 
 def _mode_file(name, config, strict, root=None):
-    """The selection keys of mode `name`, validated; `{}` when a hook cannot use it.
+    """As chaves de seleção do modo `name`, validadas; `{}` quando um hook não pode usá-lo.
 
-    Strict callers hear about an unknown mode, a duplicate name, or a mode file that fails
-    `validate_mode`, before anything acts on the selection. A hook runs without a mode it cannot
-    use, and takes the first root's definition of a duplicated name.
+    Chamadores estritos ouvem sobre um modo desconhecido, um nome duplicado, ou um arquivo de modo que falha
+    em `validate_mode`, antes de qualquer coisa agir sobre a seleção. Um hook roda sem um modo que não pode
+    usar, e usa a definição da primeira raiz para um nome duplicado.
     """
     found, errors = modes(config, root)
     path = found.get(name)
@@ -888,10 +900,10 @@ def _mode_file(name, config, strict, root=None):
 
 
 def _init_split(config):
-    """`(typed, defaults)`: the user configuration without, and with only, what init defaulted.
+    """`(typed, defaults)`: a configuração do usuário sem, e só com, o que o init definiu por padrão.
 
-    A unit counts as init's default only while it still holds the value init recorded for it, so
-    a value edited in `config.json` afterwards is typed and stays above the mode.
+    Uma unidade conta como padrão do init só enquanto ainda mantém o valor que o init registrou para ela, então
+    um valor editado em `config.json` depois fica tipado e permanece acima do modo.
     """
     listed = config.get(INIT_DEFAULTS)
     if not isinstance(listed, dict):
@@ -910,12 +922,12 @@ def _init_split(config):
 
 
 def layers(config, env, strict, root=None):
-    """`(mode, [(source, document)])`, lowest precedence first: the one selection ladder.
+    """`(mode, [(source, document)])`, menor precedência primeiro: a única escada de seleção.
 
-    What `harness init` wrote as a default (`init`), the mode, the user configuration, project
-    file, session file, then the session's environment sugar: `HARNESS_MODE` and
-    `HARNESS_STANCE_*` resolve as the session layer's last word. The mode is whichever layer named
-    one last, and its file sits under every explicit layer but over init's defaults.
+    O que `harness init` gravou como padrão (`init`), o modo, a configuração do usuário, o arquivo de
+    projeto, o arquivo de sessão, e então o açúcar de ambiente da sessão: `HARNESS_MODE` e
+    `HARNESS_STANCE_*` resolvem como a última palavra da camada de sessão. O modo é o que qualquer camada nomeou
+    por último, e seu arquivo fica abaixo de toda camada explícita mas acima dos padrões do init.
     """
     project = _project_config(env, strict, root)
     session = _session_config(env, strict, root)
@@ -936,7 +948,7 @@ def layers(config, env, strict, root=None):
 
 
 def _selection(config, env, strict, root=None):
-    """Every stance's variant in force: the ladder read for `stances` only, without walking units."""
+    """A variante de cada postura em vigor: a escada lida só para `stances`, sem percorrer unidades."""
     stances = dict(DEFAULT_STANCES)
     for _, data in layers(config, env, strict, root)[1]:
         stances.update(_stances_of(data))
@@ -944,9 +956,9 @@ def _selection(config, env, strict, root=None):
 
 
 def _units(kind, entry, config, root=None):
-    """The installed units of one kind, sorted: stance dimensions, rule, skill or role names.
+    """As unidades instaladas de um tipo, ordenadas: dimensões de postura, nomes de regra, skill ou papel.
 
-    A kind the catalog enumerates, `hooks`, counts each listed id whose module is in this checkout.
+    Um tipo que o catálogo enumera, `hooks`, conta cada id listado cujo módulo está neste checkout.
     """
     if entry.get("units"):
         base = (root or ROOT) / "policy" / "hooks"
@@ -966,7 +978,7 @@ def _units_in(source, pattern):
 
 
 def _manifest_files(config, root=None):
-    """`[(path, shipped)]`: the catalog's and the hook kernel's files, then each user root's."""
+    """`[(path, shipped)]`: os arquivos do catálogo e do núcleo de hooks, então os de cada raiz de usuário."""
     base = root or ROOT
     files = [(base / "primitives" / MANIFEST_FILE, True), (base / "policy" / "hooks" / MANIFEST_FILE, True)]
     for source in primitive_roots(config, root, "rules")[1:]:
@@ -980,9 +992,9 @@ def _reference(value, kinds):
 
 
 def validate_manifest(kind, unit, entry, kinds):
-    """The one message `entry` earns as `kind/unit`'s manifest, or None when it is sound.
+    """A única mensagem que `entry` ganha como manifesto de `kind/unit`, ou None quando é sólido.
 
-    `kinds` is the switch kinds a dependency or conflict may name, as `kind/unit`.
+    `kinds` são os tipos de switch que uma dependência ou conflito pode nomear, como `kind/unit`.
     """
     name = kind + "/" + unit
     if not isinstance(entry, dict):
@@ -1014,10 +1026,10 @@ def validate_manifest(kind, unit, entry, kinds):
 
 
 def manifests(config=None, root=None, kinds=None):
-    """`({kind: {unit: manifest}}, [refusal])` from every manifest file, each entry validated.
+    """`({kind: {unit: manifest}}, [refusal])` a partir de cada arquivo de manifesto, cada entrada validada.
 
-    A shipped file must parse; a user root may carry none. One module declared in two files is a
-    refusal, so a user root cannot rewrite what a shipped module needs or collides with.
+    Um arquivo distribuído precisa parsear; uma raiz de usuário pode não carregar nenhum. Um módulo declarado em dois
+    arquivos é uma recusa, para que uma raiz de usuário não reescreva do que um módulo distribuído precisa nem com o que colide.
     """
     kinds = [k for k, e in selection_kinds(root).items() if e.get("value") == "switch"] if kinds is None else kinds
     declared, origin, errors = {kind: {} for kind in kinds}, {}, []
@@ -1051,12 +1063,12 @@ def manifests(config=None, root=None, kinds=None):
 
 
 def manifest_refusals(document, declared, required, installed=None):
-    """Every refusal a resolved selection earns from its modules' manifests, as messages.
+    """Toda recusa que uma seleção resolvida ganha dos manifestos dos seus módulos, como mensagens.
 
-    `required` is `{kind: units}` that must declare a manifest: the shipped ones. `installed` is
-    `{kind: units}` that exist, for the kinds that have a module directory; a kind without one,
-    such as hooks, counts a unit as present when it declares a manifest. Only switched-on modules
-    take a slot, need a dependency or collide; a module switched off asks nothing.
+    `required` é `{kind: units}` que precisa declarar um manifesto: os distribuídos. `installed` é
+    `{kind: units}` que existe, para os tipos que têm um diretório de módulo; um tipo sem um,
+    como hooks, conta uma unidade como presente quando ela declara um manifesto. Só módulos ligados
+    ocupam um slot, precisam de uma dependência ou colidem; um módulo desligado não pede nada.
     """
     installed = {} if installed is None else installed
     errors = []
@@ -1081,7 +1093,7 @@ def manifest_refusals(document, declared, required, installed=None):
         if entry["slot"]:
             slots.setdefault(entry["slot"]["id"], []).append(name)
     for slot, names in sorted(slots.items()):
-        # A ceding claimant yields; the slot is refused while two or more still hold it.
+        # Um reivindicante que cede se retira; o slot é recusado enquanto dois ou mais ainda o detêm.
         holders = [name for name in names if not on[name]["slot"]["cedes"]]
         if len(holders) > 1:
             errors.append(", ".join(holders) + " each claim the slot '" + slot +
@@ -1090,10 +1102,10 @@ def manifest_refusals(document, declared, required, installed=None):
 
 
 def core_refusals(document, sources, config):
-    """One message per core hook `document` switches off while the user has not acknowledged it.
+    """Uma mensagem por hook central que `document` desliga enquanto o usuário não o reconheceu.
 
-    The acknowledgement is read from the user configuration only: a project, session or mode file
-    cannot carry it, so no file a repository ships can turn enforcement off on its own authority.
+    O reconhecimento é lido só da configuração do usuário: um arquivo de projeto, sessão ou modo
+    não pode carregá-lo, para que nenhum arquivo que um repositório distribua possa desligar a aplicação por autoridade própria.
     """
     if isinstance(config, dict) and config.get(CORE_ACK) is True:
         return []
@@ -1104,26 +1116,26 @@ def core_refusals(document, sources, config):
 
 
 def measurement(manifest):
-    """How a report shows a module: its instruments, or `unmeasured`, never `no effect`."""
+    """Como um relatório mostra um módulo: seus instrumentos, ou `unmeasured`, nunca `no effect`."""
     instruments = (manifest or {}).get("instruments") or []
     return "measured by " + ", ".join(instruments) if instruments else "unmeasured"
 
 
 def selection(env=None, strict=True, config=None, root=None):
-    """Every unit of every kind with its value, and the source that set it.
+    """Cada unidade de cada tipo com seu valor, e a fonte que o definiu.
 
-    Returns the selection document — `mode`, then `{kind: {unit: value}}` for each kind in
-    `catalog.KINDS` — plus `sources` in the same shape, each one of `default`, `init`,
-    `mode:<name>`, `user`, `project` or `session`, in that precedence, and `shadowed`,
-    `{kind: {unit: source}}` for every mode key a higher layer overrode. A variant kind's default is the built-in
-    stance or null; a switch kind's is `on`. `config` is the user configuration when the caller
-    has already read it. A kind that is not an object, or a switch value other than `on` or `off`,
-    is an error when strict and selects nothing otherwise; a unit a layer names that nothing installs is still reported.
-    So is a core hook switched off without `core_switches_acknowledged` true in the user
-    configuration, which resolves `on` when not strict (`core_refusals`).
-    Strict resolution also enforces the switch kinds' manifests (AD-22): a shipped module without
-    one, a field missing or malformed, a switched-on module whose dependency is not on, two that
-    conflict, or two that claim one slot with neither ceding it, is a `ValueError` naming them.
+    Retorna o documento de seleção — `mode`, então `{kind: {unit: value}}` para cada tipo em
+    `catalog.KINDS` — mais `sources` na mesma forma, cada um `default`, `init`,
+    `mode:<name>`, `user`, `project` ou `session`, nessa precedência, e `shadowed`,
+    `{kind: {unit: source}}` para cada chave de modo que uma camada superior sobrescreveu. O padrão de um tipo variante é a
+    postura embutida ou null; o de um tipo switch é `on`. `config` é a configuração do usuário quando o chamador
+    já a leu. Um tipo que não é um objeto, ou um valor de switch diferente de `on` ou `off`,
+    é um erro quando estrito e não seleciona nada caso contrário; uma unidade que uma camada nomeia mas que nada instala ainda é reportada.
+    O mesmo vale para um hook central desligado sem `core_switches_acknowledged` verdadeiro na configuração
+    do usuário, que resolve para `on` quando não estrito (`core_refusals`).
+    A resolução estrita também aplica os manifestos dos tipos switch (AD-22): um módulo distribuído sem
+    um, um campo faltando ou malformado, um módulo ligado cuja dependência não está ligada, dois que
+    conflitam, ou dois que reivindicam um slot sem que nenhum ceda, é um `ValueError` nomeando-os.
     """
     env = os.environ if env is None else env
     config = _user_config(env, strict) if config is None else config
@@ -1134,7 +1146,7 @@ def selection(env=None, strict=True, config=None, root=None):
             raise ValueError("\n".join(duplicates))
     mode, ladder = layers(config, env, strict, root)
     result, sources = {"mode": mode[0] if mode else None}, {"mode": mode[1] if mode else "default"}
-    shadowed = {}  # {kind: units the mode layer set}
+    shadowed = {}  # {kind: unidades que a camada de modo definiu}
     for kind, entry in kinds.items():
         switch = entry.get("value") == "switch"
         result[kind] = {unit: ("on" if switch else DEFAULT_STANCES.get(unit))
@@ -1168,7 +1180,7 @@ def selection(env=None, strict=True, config=None, root=None):
     if refusals and strict:
         raise ValueError("\n".join(refusals))
     if refusals:
-        # A hook resolving non-strictly keeps enforcing: an unacknowledged `off` is not one.
+        # Um hook resolvendo de forma não estrita continua aplicando: um `off` não reconhecido não é um.
         for unit in CORE_HOOKS:
             if result.get("hooks", {}).get(unit) == "off":
                 result["hooks"][unit], sources["hooks"][unit] = "on", "default"
@@ -1182,26 +1194,26 @@ def selection(env=None, strict=True, config=None, root=None):
         required = {kind: _units_in(base / kinds[kind]["directory"], kinds[kind]["pattern"])
                     for kind in switches if kinds[kind].get("directory") and kinds[kind].get("pattern")}
         installed = {kind: set(_units(kind, kinds[kind], config, root)) for kind in required}
-        # Hooks have no module directory, so `installed` keeps counting one as present when it
-        # declares a manifest; each hook this checkout ships must declare one.
+        # Hooks não têm diretório de módulo, então `installed` continua contando um como presente quando ele
+        # declara um manifesto; cada hook que este checkout distribui precisa declarar um.
         required.update({kind: set(_units(kind, kinds[kind], config, root))
                          for kind in switches if kinds[kind].get("units")})
         errors += manifest_refusals(result, declared, required, installed)
         if errors:
             raise ValueError("module manifest: " + "\nmodule manifest: ".join(errors))
     result["sources"] = sources
-    # A mode key is shadowed when a layer above the mode set the same unit, whatever its value.
+    # Uma chave de modo é ofuscada quando uma camada acima do modo define a mesma unidade, qualquer que seja seu valor.
     shadowed = {kind: {unit: sources[kind][unit] for unit in sorted(units)
                        if not sources[kind][unit].startswith("mode:")} for kind, units in sorted(shadowed.items())}
     result["shadowed"] = {kind: units for kind, units in shadowed.items() if units}
     return result
 
 
-# The profile fingerprint (AD-22, AD-23): which profile wrote a ledger row. The configuration it
-# covers is the user keys that reach the model or a hook; installer switches, remote control and
-# integrations change neither. `primitive_roots` is left out because the modules it adds are
-# hashed by content, so one profile on two machines matches. A row that predates the field is
-# unattributed, and the bare arm of a replay, which loads no harness, is `BARE_FINGERPRINT`.
+# A impressão digital de perfil (AD-22, AD-23): qual perfil escreveu uma linha do razão. A configuração que
+# ela cobre são as chaves de usuário que chegam ao modelo ou a um hook; switches do instalador, controle remoto e
+# integrações não alteram nenhuma. `primitive_roots` fica de fora porque os módulos que ela adiciona são
+# hasheados por conteúdo, então um perfil em duas máquinas combina. Uma linha anterior ao campo é
+# não atribuída, e o braço nu de uma repetição, que não carrega harness nenhum, é `BARE_FINGERPRINT`.
 FINGERPRINT_KEY = "profile_fingerprint"
 FINGERPRINT_CONFIG_KEYS = ("identity", "permissions", "permissions_bypass_acknowledged",
                            "plan_allow_tools", "telemetry", "governance")
@@ -1210,11 +1222,11 @@ _FINGERPRINTS = {}
 
 
 def _unit_files(entry, unit, value, config, root=None):
-    """`[(label, path)]` for the files one unit's content is, across every primitive root.
+    """`[(label, path)]` para os arquivos que são o conteúdo de uma unidade, em cada raiz primitiva.
 
-    The label is the root's position and the path inside it, so a checkout's own location never
-    reaches the digest. A skill is its whole directory; a stance is its selected variant and the
-    sidecar beside it; any other kind is its one file.
+    O rótulo é a posição da raiz e o caminho dentro dela, para que a localização própria de um checkout nunca
+    chegue ao digest. Uma skill é seu diretório inteiro; uma postura é sua variante selecionada e o
+    sidecar ao seu lado; qualquer outro tipo é seu único arquivo.
     """
     directory, pattern = entry.get("directory"), entry.get("pattern")
     if not directory or not pattern or not _identifier(unit):
@@ -1238,7 +1250,7 @@ def _unit_files(entry, unit, value, config, root=None):
 
 
 def _content_digest(files):
-    """The sha256 of the labelled files' bytes, or None when the unit has no file anywhere."""
+    """O sha256 dos bytes dos arquivos rotulados, ou None quando a unidade não tem arquivo em lugar nenhum."""
     if not files:
         return None
     digest = hashlib.sha256()
@@ -1259,12 +1271,12 @@ def _version(root=None):
 
 
 def profile(env=None, config=None, root=None):
-    """The document the profile fingerprint digests, resolved non-strict from the one ladder.
+    """O documento que a impressão digital de perfil resume, resolvido de forma não estrita a partir da única escada.
 
-    Every switched-on module with its content digest, every stance with its variant and that
-    variant's digest, the configuration values `FINGERPRINT_CONFIG_KEYS` names, and the harness
-    version. A switched-off module is absent, as it is from the session. A mode is not named:
-    what it selects is.
+    Cada módulo ligado com seu digest de conteúdo, cada postura com sua variante e o digest
+    dessa variante, os valores de configuração que `FINGERPRINT_CONFIG_KEYS` nomeia, e a versão do
+    harness. Um módulo desligado está ausente, assim como da sessão. Um modo não é nomeado:
+    o que ele seleciona é.
     """
     env = os.environ if env is None else env
     config = _user_config(env, False) if config is None else config
@@ -1287,7 +1299,7 @@ def profile(env=None, config=None, root=None):
 
 
 def _file_state(path):
-    """`(mtime_ns, size)` of a file, or None when it cannot be read: the fingerprint cache's key."""
+    """`(mtime_ns, size)` de um arquivo, ou None quando não pode ser lido: a chave do cache de impressão digital."""
     try:
         state = path.stat()
     except OSError:
@@ -1296,13 +1308,13 @@ def _file_state(path):
 
 
 def fingerprint(env=None, config=None, root=None):
-    """The profile fingerprint: the sha256 of `profile()` as canonical JSON. See `FINGERPRINT_KEY`.
+    """A impressão digital de perfil: o sha256 de `profile()` como JSON canônico. Veja `FINGERPRINT_KEY`.
 
-    Identical inputs give one fingerprint on every run and machine, and any module, stance or
-    setting that differs gives another. Remembered per process for one environment and one state
-    of the configuration files, since a hook stamps it on each row it writes: rewriting the user
-    configuration or a named selection file gives a fresh digest. A module edited under a running
-    process is not seen until the next one, which is where the checkout's edits land.
+    Entradas idênticas dão uma impressão digital em cada execução e máquina, e qualquer módulo, postura ou
+    configuração diferente dá outra. Lembrada por processo para um ambiente e um estado
+    dos arquivos de configuração, já que um hook a carimba em cada linha que escreve: reescrever a
+    configuração do usuário ou um arquivo de seleção nomeado dá um digest novo. Um módulo editado sob um
+    processo em execução não é visto até o próximo, que é onde as edições do checkout chegam.
     """
     env = os.environ if env is None else env
     files = [config_path(env)] + [Path(env[name]).expanduser() for name in
@@ -1321,11 +1333,11 @@ def fingerprint(env=None, config=None, root=None):
     return value
 
 
-# Per-module attribution of context tokens (AD-23). Context is shared, so what each module put
-# there is estimated, never measured, and carries AD-12's soft-estimate label and its method.
-# The estimate is of resident text only: what is loaded before the first prompt. A listed kind
-# is resident as its listing entry, its name and description, and its body loads on demand; a
-# hook's context arrives per event at run time and is not estimated here.
+# Atribuição por módulo de tokens de contexto (AD-23). O contexto é compartilhado, então o que cada módulo pôs
+# lá é estimado, nunca medido, e carrega o rótulo de estimativa suave do AD-12 e seu método.
+# A estimativa é só de texto residente: o que é carregado antes do primeiro prompt. Um tipo listado
+# é residente como sua entrada de listagem, seu nome e descrição, e seu corpo carrega sob demanda; o
+# contexto de um hook chega por evento em tempo de execução e não é estimado aqui.
 ATTRIBUTION_KEY = "context_attribution"
 SOFT_ESTIMATE = "soft estimate"
 CHARS_PER_TOKEN = 4.0
@@ -1335,8 +1347,8 @@ LISTED_KINDS = ("skills", "roles", "workflows")
 
 
 def _listed_description(path):
-    """The frontmatter `description` a session lists, folded and literal continuation lines
-    included, read the way `scripts/cost_bench.py` counts it for the static tier."""
+    """A `description` do frontmatter que uma sessão lista, dobrada e com linhas de continuação
+    literal incluídas, lida da forma como `scripts/cost_bench.py` a conta para a camada estática."""
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except (OSError, ValueError):
@@ -1358,7 +1370,7 @@ def _listed_description(path):
 
 
 def _resident_text(kind, entry, unit, value, config, root=None):
-    """The text one unit keeps resident, from the first primitive root holding it, or None."""
+    """O texto que uma unidade mantém residente, da primeira raiz primitiva que a contém, ou None."""
     directory, pattern = entry.get("directory"), entry.get("pattern")
     if not directory or not pattern or not _identifier(unit):
         return None
@@ -1381,11 +1393,11 @@ def _resident_text(kind, entry, unit, value, config, root=None):
 
 
 def context_attribution(env=None, config=None, root=None):
-    """`{"estimand", "method", "modules": {"kind/unit": tokens}}` for the selection in force.
+    """`{"estimand", "method", "modules": {"kind/unit": tokens}}` para a seleção em vigor.
 
-    Resolved non-strict from the ladder `profile()` reads, so one module switched off removes
-    that module's entry and changes no other. Every switched-on module and every stance with
-    resident text has an entry; a unit installed nowhere, and a hook, has none.
+    Resolvido de forma não estrita a partir da escada que `profile()` lê, então um módulo desligado remove
+    a entrada desse módulo e não muda nenhuma outra. Cada módulo ligado e cada postura com
+    texto residente tem uma entrada; uma unidade instalada em lugar nenhum, e um hook, não têm nenhuma.
     """
     env = os.environ if env is None else env
     config = _user_config(env, False) if config is None else config
@@ -1403,11 +1415,11 @@ def context_attribution(env=None, config=None, root=None):
 
 
 def resolve(env=None, strict=True, table=False):
-    """The posture in force: `{"stances": {dimension: variant}}`, every dimension present.
+    """A postura em vigor: `{"stances": {dimension: variant}}`, cada dimensão presente.
 
-    A missing config file is the default set and never an empty map, which would read as
-    "no stance in force". The cost table is opt-in with `table=True`, because most callers are
-    hot-path hooks answering one question and walking sidecars for them would be pure cost.
+    Um arquivo de configuração ausente é o conjunto padrão e nunca um mapa vazio, o que se leria como
+    "nenhuma postura em vigor". A tabela de custo é opt-in com `table=True`, porque a maioria dos chamadores são
+    hooks de caminho crítico respondendo uma pergunta, e percorrer sidecars para eles seria custo puro.
     """
     env = os.environ if env is None else env
     config = _user_config(env, strict)
@@ -1418,10 +1430,10 @@ def resolve(env=None, strict=True, table=False):
 
 
 def cost_table(env=None, strict=False, root=None):
-    """The active cost variant's table for a caller that has only an environment.
+    """A tabela da variante de custo ativa para um chamador que só tem um ambiente.
 
-    Non-strict by default: an unusable sidecar somewhere on the chain is a warning in the table,
-    never a reason for the work in hand to stop.
+    Não estrita por padrão: um sidecar inutilizável em algum ponto da cadeia é um aviso na tabela,
+    nunca um motivo para o trabalho em mãos parar.
     """
     env = os.environ if env is None else env
     config = _user_config(env, strict)
@@ -1429,19 +1441,19 @@ def cost_table(env=None, strict=False, root=None):
 
 
 def selected(name, fallback=None, env=None, strict=True):
-    """One dimension's variant, or `fallback` when nothing on the ladder names it.
+    """A variante de uma dimensão, ou `fallback` quando nada na escada a nomeia.
 
-    Reads the stance ladder only: a hook asking one question should not pay for the cost table.
+    Lê só a escada de posturas: um hook fazendo uma pergunta não deveria pagar pela tabela de custo.
     """
     env = os.environ if env is None else env
     return _selection(_user_config(env, strict), env, strict).get(name) or fallback
 
 
 def permissions(env=None, strict=False):
-    """The permission posture the user selected, or `inherit` when the config names none.
+    """A postura de permissão que o usuário selecionou, ou `inherit` quando a config não nomeia nenhuma.
 
-    Non-strict by default: a posture nobody can read is not a posture the user chose, and a
-    caller that widens authority on it would be doing so on a file it could not open.
+    Não estrita por padrão: uma postura que ninguém consegue ler não é uma postura que o usuário escolheu, e um
+    chamador que amplia autoridade com base nela estaria fazendo isso com base em um arquivo que não pôde abrir.
     """
     env = os.environ if env is None else env
     value = _user_config(env, strict).get("permissions")
@@ -1449,11 +1461,11 @@ def permissions(env=None, strict=False):
 
 
 def plan_allow_tools(env=None, strict=False):
-    """The tool-name globs the user allows during plan mode, `fnmatch` style. Empty by default.
+    """Os globs de nome de ferramenta que o usuário permite durante o modo plano, estilo `fnmatch`. Vazio por padrão.
 
-    Nothing is inferred: a PreToolUse payload carries no read-only hint for an MCP tool, so the
-    only thing that can say a tool is safe to investigate with is the user naming it. A value
-    that is not a list of non-empty strings names nothing.
+    Nada é inferido: um payload de PreToolUse não carrega dica de somente-leitura para uma ferramenta MCP, então a
+    única coisa que pode dizer que uma ferramenta é segura para investigar com ela é o usuário a nomeando. Um valor
+    que não é uma lista de strings não vazias não nomeia nada.
     """
     env = os.environ if env is None else env
     value = _user_config(env, strict).get(PLAN_TOOLS_KEY)
@@ -1463,11 +1475,11 @@ def plan_allow_tools(env=None, strict=False):
 
 
 def row_for(table, role):
-    """The row that governs one role: its own, or its band's when it is a band worker.
+    """A linha que governa um papel: a própria, ou a da sua banda quando é um trabalhador de banda.
 
-    The bands exist so a variant can price work it cannot name a role for, and the band workers
-    are the roles that carry a band into a spawn. A row keyed by the role beats the band's,
-    because naming the role is the more specific thing a variant can say.
+    As bandas existem para que uma variante possa precificar trabalho para o qual não consegue nomear um papel, e os trabalhadores de banda
+    são os papéis que carregam uma banda para dentro de um spawn. Uma linha indexada pelo papel vence a da banda,
+    porque nomear o papel é a coisa mais específica que uma variante pode dizer.
     """
     rows = table.get("rows") if isinstance(table, dict) else None
     rows = rows if isinstance(rows, dict) else {}
@@ -1480,7 +1492,7 @@ def row_for(table, role):
 
 
 def _sibling(name):
-    """A module beside this file, or None. Resolving a posture must never raise on an import."""
+    """Um módulo ao lado deste arquivo, ou None. Resolver uma postura nunca deve levantar exceção numa importação."""
     try:
         spec = importlib.util.spec_from_file_location(
             "harness_" + name.replace("-", "_"), str(Path(__file__).resolve().parent / (name + ".py")))
@@ -1492,11 +1504,11 @@ def _sibling(name):
 
 
 def budget_figures(row):
-    """The halves of one row's soft budget worth stating, keyed as the row keys them.
+    """As metades do orçamento suave de uma linha que valem a pena ser ditas, indexadas como a linha as indexa.
 
-    A null half is left out rather than written as "no budget", which would read as permission to
-    spend without limit, and a half under one unit goes with it: "about 0 output tokens" would
-    read as an instruction to do nothing, which is a budget nobody wrote.
+    Uma metade nula é deixada de fora em vez de escrita como "sem orçamento", o que se leria como permissão para
+    gastar sem limite, e uma metade abaixo de uma unidade vai junto: "cerca de 0 tokens de saída" se
+    leria como uma instrução para não fazer nada, o que é um orçamento que ninguém escreveu.
     """
     if not isinstance(row, dict):
         return {}
@@ -1505,13 +1517,13 @@ def budget_figures(row):
 
 
 def budget_sentence(row):
-    """The sentence one row's soft budget is stated in, or None when the row prices nothing.
+    """A frase em que o orçamento suave de uma linha é declarado, ou None quando a linha não precifica nada.
 
-    The one wording for every brief the harness writes: a native spawn's, appended by
-    `brief-guard`, and an isolated role worker's, appended by `harness role run`. An agent cannot
-    see the cost variant that priced it, so the row's figures are stated in the brief — every
-    number from the table and none of the words. It is soft, because a hard cap would truncate
-    the work rather than the spend.
+    A única redação para todo brief que o harness escreve: o de um spawn nativo, anexado por
+    `brief-guard`, e o de um trabalhador de papel isolado, anexado por `harness role run`. Um agente não pode
+    ver a variante de custo que o precificou, então os números da linha são declarados no brief — todo
+    número da tabela e nenhuma das palavras. É suave, porque um teto rígido truncaria
+    o trabalho em vez do gasto.
     """
     parts = ["about {:,} {}".format(value, BUDGET_UNITS[key])
              for key, value in budget_figures(row).items()]
@@ -1522,12 +1534,12 @@ def budget_sentence(row):
 
 
 def budget_stated(text, detectors=None):
-    """True when this brief already prices itself, or when nothing here can tell.
+    """True quando este brief já se precifica sozinho, ou quando nada aqui consegue dizer.
 
-    What counts as a stated budget belongs to `rule-detectors.py` and not to a second copy per
-    caller: a sentence the detector still reads as missing would be appended forever and the
-    number would never move. A registry that will not load, or one without the pattern, is
-    "cannot tell", which appends nothing.
+    O que conta como um orçamento declarado pertence a `rule-detectors.py` e não a uma segunda cópia por
+    chamador: uma frase que o detector ainda lê como ausente seria anexada para sempre e o
+    número nunca se moveria. Um registro que não carrega, ou um sem o padrão, é
+    "não é possível dizer", o que não anexa nada.
     """
     module = _sibling("rule-detectors") if detectors is None else detectors
     pattern = getattr(module, "BUDGET_RE", None)
@@ -1535,10 +1547,10 @@ def budget_stated(text, detectors=None):
 
 
 def tier_models(runtime="claude-code", root=None):
-    """The adapter's `{class: native model}`, strongest class first, or `{}` when unreadable.
+    """O `{class: native model}` do adaptador, classe mais forte primeiro, ou `{}` quando ilegível.
 
-    Model names belong to `adapters/<runtime>/bindings.json`, never to hook code: a lineup
-    change is a data edit, and a caller that gets nothing says so rather than guessing.
+    Nomes de modelo pertencem a `adapters/<runtime>/bindings.json`, nunca ao código do hook: uma mudança
+    de alinhamento é uma edição de dados, e um chamador que não obtém nada diz isso em vez de adivinhar.
     """
     path = (root or ROOT) / "adapters" / runtime / "bindings.json"
     try:
@@ -1550,5 +1562,5 @@ def tier_models(runtime="claude-code", root=None):
 
 
 def ladder(runtime="claude-code", root=None):
-    """The adapter's native models, strongest class first, or `[]` when it cannot be read."""
+    """Os modelos nativos do adaptador, classe mais forte primeiro, ou `[]` quando não pode ser lido."""
     return list(tier_models(runtime, root).values())

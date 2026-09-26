@@ -1,36 +1,39 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""PreToolUse on `Agent`: append a return bound, and the posture's soft budget, to a brief
-that states neither.
+"""PreToolUse em `Agent`: acrescenta um limite de retorno, e o orçamento leve da postura, a um brief
+que não declara nenhum dos dois.
 
-`delegation.md` says to bound the brief, and `transcript-hygiene/model-wrote-no-cap` measures
-that it is not: 536 hits across 30 percent of sessions. Asking the orchestrator to write the
-cap does not work, so the hook writes it instead.
+`delegation.md` diz para limitar o brief, e `transcript-hygiene/model-wrote-no-cap` mede que não
+é o caso: 536 ocorrências em 30 por cento das sessões. Pedir ao orquestrador para escrever o
+teto não funciona, então o hook o escreve em vez disso.
 
-That detector counts briefs as the model wrote them, and goes on counting them after this hook
-caps them: a transcript records the model's `tool_use` input, not the `updatedInput` this hook
-returns (#324). Its number says whether the orchestrator still needs the hook, and is not
-evidence that an uncapped brief reached a subagent.
+Aquele detector conta briefs como o modelo os escreveu, e continua os contando depois que este
+hook os limita: um transcript registra a entrada `tool_use` do modelo, não o `updatedInput` que
+este hook retorna (#324). Seu número diz se o orquestrador ainda precisa do hook, e não é
+evidência de que um brief sem teto alcançou um subagente.
 
-Adapted from unclebob/swarm-forge, whose handoff helper fills the commit SHA from the sender's
-HEAD while the constitution says "do not type a SHA". The agent cannot get a field wrong that
-it never writes.
+Adaptado de unclebob/swarm-forge, cujo auxiliar de passagem de bastão preenche o SHA do commit a
+partir do HEAD do remetente enquanto a constituição diz "não digite um SHA". O agente não
+consegue errar um campo que nunca escreve.
 
-What counts as a bound, and which agents are exempt, come from `rule-detectors.py` rather than
-a second copy here, so the hook adds a cap to exactly the briefs the detector counts. A second
-copy would drift, and the two would then disagree about which briefs the orchestrator bounded —
-the hook appending to a brief that already states a cap, or leaving one the detector counts.
+O que conta como um limite, e quais agentes são isentos, vêm de `rule-detectors.py` em vez de
+uma segunda cópia aqui, para que o hook acrescente um teto exatamente aos briefs que o detector
+conta. Uma segunda cópia divergiria, e as duas então discordariam sobre quais briefs o
+orquestrador limitou — o hook acrescentando a um brief que já declara um teto, ou deixando um que
+o detector conta.
 
-The budget is the same argument for spend. A subagent cannot see the cost variant that priced
-it, so the row's expected output tokens and tool calls are stated in the brief, once, in the
-wording `posture.py` fixes for every brief the harness writes, an isolated role worker's included.
-A row with no budgets, a table that will not build, and a brief that already prices itself all
-mean no sentence, which is what keeps a null variant byte-identical.
+O orçamento é o mesmo argumento para o gasto. Um subagente não consegue ver a variante de custo
+que o precificou, então os tokens de saída e chamadas de ferramenta esperados da linha são
+declarados no brief, uma vez, na redação que `posture.py` fixa para todo brief que o harness
+escreve, incluindo o de um worker de papel isolado. Uma linha sem orçamentos, uma tabela que não
+constrói, e um brief que já se precifica sozinho significam todos nenhuma frase, que é o que
+mantém uma variante nula byte-idêntica.
 
-A spawn that named a role is priced on every runtime. A spawn that named none is priced by the
-band worker it is about to be routed to, so it is priced only where that reroute happens — Claude
-Code, whose hook rewrites `subagent_type`. On any other runtime nothing routes such a spawn, and
-a budget naming a band it will not run in is worse than none.
+Um disparo que nomeou um papel é precificado em todo runtime. Um disparo que não nomeou nenhum é
+precificado pelo band worker para o qual está prestes a ser roteado, então só é precificado onde
+esse reroteamento acontece — Claude Code, cujo hook reescreve `subagent_type`. Em qualquer outro
+runtime nada roteia tal disparo, e um orçamento nomeando uma banda em que não vai rodar é pior
+que nenhum.
 """
 import importlib.util
 import json
@@ -40,27 +43,27 @@ from pathlib import Path
 
 HOOK = "harness:brief-guard"
 HOOKS = Path(__file__).resolve().parent
-# The runtime whose spawn hook reroutes an unnamed spawn to a band worker. The coordinator sets
-# `HARNESS_RUNTIME`; a hook run by hand has no coordinator and is this one.
+# O runtime cujo hook de disparo reroteia um disparo sem nome para um band worker. O coordenador
+# define `HARNESS_RUNTIME`; um hook rodado à mão não tem coordenador e é este.
 ROUTING_RUNTIME = "claude-code"
 
-# Written so it matches the detector's own cap pattern; a bound the detector cannot see is
-# not a bound. `tests/test_brief_guard.py` asserts that parity.
+# Escrito para combinar com o próprio padrão de teto do detector; um limite que o detector não
+# consegue ver não é um limite. `tests/test_brief_guard.py` garante essa paridade.
 BOUND = ("\n\nReturn at most 400 words: the result in your first sentence, then only the findings "
          "that change a decision, in plain sentences or short bullets with no section labels. "
          "Write anything longer to a file and return its path, not its contents.")
 CAP_NOTE = "the brief stated no return bound, so a 400-word cap was added"
-# The budget sentence carries no notice of its own. Stating the variant's spend is what this hook
-# does on almost every spawn, and an alert on the ordinary case is noise a reader learns to
-# ignore; the cap keeps its notice because a brief that states no bound is the exception.
+# A frase de orçamento não carrega aviso próprio algum. Declarar o gasto da variante é o que este
+# hook faz em quase todo disparo, e um alerta no caso comum é ruído que um leitor aprende a
+# ignorar; o teto mantém seu aviso porque um brief que não declara limite é a exceção.
 #
-# Its wording, and what counts as a brief that already prices itself, are `posture.py`'s
-# `budget_sentence` and `budget_stated`: an isolated role worker's brief carries the same
-# sentence, and two copies of it would drift.
+# Sua redação, e o que conta como um brief que já se precifica sozinho, são de `posture.py`:
+# `budget_sentence` e `budget_stated`: o brief de um worker de papel isolado carrega a mesma
+# frase, e duas cópias dela divergiriam.
 
 
 def sibling(name):
-    """A module beside this hook, or None. A hook must never block a spawn because an import failed."""
+    """Um módulo ao lado deste hook, ou None. Um hook nunca deve bloquear um disparo porque um import falhou."""
     try:
         spec = importlib.util.spec_from_file_location(
             "harness_" + name.replace("-", "_"), str(HOOKS / (name + ".py")))
@@ -72,18 +75,18 @@ def sibling(name):
 
 
 def detectors():
-    """The detector module, or None."""
+    """O módulo detector, ou None."""
     return sibling("rule-detectors")
 
 
 def stance():
-    """The selected `delegation` stance, resolved by `posture.py` for every hook alike."""
+    """A stance `delegation` selecionada, resolvida por `posture.py` para todo hook igualmente."""
     module = sibling("posture")
     return module.selected("delegation", "tiered", strict=False) if module else "tiered"
 
 
 def needs_bound(module, tool_input):
-    """True when this brief carries no cap and the agent's own definition carries none either."""
+    """True quando este brief não carrega teto e a própria definição do agente também não carrega nenhum."""
     kind = tool_input.get("subagent_type")
     if isinstance(kind, str) and kind.strip() in module.CAPPED_AGENTS:
         return False
@@ -94,19 +97,21 @@ def needs_bound(module, tool_input):
 
 
 def effective_role(payload, tool_input, posture, router, table, variant):
-    """The role whose row prices this spawn, or None when nothing prices it.
+    """O papel cuja linha precifica este disparo, ou None quando nada o precifica.
 
-    A spawn that named a definition is priced by that role. A spawn that named none is priced
-    by the band worker it is about to be routed to — which this hook cannot read off the event,
-    because the coordinator hands both hooks the original call and not each other's rewrite. So
-    the route is computed by calling `tier-agent-spawns`' own `band_route`, on the one table
-    `table()` builds: a second answer to "where does an unnamed spawn go", or a second table,
-    would sooner or later price the wrong band. Which spawns count as unnamed is that hook's
-    predicate too, so a `subagent_type` of whitespace cannot be priced here and routed nowhere.
+    Um disparo que nomeou uma definição é precificado por aquele papel. Um disparo que não nomeou
+    nenhum é precificado pelo band worker para o qual está prestes a ser roteado — o que este
+    hook não consegue ler do evento, porque o coordenador entrega aos dois hooks a chamada
+    original e não a reescrita um do outro. Então a rota é computada chamando o próprio
+    `band_route` de `tier-agent-spawns`, sobre a única tabela que `table()` constrói: uma segunda
+    resposta para "para onde vai um disparo sem nome", ou uma segunda tabela, mais cedo ou mais
+    tarde precificaria a banda errada. Quais disparos contam como sem nome também é o predicado
+    daquele hook, então um `subagent_type` de espaço em branco não pode ser precificado aqui e
+    roteado a lugar nenhum.
 
-    A spawn nothing routes — another runtime, no default band, a worker that is not installed
-    or not in this session's registry, a repository that ships its own, a delegation stance
-    that is not `tiered` — is priced by nothing, as it was before.
+    Um disparo que nada roteia — outro runtime, nenhuma banda padrão, um worker não instalado ou
+    fora do registro desta sessão, um repositório que traz o seu próprio, uma stance de
+    delegação que não é `tiered` — não é precificado por nada, como era antes.
     """
     if router is None:
         return None
@@ -124,13 +129,14 @@ def effective_role(payload, tool_input, posture, router, table, variant):
 
 
 def budget_for(payload, tool_input, module, variant):
-    """The budget sentence this brief is missing, or None. Never raises: a spawn outranks a row.
+    """A frase de orçamento que este brief está sem, ou None. Nunca levanta exceção: um disparo tem prioridade sobre uma linha.
 
-    The cost table is read here and nowhere else in this hook, at most once, and never for a
-    spawn nothing would price: a table is a walk of every sidecar on the `extends` chain, and
-    this hook runs on a tool call. Any failure building it is simply no sentence — as is any
-    failure asking where the spawn goes, including an older `posture.py` beside a newer spawn
-    hook, whose missing functions would otherwise raise into the coordinator and deny the call.
+    A tabela de custo é lida aqui e em nenhum outro lugar deste hook, no máximo uma vez, e nunca
+    para um disparo que nada precificaria: uma tabela é uma varredura de todo sidecar na cadeia
+    `extends`, e este hook roda numa chamada de ferramenta. Qualquer falha ao construí-la é
+    simplesmente nenhuma frase — assim como qualquer falha ao perguntar para onde o disparo vai,
+    incluindo um `posture.py` mais antigo ao lado de um hook de disparo mais novo, cujas funções
+    ausentes de outra forma levantariam exceção no coordenador e negariam a chamada.
     """
     posture, router = sibling("posture"), sibling("tier-agent-spawns")
     if posture is None or router is None or not hasattr(posture, "budget_stated"):
@@ -165,15 +171,15 @@ def main():
         return
     variant = stance()
     if variant == "off":
-        # The lifecycle already denies every spawn here; a second hook adding a brief to an
-        # event that is refused anyway is noise.
+        # O ciclo de vida já nega todo disparo aqui; um segundo hook acrescentando um brief a um
+        # evento que já é recusado de qualquer forma é ruído.
         return
     module = detectors()
     prompt = tool_input.get("prompt")
     if module is None or not isinstance(prompt, str) or not prompt.strip():
         return
-    # The bound first and the budget after it, so a brief that is missing both reads as the
-    # shape of the return and then what it may spend getting there.
+    # O limite primeiro e o orçamento depois dele, para que um brief sem os dois se leia como a
+    # forma do retorno e depois o que pode gastar para chegar lá.
     added, notes = "", []
     if needs_bound(module, tool_input):
         added, notes = BOUND, [CAP_NOTE]
@@ -182,7 +188,7 @@ def main():
         added += budget
     if not added:
         return
-    # What this hook wrote into the brief, against the brief it was given. See `decisions.py`.
+    # O que este hook escreveu no brief, contra o brief que recebeu. Veja `decisions.py`.
     log = sibling("decisions")
     if log is not None:
         log.record("brief-guard", "cap+budget" if notes and budget else ("cap" if notes else "budget"),

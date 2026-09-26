@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""This repository's rule pack, over the vendored `ruleprobe` measurement engine.
+"""O pacote de regras deste repositório, sobre o motor de medição `ruleprobe` vendorizado.
 
-The engine — the event schema, the shell decomposition, the registry and `run()` — is
-`ruleprobe`, vendored as a wheel in `lib/vendor` beside `tomlkit` and imported below. Six
-generic detectors ship with it (`transcript-hygiene/whole-file-cat`,
+O motor — o schema de eventos, a decomposição de shell, o registro e `run()` — é `ruleprobe`,
+vendorizado como um wheel em `lib/vendor` ao lado de `tomlkit` e importado abaixo. Seis
+detectores genéricos vêm com ele (`transcript-hygiene/whole-file-cat`,
 `transcript-hygiene/unfiltered-find`, `verification/no-verify`, `secrets/secret-in-write`,
-`cache-hygiene/compact`, `cache-hygiene/model-switch`); this file holds the eleven that are
-about *these* rules, the opt-outs, and the registry `bin/harness` and `usage-log.py` read.
+`cache-hygiene/compact`, `cache-hygiene/model-switch`); este arquivo guarda os onze que são sobre
+*estas* regras, as isenções, e o registro que `bin/harness` e `usage-log.py` leem.
 
-This is not a hook: it has no `main()` and no lifecycle event. `usage-log.py` builds the
-event list in the pass it already makes over a transcript and calls `run()`; `bin/harness
-lint` imports `DETECTORS` and `OPT_OUT`, to check that every rule file is either measured or
-has opted out with a reason, and takes `SECRET_PATTERNS` from here. Both load this file by
-path from the checkout, which is why the vendored wheel is always reachable.
+Isto não é um hook: não tem `main()` nem evento de ciclo de vida. `usage-log.py` constrói a lista
+de eventos na passagem que já faz sobre um transcript e chama `run()`; `bin/harness lint`
+importa `DETECTORS` e `OPT_OUT`, para checar que toda regra é medida ou tem uma isenção com um
+motivo, e pega `SECRET_PATTERNS` daqui. Ambos carregam este arquivo por caminho a partir do
+checkout, por isso o wheel vendorizado está sempre alcançável.
 
-Event schema, hits, cost and the known misses of the shell parse: `ruleprobe.events`,
-`ruleprobe.registry` and `ruleprobe.shell`. The two facts a reader of this file needs are
-that `run()` returns `{detector_id: [Hit, ...]}` with the empty detectors omitted, and that a
-hit never carries a snippet — the transcript is the evidence, and `usage.jsonl` holds no
-command text (plan decision 3).
+Schema de eventos, hits, custo e as falhas conhecidas do parse de shell: `ruleprobe.events`,
+`ruleprobe.registry` e `ruleprobe.shell`. Os dois fatos que um leitor deste arquivo precisa são
+que `run()` retorna `{detector_id: [Hit, ...]}` com os detectores vazios omitidos, e que um hit
+nunca carrega um trecho — o transcript é a evidência, e `usage.jsonl` não guarda texto de
+comando algum (decisão 3 do plano).
 """
 import re
 import sys
@@ -34,19 +34,19 @@ from ruleprobe.registry import Detector as _Detector  # noqa: E402
 from ruleprobe.shell import (MAX_COMMAND, MARKER_RE, SUB_PLACEHOLDER, git_calls,  # noqa: E402
                              has_redirect, normalise, operands, pipelines, strip_heredocs)
 
-# The lint greps the tree for these shapes and the engine's own `secret-in-write` detector
-# reads the same list, so there is one source of truth for both and it is the wheel's.
+# O lint faz grep na árvore por essas formas e o próprio detector `secret-in-write` do motor lê a
+# mesma lista, então há uma única fonte de verdade para os dois e ela é a do wheel.
 SECRET_PATTERNS = generic.SECRET_PATTERNS
 
-# The three openers and the closing phrase are read from `claude/output-styles/scannable.md`
-# (sections 1 and 9) at build time and frozen here; this module never reads a file at runtime.
+# Os três abridores e a frase de fechamento são lidos de `claude/output-styles/scannable.md`
+# (seções 1 e 9) no momento do build e congelados aqui; este módulo nunca lê um arquivo em tempo de execução.
 BANNED_OPENERS = ("I started by", "After investigating", "Great question")
 BANNED_CLOSER = "Let me know if"
 
-# The two shapes `decisions-and-plans` prescribes — a batched "Decisions" block, or a
-# recommendation line — and the markers that show another course was named beside them.
-# The trigger is a line that *opens* with the word; an inline "I recommend" in running
-# prose is not a decision block and does not fire.
+# As duas formas que `decisions-and-plans` prescreve — um bloco "Decisions" em lote, ou uma
+# linha de recomendação — e os marcadores que mostram que outro caminho foi nomeado ao lado
+# deles. O gatilho é uma linha que *abre* com a palavra; um "I recommend" inline em prosa
+# corrida não é um bloco de decisão e não dispara.
 DECISION_RE = re.compile(
     r"^[\s*_>#|-]*recommend(?:ation|ed|ing|s)?\b"
     r"|\brecommendation:"
@@ -58,16 +58,16 @@ ALTERNATIVE_RE = re.compile(
     re.I | re.M,
 )
 
-# `WebSearch` is capped per session by claude/rules/research-and-verification.md.
+# `WebSearch` é limitado por sessão por claude/rules/research-and-verification.md.
 SEARCH_CAP = 200
 
-# Agents whose own definition carries the word cap, so a brief need not repeat it.
+# Agentes cuja própria definição carrega o limite de palavras, para que um brief não precise repeti-lo.
 CAPPED_AGENTS = frozenset(("log-compressor", "gatherer", "reviewer", "spec-reviewer", "design-judge"))
 
 CONVENTIONAL_RE = re.compile(r"^(feat|fix|chore|docs|refactor|test|perf|build|ci|style|revert)(\([^)]+\))?!?: \S")
-# Every shape a word cap is written in: "at most 400 words", "400 words max", "400 words
-# or fewer", "within 400 words", "a 400-word cap", "cap the return at 400 words". A cap
-# always carries a number, so "keep it short" is still a miss.
+# Toda forma em que um limite de palavras é escrito: "at most 400 words", "400 words max",
+# "400 words or fewer", "within 400 words", "a 400-word cap", "cap the return at 400 words". Um
+# limite sempre carrega um número, então "keep it short" ainda é uma falha.
 WORD_CAP_RE = re.compile(
     r"(?i)(?:(?:at most|no more than|under|within|max(?:imum)?|≤|<=)\s*\d+\s*[- ]?words?"
     r"|\d+\s*[- ]?words?\s*(?:or (?:fewer|less)|max(?:imum)?|cap)"
@@ -75,11 +75,11 @@ WORD_CAP_RE = re.compile(
     r"|cap[^.\n]{0,40}?\d+\s*[- ]?words?"
     r"|word\s+cap\s*(?:of\s+)?\d+)"
 )
-# A brief that already prices itself: the sentence `brief-guard` writes, or a spend the author
-# wrote in their own words ("under 20k output tokens", "at most 30 tool calls"). A spend is three
-# things together — a limiting word, a quantity and one of the two units — because any one of
-# them alone is ordinary prose: "fix the 3 tool calls in parser.py" counts nothing, and neither
-# does "the budget of the project".
+# Um brief que já se precifica sozinho: a frase que `brief-guard` escreve, ou um gasto que o
+# autor escreveu com suas próprias palavras ("under 20k output tokens", "at most 30 tool calls").
+# Um gasto é três coisas juntas — uma palavra limitante, uma quantidade e uma das duas unidades —
+# porque qualquer uma delas sozinha é prosa comum: "fix the 3 tool calls in parser.py" não conta
+# nada, e "the budget of the project" também não.
 _BUDGET_LIMIT = (r"(?:at most|no more than|not more than|fewer than|less than|up to|under|within"
                  r"|about|around|approx(?:\.|imately)?|expected|expect|spend|budget(?:ed)?|cap(?:ped)?"
                  r"|limit(?:ed)?|max(?:imum)?|≤|<=|<|~)")
@@ -89,24 +89,24 @@ BUDGET_RE = re.compile(
     r"|" + _BUDGET_LIMIT + r"(?:\s+[\w,'’-]+){0,3}\s*"
     r"\d[\d,._]*\s*[kKmM]?\s*(?:of\s+)?" + _BUDGET_UNIT + r")"
 )
-# The autonomy gate's two marks: the prefix the model re-runs a denied command behind, and the
-# signature the grade hook writes into the reason it denies with. The marker pattern mirrors
-# `grade-bash.py`'s own `MARKER_RE`, so what the gate lets through is what this counts; a
-# quoted value (`HARNESS_CONFIRMED="1"`) is not the marker there and is not one here.
+# As duas marcas do portão de autonomia: o prefixo atrás do qual o modelo re-roda um comando
+# negado, e a assinatura que o hook de avaliação escreve na razão com que nega. O padrão de
+# marcador espelha o próprio `MARKER_RE` de `grade-bash.py`, então o que o portão deixa passar é
+# o que isto conta; um valor entre aspas (`HARNESS_CONFIRMED="1"`) não é o marcador lá e não é um aqui.
 _COMMENT_RE = re.compile(r"^(?:\s*(?:#[^\n]*)?\n)+")
 _CONFIRMED_RE = re.compile(r"^\s*(?:env\s+)?HARNESS_CONFIRMED=1\s*;?\s*")
 GRADE_SIGNATURE = "(grade-bash hook,"
-# A path that says it holds a credential, by basename; see `_is_secret_path`.
+# Um caminho cujo próprio nome diz que guarda uma credencial, pelo nome-base; veja `_is_secret_path`.
 ENV_EXAMPLES = frozenset(("example", "sample", "template", "dist"))
 KEY_SUFFIXES = (".pem", ".p12", ".pfx")
 _FENCE_RE = re.compile(r"^\s{0,3}(`{3,})(.*)$")
 
 
 class Detector(_Detector):
-    """The engine's `Detector` under the two field names this repository's registry uses.
+    """O `Detector` do motor sob os dois nomes de campo que o registro deste repositório usa.
 
-    `kind` is the engine's `event` and `stance` is its `gate`; both are read by the tests and
-    by `check_detectors`, and neither is worth a rename across a stored ledger.
+    `kind` é o `event` do motor e `stance` é seu `gate`; ambos são lidos pelos testes e por
+    `check_detectors`, e nenhum vale a pena renomear através de um ledger armazenado.
     """
 
     __slots__ = ()
@@ -120,17 +120,17 @@ class Detector(_Detector):
         return self.gate
 
 
-# --- helpers ------------------------------------------------------------------------
+# --- auxiliares ------------------------------------------------------------------------
 
 
 def _messages_of(parsed, args):
-    """Every `-m` value of one `git commit`, in order, markers resolved to their body.
+    """Todo valor `-m` de um `git commit`, em ordem, com marcadores resolvidos para seu corpo.
 
-    `git commit` with no `-m` — `--amend --no-edit`, `-F file`, `-C <commit>` — carries no
-    message here: a heredoc elsewhere in the command belongs to that other command, not
-    to the commit. Neither does a commit whose message is a substitution the parse could
-    not open (`-m "$(cat msg.txt)"`): an unread message is not a bad one, so the whole
-    commit yields no messages rather than an empty subject.
+    `git commit` sem `-m` — `--amend --no-edit`, `-F file`, `-C <commit>` — não carrega
+    mensagem alguma aqui: um heredoc em outro lugar do comando pertence a esse outro comando, não
+    ao commit. Nem um commit cuja mensagem é uma substituição que o parse não conseguiu abrir
+    (`-m "$(cat msg.txt)"`): uma mensagem não lida não é uma ruim, então o commit inteiro
+    produz nenhuma mensagem em vez de um assunto vazio.
     """
     out = []
     i = 0
@@ -144,8 +144,8 @@ def _messages_of(parsed, args):
             value = token.split("=", 1)[1]
             i += 1
         elif token.startswith("-") and not token.startswith("--") and "m" in token[1:]:
-            # A short cluster: everything after the first `m` is the value, as git reads
-            # it, so `-am`, `-sm` and `-mfeat: x` all land here.
+            # Um agrupamento curto: tudo depois do primeiro `m` é o valor, como o git o lê,
+            # então `-am`, `-sm` e `-mfeat: x` caem todos aqui.
             rest = token[1:].split("m", 1)[1]
             if rest:
                 value = rest
@@ -168,12 +168,12 @@ def _messages_of(parsed, args):
 
 
 def _commit_messages(parsed):
-    """The `-m` values of every `git commit` in one parsed command, commit by commit."""
+    """Os valores `-m` de cada `git commit` num comando parseado, commit por commit."""
     return [_messages_of(parsed, args) for _, sub, args in git_calls(parsed, ("commit",))]
 
 
 def _is_secret_path(path):
-    """A path whose own name says it holds a credential."""
+    """Um caminho cujo próprio nome diz que guarda uma credencial."""
     base = path.rstrip("/").rsplit("/", 1)[-1]
     if base == ".env":
         return True
@@ -187,14 +187,15 @@ def _is_secret_path(path):
 
 
 def _unmarked(text):
-    """`text` with quoted and backticked spans blanked, so a phrase under discussion is
-    not read as a phrase in use."""
+    """`text` com trechos entre aspas e crases apagados, para que uma frase em discussão não
+    seja lida como uma frase em uso."""
     return re.sub(r"`[^`]*`|'[^'\n]*'|\"[^\"\n]*\"", " ", text)
 
 
 def _fenced_lines(text):
-    """Every line inside a fenced code block, by the CommonMark closing rule: a closing
-    fence carries at least as many backticks as the opener and no info string."""
+    """Toda linha dentro de um bloco de código cercado, pela regra de fechamento do
+    CommonMark: uma cerca de fechamento carrega ao menos tantas crases quanto o abridor e
+    nenhuma string de informação."""
     out, opener = [], None
     for line in (text or "").split("\n"):
         match = _FENCE_RE.match(line)
@@ -209,24 +210,24 @@ def _fenced_lines(text):
     return out
 
 
-# --- detectors ---------------------------------------------------------------------
+# --- detectores ---------------------------------------------------------------------
 
 
 def model_wrote_no_cap(events, ctx):
-    """An `Agent` brief the model wrote with no word cap, for an agent whose definition
-    carries none.
+    """Um brief de `Agent` que o modelo escreveu sem limite de palavras, para um agente cuja
+    definição não carrega nenhum.
 
-    This measures the brief as authored, never as delivered. Claude Code writes the `tool_use`
-    block with the input the model produced; a `PreToolUse` hook's `updatedInput` is recorded
-    separately, on an `attachment` line of type `hook_success`, which the event builder does not
-    read. So every brief `brief-guard` capped is still a hit here, and the count is a measure of
-    orchestrator compliance — the same way `usage-log.mark_reroutes` measures the spawn hook's
-    work from what happened rather than from what the hook announced.
+    Isto mede o brief como foi escrito, nunca como foi entregue. O Claude Code escreve o bloco
+    `tool_use` com a entrada que o modelo produziu; o `updatedInput` de um hook de `PreToolUse` é
+    registrado separadamente, numa linha `attachment` do tipo `hook_success`, que o construtor de
+    eventos não lê. Então todo brief que `brief-guard` limitou ainda é um hit aqui, e a contagem
+    é uma medida de conformidade do orquestrador — do mesmo jeito que `usage-log.mark_reroutes`
+    mede o trabalho do hook de disparo pelo que aconteceu em vez de pelo que o hook anunciou.
 
-    The id says so since #324: the old `transcript-hygiene/brief-without-cap` read as a count
-    of uncapped briefs reaching a subagent, which, with the hook installed, is a number this
-    module cannot see and is very nearly zero. `promote?` on this detector means the
-    orchestrator does not write bounds and the hook is carrying the rule.
+    O id diz isso desde #324: o antigo `transcript-hygiene/brief-without-cap` lia como uma
+    contagem de briefs sem limite alcançando um subagente, o que, com o hook instalado, é um
+    número que este módulo não consegue ver e é muito próximo de zero. `promote?` neste detector
+    significa que o orquestrador não escreve limites e o hook está carregando a regra.
     """
     hits = []
     for event in events:
@@ -241,10 +242,10 @@ def model_wrote_no_cap(events, ctx):
 
 
 def executed_from_summary(events, ctx):
-    """A Bash command whose first appearance in the session was inside an `Agent` return.
+    """Um comando Bash cuja primeira aparição na sessão foi dentro de um retorno de `Agent`.
 
-    A command the session already ran, and a subagent then quoted back, is not a hit: the
-    rule is about acting on text that arrived from a subagent, not about repetition.
+    Um comando que a sessão já rodou, e que um subagente depois citou de volta, não é um hit: a
+    regra é sobre agir sobre texto que chegou de um subagente, não sobre repetição.
     """
     origin, hits = {}, []
     for event in events:
@@ -265,7 +266,7 @@ def executed_from_summary(events, ctx):
 
 
 def git_add_secret_file(events, ctx):
-    """`git add` of a path whose name says it holds a credential."""
+    """`git add` de um caminho cujo nome diz que guarda uma credencial."""
     hits = []
     for parsed in ctx.bash:
         for _, _, args in git_calls(parsed, ("add",)):
@@ -276,7 +277,7 @@ def git_add_secret_file(events, ctx):
 
 
 def search_over_cap(events, ctx):
-    """One hit on the search that takes the session past the per-session cap."""
+    """Um único hit na busca que leva a sessão além do teto por sessão."""
     seen = 0
     for event in events:
         if event.get("kind") == "tool_use" and event.get("name") == "WebSearch":
@@ -297,8 +298,8 @@ def banned_opener(events, ctx):
 
 
 def second_table(events, ctx):
-    """Two or more table blocks in one final message; a block is two or more
-    consecutive lines starting with `|`."""
+    """Dois ou mais blocos de tabela numa mensagem final; um bloco é duas ou mais linhas
+    consecutivas começando com `|`."""
     hits = []
     for event in ctx.finals:
         blocks, run_len = 0, 0
@@ -314,10 +315,11 @@ def second_table(events, ctx):
     return hits
 
 
-# The `concise` voice forbids the scaffold other voices used: a reply template's section labels.
-# Status words are not in the list, because the stance allows them when reporting a fix. A label
-# counts only in label position: closed by a colon (after closing bold or not), wrapped whole in
-# bold, or standing as a heading. A bare word at the end of a line is a list item or prose.
+# A voz `concise` proíbe o esqueleto que outras vozes usavam: os rótulos de seção de um template
+# de resposta. Palavras de status não estão na lista, porque a stance as permite ao reportar uma
+# correção. Um rótulo só conta em posição de rótulo: fechado por dois-pontos (depois de negrito
+# fechado ou não), embrulhado inteiro em negrito, ou como um cabeçalho. Uma palavra nua no fim de
+# uma linha é um item de lista ou prosa.
 _SCAFFOLD_LABELS = (r"(?:What changed|What you need to know|What you need to do|Still open|"
                     r"Verification|Why|The catch|Catch|Alternatives)")
 _LIST_MARKER = r"^\s{0,3}(?:(?:[-*+]|\d+[.)])\s+)?"
@@ -329,14 +331,14 @@ SCAFFOLD_LABEL_RE = re.compile(
 HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s")
 
 
-# Backtick and tilde fences, for `_unfenced_lines` only; `_fenced_lines` keeps `_FENCE_RE` so the
-# detectors that read fenced commands keep their measured behaviour.
+# Cercas de crase e til, só para `_unfenced_lines`; `_fenced_lines` mantém `_FENCE_RE` para que
+# os detectores que leem comandos cercados mantenham seu comportamento medido.
 _ANY_FENCE_RE = re.compile(r"^\s{0,3}(`{3,}|~{3,})(.*)$")
 
 
 def _unfenced_lines(text):
-    """Every line outside a fenced code block, backtick or tilde, by the CommonMark closing
-    rule: the same fence character, at least as many of it, and no info string."""
+    """Toda linha fora de um bloco de código cercado, crase ou til, pela regra de fechamento do
+    CommonMark: o mesmo caractere de cerca, ao menos tantos dele, e nenhuma string de informação."""
     out, opener = [], None
     for line in (text or "").split("\n"):
         match = _ANY_FENCE_RE.match(line)
@@ -352,8 +354,8 @@ def _unfenced_lines(text):
 
 
 def scaffold_leak(events, ctx):
-    """A final message that wears a reply template's section labels, outside code fences; a
-    backticked or quoted mention is not a label. One hit per message."""
+    """Uma mensagem final que usa os rótulos de seção de um template de resposta, fora de cercas
+    de código; uma menção entre crases ou aspas não é um rótulo. Um hit por mensagem."""
     hits = []
     for event in ctx.finals:
         for line in _unfenced_lines(text_of(event.get("text"))):
@@ -365,7 +367,7 @@ def scaffold_leak(events, ctx):
 
 
 def heading_first(events, ctx):
-    """A final message whose first non-blank line is a markdown heading."""
+    """Uma mensagem final cuja primeira linha não vazia é um cabeçalho markdown."""
     hits = []
     for event in ctx.finals:
         lines = [l for l in text_of(event.get("text")).split("\n") if l.strip()]
@@ -375,11 +377,10 @@ def heading_first(events, ctx):
 
 
 def recommendation_without_alternative(events, ctx):
-    """A final message that decides between courses and names only one. The rule asks for
-    "the alternatives with their honest case", so a batched `Decisions` block or a
-    recommendation line standing alone is the shape it forbids. Markers are read out of
-    the raw text rather than the unmarked text, so an alternative named inside a quote
-    still counts as named."""
+    """Uma mensagem final que decide entre caminhos e nomeia só um. A regra pede "as
+    alternativas com seu caso honesto", então um bloco `Decisions` em lote ou uma linha de
+    recomendação isolada é a forma que ela proíbe. Marcadores são lidos do texto bruto em vez do
+    texto sem marcas, para que uma alternativa nomeada dentro de uma citação ainda conte como nomeada."""
     hits = []
     for event in ctx.finals:
         text = text_of(event.get("text"))
@@ -389,7 +390,7 @@ def recommendation_without_alternative(events, ctx):
 
 
 def non_conventional(events, ctx):
-    """A commit subject that is not a Conventional Commit line."""
+    """Um assunto de commit que não é uma linha de Conventional Commit."""
     hits = []
     for parsed in ctx.bash:
         for messages in _commit_messages(parsed):
@@ -403,7 +404,7 @@ def non_conventional(events, ctx):
 
 
 def missing_trailer(events, ctx):
-    """A commit whose message carries no `Co-Authored-By:` line, in any `-m`."""
+    """Um commit cuja mensagem não carrega linha `Co-Authored-By:` nenhuma, em nenhum `-m`."""
     hits = []
     for parsed in ctx.bash:
         for messages in _commit_messages(parsed):
@@ -416,20 +417,21 @@ def missing_trailer(events, ctx):
 
 
 def confirmed_irreversible(events, ctx):
-    """A command re-run behind the marker, which is a grade-3 action the user said yes to.
+    """Um comando re-rodado atrás do marcador, que é uma ação de nota 3 à qual o usuário disse sim.
 
-    `env` may carry the assignment, as the shell allows, and leading blank or comment lines
-    are nothing the shell runs; anything else before the marker means the gate saw a different
-    command from this one, so a marker buried mid-command confirms nothing and counts nothing.
+    `env` pode carregar a atribuição, como o shell permite, e linhas em branco ou de comentário
+    no início não são nada que o shell roda; qualquer outra coisa antes do marcador significa que
+    o portão viu um comando diferente deste, então um marcador enterrado no meio do comando não
+    confirma nada e não conta nada.
     """
     return [hit(p.event) for p in ctx.bash
             if _CONFIRMED_RE.match(_COMMENT_RE.sub("", p.command))]
 
 
 def denied_by_grade(events, ctx):
-    """A Bash result carrying the grade hook's signature: the gate fired and the command
-    never ran. The hook signs its own deny reason, so the string is the evidence — the
-    detector never imports it, and reads no other hook's output as a denial."""
+    """Um resultado de Bash carregando a assinatura do hook de avaliação: o portão disparou e o
+    comando nunca rodou. O hook assina sua própria razão de negação, então a string é a
+    evidência — o detector nunca a importa, e não lê a saída de nenhum outro hook como uma negação."""
     hits = []
     for event in events:
         if event.get("kind") != "tool_result" or event.get("tool_name") != "Bash":
@@ -439,21 +441,22 @@ def denied_by_grade(events, ctx):
     return hits
 
 
-# --- the registry -------------------------------------------------------------------
+# --- o registro -------------------------------------------------------------------
 
-_COMMITS_ON = ("commits", None)  # any variant but `off`
-_VOICE_ON = ("voice", None)  # the shape is the stance's; `off` imposes none
-_VOICE_CONCISE = ("voice", ("concise",))  # shapes only the `concise` voice forbids
+_COMMITS_ON = ("commits", None)  # qualquer variante menos `off`
+_VOICE_ON = ("voice", None)  # a forma é da stance; `off` não impõe nenhuma
+_VOICE_CONCISE = ("voice", ("concise",))  # formas que só a voz `concise` proíbe
 _COMMITS_ATTRIBUTED = ("commits", ("conventional-attributed",))
 
-# A cost variant whose `compaction` switch is `compact-allowed` lifts `cache-hygiene.md`'s "not
-# compaction", so a compaction there is the stance working, not a miss. Frozen here because
-# this module reads no file at runtime; a test holds it equal to the shipped sidecars.
+# Uma variante de custo cujo switch `compaction` é `compact-allowed` levanta o "not compaction"
+# de `cache-hygiene.md`, então uma compactação ali é a stance funcionando, não uma falha.
+# Congelado aqui porque este módulo não lê arquivo nenhum em tempo de execução; um teste o
+# mantém igual aos sidecars embutidos.
 COMPACTION_ALLOWED = frozenset(("max",))
 _GATES = {"cache-hygiene/compact": lambda stances: stances.get("cost") not in COMPACTION_ALLOWED}
 
-# The six the engine ships, re-registered under this file's `Detector` so every entry in the
-# registry answers to the same field names. The functions are the wheel's, not a second copy.
+# Os seis que o motor traz, re-registrados sob o `Detector` deste arquivo para que toda entrada
+# no registro responda aos mesmos nomes de campo. As funções são as do wheel, não uma segunda cópia.
 _GENERIC = [Detector(d.id, d.rule, d.event, d.fn, _GATES.get(d.id, d.gate))
             for d in generic.DETECTORS]
 
@@ -479,12 +482,12 @@ _REGISTRY = _GENERIC + [
 
 DETECTORS = dict((d.id, d) for d in _REGISTRY)
 
-# A detector that was renamed, old id → new. A ledger row written under the old id is never
-# rewritten; `harness usage --rules` folds this map on every read instead, so one measurement
-# stays one line and one series across the rename. Renaming is still a last resort.
+# Um detector que foi renomeado, id antigo → novo. Uma linha de ledger escrita sob o id antigo
+# nunca é reescrita; `harness usage --rules` dobra este mapa a cada leitura em vez disso, então
+# uma medição continua sendo uma linha e uma série através da renomeação. Renomear ainda é um último recurso.
 RENAMED = {"transcript-hygiene/brief-without-cap": "transcript-hygiene/model-wrote-no-cap"}
 
-# Rules with nothing a transcript can decide. The reason is what the lint prints.
+# Regras sobre as quais um transcript não pode decidir nada. O motivo é o que o lint imprime.
 OPT_OUT = {
     "conciseness": "a comment's redundancy is a judgment over the codebase, not a transcript pattern",
     "working-style": "\"verify before you claim\" needs a semantic link between a claim and a command",
@@ -492,9 +495,10 @@ OPT_OUT = {
 
 
 def run(events, stances=None, strict=False, errors=None):
-    """Every detector over one session's events; detectors with no hits are omitted.
+    """Todo detector sobre os eventos de uma sessão; detectores sem hits são omitidos.
 
-    The registry is built per call from `_REGISTRY`, which is a list so a test can add a
-    detector to it and take it away again; the cost is once per session, not once per event.
+    O registro é construído por chamada a partir de `_REGISTRY`, que é uma lista para que um
+    teste possa adicionar um detector a ela e retirá-lo de novo; o custo é uma vez por sessão,
+    não uma vez por evento.
     """
     return _run(events, stances, registry=Registry(_REGISTRY), strict=strict, errors=errors)

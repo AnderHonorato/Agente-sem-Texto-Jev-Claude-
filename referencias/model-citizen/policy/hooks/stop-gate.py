@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Stop hook: run the repository's own gate and refuse to finish while it is red.
+"""Hook de Stop: roda o próprio portão do repositório e recusa terminar enquanto está vermelho.
 
-Opt-in per repository — the gate is the fenced block under the `## Gate` heading of the
-repo's `AGENTS.md`, executed together in one shell. A repo without that block is untouched.
-Trusted folders only: the block is a repository's own text, so it runs only where Claude
-Code's folder-trust dialog has been accepted (the `hasTrustDialogAccepted` flag it records
-per project), the same consent that gates a repository's `.claude/settings.json` hooks, or
-where the root is listed in ~/.config/agent-harness/trusted.txt by `harness trust`.
-Bounded: after MAX_BLOCKS consecutive blocks the turn is released, so a gate that can never
-pass cannot trap a session. The count is kept per session, so two sessions stopping in the same
-checkout never reset each other's; a session silent for STALE_SECONDS is forgotten. A timeout releases the turn as unverified; unexpected errors block. Neither records success.
+Opt-in por repositório — o portão é o bloco cercado sob o cabeçalho `## Gate` do `AGENTS.md` do
+repositório, executado junto num único shell. Um repositório sem esse bloco fica intocado. Só
+pastas confiáveis: o bloco é texto próprio de um repositório, então só roda onde o diálogo de
+confiança de pasta do Claude Code foi aceito (a flag `hasTrustDialogAccepted` que ele registra
+por projeto), o mesmo consentimento que restringe os hooks do `.claude/settings.json` de um
+repositório, ou onde a raiz está listada em ~/.config/agent-harness/trusted.txt por
+`harness trust`. Limitado: depois de MAX_BLOCKS bloqueios consecutivos o turno é liberado, para
+que um portão que nunca consegue passar não consiga prender uma sessão. A contagem é mantida por
+sessão, então duas sessões parando no mesmo checkout nunca resetam a contagem uma da outra; uma
+sessão silenciosa por STALE_SECONDS é esquecida. Um timeout libera o turno como não verificado;
+erros inesperados bloqueiam. Nenhum dos dois registra sucesso.
 """
 import hashlib
 import importlib.util
@@ -35,7 +37,7 @@ _LOG = []
 
 
 def decisions():
-    """The sibling decision log, or None. A log that will not load costs nothing but its rows."""
+    """O log de decisão irmão, ou None. Um log que não carrega custa nada além das suas próprias linhas."""
     if not _LOG:
         module = None
         try:
@@ -50,16 +52,18 @@ def decisions():
 
 
 def log_gate(payload, root, commands, answer, outcome):
-    """Record what this Stop event was answered with, and how the gate turned out.
+    """Registra com o que este evento Stop foi respondido, e como o portão se desenrolou.
 
-    Both records are written here because both facts are known here: the hook runs the gate
-    itself, so the outcome does not wait for a later event. The judged input is the repository's
-    own gate block — the text this hook decided to run — and never the turn's final message.
+    Ambos os registros são escritos aqui porque ambos os fatos são conhecidos aqui: o hook roda o
+    portão em si, então o resultado não espera por um evento posterior. A entrada julgada é o
+    próprio bloco de portão do repositório — o texto que este hook decidiu rodar — e nunca a
+    mensagem final do turno.
 
-    The claim the turn ended on is the transcript's, not the payload's: a Stop event carries no
-    assistant text, so the log reads a capped tail of the file the event names. That read only
-    happens under `telemetry.completion_claim`, which is off, because it is the one field in the
-    log that holds model prose. Both runtimes' names for the file are accepted.
+    A alegação em que o turno terminou é a do transcript, não a do payload: um evento Stop não
+    carrega texto de assistente, então o log lê um final limitado do arquivo que o evento nomeia.
+    Essa leitura só acontece sob `telemetry.completion_claim`, que está desligado, porque é o
+    único campo no log que guarda prosa do modelo. Os nomes de ambos os runtimes para o arquivo
+    são aceitos.
     """
     module = decisions()
     if module is None:
@@ -88,13 +92,13 @@ def git_root(cwd):
 
 
 def claude_config():
-    """Claude Code's per-user state file, honouring CLAUDE_CONFIG_DIR."""
+    """O arquivo de estado por usuário do Claude Code, honrando CLAUDE_CONFIG_DIR."""
     config_dir = os.environ.get("CLAUDE_CONFIG_DIR")
     return (Path(config_dir) if config_dir else Path.home()) / ".claude.json"
 
 
 def listed_roots():
-    """Roots recorded by `harness trust`, as written and resolved."""
+    """Raízes registradas por `harness trust`, como escritas e resolvidas."""
     try:
         lines = TRUSTED.read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -108,8 +112,8 @@ def listed_roots():
 
 
 def trusted(root, cwd):
-    """True when the folder-trust dialog has been accepted for the working directory, the
-    repository root, or a directory between them, or when `harness trust` listed the root."""
+    """True quando o diálogo de confiança de pasta foi aceito para o diretório de trabalho, a
+    raiz do repositório, ou um diretório entre eles, ou quando `harness trust` listou a raiz."""
     if os.environ.get("HARNESS_RUNTIME") == "codex":
         return bool(listed_roots() & {str(Path(root)), str(Path(root).resolve())})
     try:
@@ -124,7 +128,7 @@ def trusted(root, cwd):
     keys = {str(Path(root)), str(top)}
     path = Path(cwd)
     while path.resolve() == top or top in path.resolve().parents:
-        keys.update((str(path), str(path.resolve())))  # symlinked temp dirs record either form
+        keys.update((str(path), str(path.resolve())))  # diretórios temp com symlink registram qualquer uma das formas
         if path.resolve() == top:
             break
         path = path.parent
@@ -164,7 +168,7 @@ def gate_commands(root):
                 break
             fenced = True
         elif not fenced:
-            if text.startswith("#"):  # the next heading, with no block between
+            if text.startswith("#"):  # o próximo cabeçalho, sem bloco algum entre eles
                 break
         elif text and not text.startswith("#"):
             commands.append(text)
@@ -224,7 +228,7 @@ def write_state(path, data):
 
 
 def run_gate(root, commands):
-    """The first red command as (command, exit code, output), or None when every one passes."""
+    """O primeiro comando vermelho como (command, exit code, output), ou None quando todos passam."""
     cmd = "\n".join(commands)
     out = subprocess.run(["bash", "-e", "-o", "pipefail", "-c", cmd], cwd=root,
                          capture_output=True, text=True, timeout=BUDGET_SECONDS)
@@ -244,7 +248,7 @@ def reason(path, cmd, code, output):
 
 
 def live_sessions(state, now):
-    """The per-session block counts in `state`, without entries silent for STALE_SECONDS."""
+    """As contagens de bloqueio por sessão em `state`, sem entradas silenciosas por STALE_SECONDS."""
     sessions = state.get("sessions")
     if not isinstance(sessions, dict):
         return {}
@@ -260,7 +264,7 @@ def live_sessions(state, now):
 
 
 def release(path, session, note):
-    # Re-read: the gate can run for minutes, and another session may have recorded blocks meanwhile.
+    # Relê: o portão pode rodar por minutos, e outra sessão pode ter registrado bloqueios nesse meio tempo.
     sessions = live_sessions(read_state(path), time.time())
     sessions.pop(session, None)
     write_state(path, {"green_hash": None, "status": "unverified", "reason": note,

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Reads a test, build or log run on stdin and prints only the lines that carry
-information: failures, tracebacks and what follows them, summary lines, and the
-tail of the run.
+"""Lê uma execução de teste, build ou log no stdin e imprime só as linhas que carregam
+informação: falhas, tracebacks e o que os segue, linhas de resumo, e o final da execução.
 
-Invoked by `filter-output.py`, which rewrites a matching Bash command to pipe
-through it. Always exits 0, so the `pipefail` pipeline reports the status of the
-command being filtered.
+Invocado por `filter-output.py`, que reescreve um comando Bash correspondente para passar
+por ele via pipe. Sempre sai com 0, para que o pipeline `pipefail` reporte o status do
+comando sendo filtrado.
 """
 import re
 import sys

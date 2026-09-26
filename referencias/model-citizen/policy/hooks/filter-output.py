@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""PreToolUse hook: pipe verbose test, build and type-check runs through
-`filter-lines.py`, so only failures, the summary and the tail of a run enter the
+"""Hook de PreToolUse: passa execuções verbosas de teste, build e checagem de tipos por pipe
+através de `filter-lines.py`, para que só falhas, o resumo e o final de uma execução entrem no
 transcript.
 
-Why a hook and not an instruction: by the time the model could decide to read the
-output narrowly, the whole run is already in context and every later turn pays for
-it. Trimming it is a computational job.
+Por que um hook e não uma instrução: no momento em que o modelo poderia decidir ler a saída de
+forma restrita, a execução inteira já está no contexto e todo turno posterior paga por isso.
+Reduzi-la é um trabalho computacional.
 
-Behaviour:
-  - Rewrites a command that runs one of MATCHES, after leading environment
-    assignments and `cd ... &&` prefixes are stripped.
-  - Leaves the command alone when it is already filtered, already pipes to a
-    pager, redirects to a file, or watches.
-  - Emits `updatedInput` only. It never returns a permission decision, so the
-    normal permission flow and any other PreToolUse hook on Bash are untouched.
-  - `set -o pipefail` keeps the original exit status; the filter always exits 0.
+Comportamento:
+  - Reescreve um comando que roda um dos MATCHES, depois que atribuições de ambiente
+    iniciais e prefixos `cd ... &&` são removidos.
+  - Deixa o comando intacto quando já está filtrado, já faz pipe para um
+    pager, redireciona para um arquivo, ou observa (watch).
+  - Emite só `updatedInput`. Nunca retorna uma decisão de permissão, então o
+    fluxo de permissão normal e qualquer outro hook de PreToolUse em Bash ficam intocados.
+  - `set -o pipefail` mantém o status de saída original; o filtro sempre sai com 0.
 
-Test: echo '{"tool_name":"Bash","tool_input":{"command":"pytest -q"}}' | python3 filter-output.py
+Teste: echo '{"tool_name":"Bash","tool_input":{"command":"pytest -q"}}' | python3 filter-output.py
 """
 import json
 import re

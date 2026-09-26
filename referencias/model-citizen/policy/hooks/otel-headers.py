@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Print the OTLP headers a runtime should send, as one JSON object, and nothing else.
+"""Imprime os cabeçalhos OTLP que um runtime deveria enviar, como um único objeto JSON, e nada mais.
 
-Claude Code reads the path to this script from the `otelHeadersHelper` setting, runs it about
-every 29 minutes, and parses its standard output as `{"name": "value"}`. `harness sync` writes
-that setting only when `telemetry.native` names `claude-code` and a header source is
-configured.
+O Claude Code lê o caminho para este script da configuração `otelHeadersHelper`, o roda a cada
+uns 29 minutos, e faz parse da sua saída padrão como `{"name": "value"}`. `harness sync` só
+escreve essa configuração quando `telemetry.native` nomeia `claude-code` e uma fonte de
+cabeçalho está configurada.
 
-Every value here is a credential, so a failure prints **nothing at all** and fails by exit
-status: text on standard output would be parsed as a header, and text on standard error lands
-in logs the value was deliberately kept out of. The sources are the ones the exporter uses and
-no others — the named environment variable and the mode-600 file outside every work tree.
+Todo valor aqui é uma credencial, então uma falha não imprime **nada de forma alguma** e falha
+pelo status de saída: texto na saída padrão seria interpretado como um cabeçalho, e texto no
+erro padrão cai em logs dos quais o valor foi deliberadamente mantido fora. As fontes são
+aquelas que o exportador usa e nenhuma outra — a variável de ambiente nomeada e o arquivo modo
+600 fora de toda árvore de trabalho.
 
-A variable reaches this script only if it reached the runtime that spawned it, which a
-desktop-launched client may not have; `headers_file` is the source that does not depend on
-that. See docs/telemetry.md.
+Uma variável só alcança este script se alcançou o runtime que o lançou, o que um cliente
+lançado por desktop pode não ter; `headers_file` é a fonte que não depende disso. Veja docs/telemetry.md.
 """
 import importlib.util
 import json
@@ -23,7 +23,7 @@ from pathlib import Path
 
 
 def load():
-    """The exporter's own settings and header rules, from the file beside this one."""
+    """As próprias configurações e regras de cabeçalho do exportador, a partir do arquivo ao lado deste."""
     path = Path(__file__).resolve().parent / "telemetry.py"
     spec = importlib.util.spec_from_file_location("harness_telemetry", str(path))
     module = importlib.util.module_from_spec(spec)

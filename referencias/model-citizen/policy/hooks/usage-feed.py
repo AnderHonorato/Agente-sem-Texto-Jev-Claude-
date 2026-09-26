@@ -1,62 +1,62 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Feed measured spend back to the orchestrator: one turn line, one line per finished subagent.
+"""Alimenta o gasto medido de volta ao orquestrador: uma linha de turno, uma linha por subagente terminado.
 
-Four events, all on the parent thread. `SubagentStart` and `SubagentStop` record when an agent
-began and what it cost. `PostToolUse` on `Agent` reports a synchronous return the moment it lands,
-and says how many agents are running when that is past the posture's width. `UserPromptSubmit`
-reports the turn and every subagent that finished since the previous prompt — which is how a
-background spawn, whose `PostToolUse` fires at launch with no totals, is reported at all.
+Quatro eventos, todos na thread pai. `SubagentStart` e `SubagentStop` registram quando um agente
+começou e o que custou. `PostToolUse` em `Agent` reporta um retorno síncrono no momento em que chega,
+e diz quantos agentes estão rodando quando isso passa da largura da postura. `UserPromptSubmit`
+reporta o turno e cada subagente que terminou desde o prompt anterior — o que é como um
+spawn em segundo plano, cujo `PostToolUse` dispara no lançamento sem totais, é reportado de qualquer forma.
 
-Seven facts shape the whole file:
+Sete fatos moldam o arquivo inteiro:
 
-- **A tool response's token figure describes only the subagent's last response.** Measured on a
-  live return: `tool_response.usage.output_tokens` said 3,143 against 10,575 actually spent over
-  nineteen responses. The real figure is summed from the subagent's own transcript, once per
-  message id at the field-wise maximum, by `usage-log.py`'s per-agent row function and not by a
-  second copy of that logic here.
-- **These hooks run concurrently, as separate processes.** So state is split in two. A subagent
-  event is one line under 4 KB appended to `<session>.events.jsonl` through an `O_APPEND`
-  descriptor, which no handler ever rewrites and which therefore cannot lose a record. Everything
-  the main thread read-modify-writes lives in `<session>.json`, under an exclusive `flock` on
-  `<session>.lock` with a bounded wait. No lock, no write, and nothing emitted.
-- **Nothing slow happens under the lock.** `SubagentStart` and `SubagentStop` never take it at
-  all, and the two main-thread events sum a subagent's transcript before acquiring it. A stop
-  that took four seconds to read while holding the lock would starve the prompt waiting behind
-  it, and that prompt would silently lose its line.
-- **A record that cannot be computed is still a record.** A stop is journalled in a `finally`,
-  with null totals when the sum failed and `partial` when a budget cut it short. An agent whose
-  stop went missing would otherwise count as running for the rest of the session and the width
-  line would fire falsely forever; a start with no stop also decays after three hours.
-- **A subagent's spend is summed when it is reported, not when it stops.** Measured live: a
-  `SubagentStop` fired while the agent's transcript still held nothing but `user` records, the
-  stop was journalled with null totals, and the one line the session ever printed for that agent
-  said `spend unknown` — while replaying the same payload a moment later yielded 297. So a stop
-  that carries no figure, or one a response was still being written into, is summed again at the
-  moment it is about to be named, before the lock, inside one wall-clock budget shared by every
-  agent that event reports. The return also waits a bounded moment for the last response to
-  finish being written, says `(so far)` when it never does, and the stop the journal brings later
-  raises the session totals without the agent being announced a second time.
-- **A line is worth saying once.** `spend unknown` names its agent and is said once, because no
-  later event can put a figure on it and a session that repeats it teaches the orchestrator to
-  skip the feed. What the figures measure is said once too, before the first of them. An agent
-  resumed with a follow-up message, on the other hand, stops once per round against one agent id,
-  and each of those rounds is a completion the feed owes a line — cumulative, because one
-  transcript covers them all. Whether such a round has landed is not a question the transcript's
-  shape can answer: it ends on the previous round's finished response either way. So a later
-  round is settled by its figure passing the one already reported, and is re-summed at each
-  event, silently, until it does.
-- **Reads are bounded everywhere.** The parent transcript is read from a saved offset, trusted
-  only while the inode and the hash of the first record still match, and from 8 MiB before the
-  end on a cold start. The journal is read from its own saved offset, so a long session's totals
-  can only grow. A subagent's transcript is capped by bytes and by the clock.
+- **O número de tokens da resposta de uma ferramenta descreve só a última resposta do subagente.** Medido num
+  retorno ao vivo: `tool_response.usage.output_tokens` dizia 3.143 contra 10.575 realmente gastos em
+  dezenove respostas. O número real é somado a partir da própria transcrição do subagente, uma vez por
+  id de mensagem no máximo campo a campo, pela função de linha por agente de `usage-log.py` e não por uma
+  segunda cópia dessa lógica aqui.
+- **Estes hooks rodam concorrentemente, como processos separados.** Então o estado é dividido em dois. Um evento
+  de subagente é uma linha abaixo de 4 KB anexada a `<session>.events.jsonl` através de um descritor
+  `O_APPEND`, que nenhum manipulador jamais reescreve e que portanto não pode perder um registro. Tudo
+  que a thread principal lê-modifica-escreve mora em `<session>.json`, sob um `flock` exclusivo em
+  `<session>.lock` com uma espera limitada. Sem trava, sem escrita, e nada emitido.
+- **Nada lento acontece sob a trava.** `SubagentStart` e `SubagentStop` nunca a tomam de jeito
+  nenhum, e os dois eventos de thread principal somam a transcrição de um subagente antes de adquiri-la. Um stop
+  que levasse quatro segundos para ler enquanto segura a trava faria o prompt esperando atrás
+  dele passar fome, e esse prompt silenciosamente perderia sua linha.
+- **Um registro que não pode ser calculado ainda é um registro.** Um stop é registrado no diário num `finally`,
+  com totais nulos quando a soma falhou e `partial` quando um orçamento o cortou pela metade. Um agente cujo
+  stop se perdesse contaria como rodando pelo resto da sessão e a linha de
+  largura dispararia falsamente para sempre; um start sem stop também decai depois de três horas.
+- **O gasto de um subagente é somado quando é reportado, não quando ele para.** Medido ao vivo: um
+  `SubagentStop` disparou enquanto a transcrição do agente ainda mantinha nada além de registros `user`, o
+  stop foi registrado no diário com totais nulos, e a única linha que a sessão jamais imprimiu para aquele agente
+  dizia `spend unknown` — enquanto reproduzir a mesma carga um momento depois rendeu 297. Então um stop
+  que não carrega número, ou um em que uma resposta ainda estava sendo escrita, é somado de novo no
+  momento em que está prestes a ser nomeado, antes da trava, dentro de um orçamento de relógio de parede compartilhado por todo
+  agente que esse evento reporta. O retorno também espera um momento limitado pela última resposta
+  terminar de ser escrita, diz `(so far)` quando isso nunca acontece, e o stop que o diário traz depois
+  levanta os totais da sessão sem o agente ser anunciado uma segunda vez.
+- **Uma linha vale a pena ser dita uma vez.** `spend unknown` nomeia seu agente e é dita uma vez, porque nenhum
+  evento posterior pode colocar um número nele e uma sessão que a repete ensina o orquestrador a
+  pular o feed. O que os números medem também é dito uma vez, antes do primeiro deles. Um agente
+  retomado com uma mensagem de acompanhamento, por outro lado, para uma vez por rodada contra um id de agente,
+  e cada uma dessas rodadas é uma conclusão que o feed deve uma linha — cumulativa, porque uma
+  transcrição cobre todas elas. Se tal rodada chegou não é uma pergunta que a forma da transcrição
+  pode responder: ela termina na resposta concluída da rodada anterior de qualquer forma. Então uma rodada
+  posterior é resolvida por seu número ultrapassar o já reportado, e é re-somada a cada
+  evento, silenciosamente, até que o faça.
+- **Leituras são limitadas em todo lugar.** A transcrição pai é lida a partir de um offset salvo, confiável
+  só enquanto o inode e o hash do primeiro registro ainda combinam, e a partir de 8 MiB antes do
+  fim num início a frio. O diário é lido a partir do seu próprio offset salvo, então os totais de uma sessão longa
+  só podem crescer. A transcrição de um subagente é limitada por bytes e pelo relógio.
 
-No budget, threshold, model name or role name lives here: every number comes from the cost
-table, every switch from `switches.turn_feed`, `switches.nudge_at`, `switches.session_nudge_at`
-and `switches.max_parallel`.
-A variant that sets none of them feeds nothing. Any failure at all emits nothing and exits 0,
-and no line the feed emits is ever a decision. The fresh-session nudge is a recommendation, so
-saying it also records an adherence event, which `adherence.py` later answers.
+Nenhum orçamento, limiar, nome de modelo ou nome de papel mora aqui: todo número vem da tabela de
+custo, todo switch de `switches.turn_feed`, `switches.nudge_at`, `switches.session_nudge_at`
+e `switches.max_parallel`.
+Uma variante que não define nenhum deles não alimenta nada. Qualquer falha, seja qual for, não emite nada e sai com 0,
+e nenhuma linha que o feed emite é jamais uma decisão. O empurrão de sessão nova é uma recomendação, então
+dizê-lo também registra um evento de adesão, que `adherence.py` responde depois.
 """
 import errno
 import hashlib
@@ -75,53 +75,53 @@ except ImportError:  # pragma: no cover - a platform with no advisory locking
 
 HOOKS = Path(__file__).resolve().parent
 PREFIX = "usage-feed: "
-# A journal line is one `os.write`. Far under PIPE_BUF, which is what makes an append atomic.
+# Uma linha de diário é um `os.write`. Bem abaixo de PIPE_BUF, o que é o que torna um append atômico.
 MAX_LINE = 4096
-# How many message ids stay open for a later line to raise, newest kept and oldest evicted. One
-# API response is written as several lines repeating its id, and a response whose id is evicted
-# before its final, largest figure arrives would be counted twice; a tail this long is far past
-# that window.
+# Quantos ids de mensagem ficam abertos para uma linha posterior levantar, mais novo mantido e mais velho descartado. Uma
+# resposta de API é escrita como várias linhas repetindo seu id, e uma resposta cujo id é descartado
+# antes do seu número final, maior, chegar seria contada duas vezes; uma cauda deste tamanho está bem além
+# dessa janela.
 OPEN_TAIL = 64
 MAX_LISTED = 5
-# Stops waiting for a line, and ids whose spend is already in the totals. Both bound what one
-# session's state file can grow to, and both are far past any real fan-out.
+# Stops esperando por uma linha, e ids cujo gasto já está nos totais. Ambos limitam até onde o arquivo de
+# estado de uma sessão pode crescer, e ambos estão bem além de qualquer fan-out real.
 MAX_PENDING = 200
 MAX_COUNTED = 1000
-# A cold start reads this much of the transcript's tail, not the whole file.
+# Um início a frio lê essa quantidade da cauda da transcrição, não o arquivo inteiro.
 COLD_TAIL = 8 * 1024 * 1024
 READ_BUDGET = 3.0
-# What one subagent's transcript may cost a hook that has ten seconds for everything.
+# O que a transcrição de um subagente pode custar a um hook que tem dez segundos para tudo.
 AGENT_BUDGET = 4.0
 AGENT_BYTES = 8 * 1024 * 1024
-# How long a synchronous return may wait for the subagent's last response to finish being
-# written, and how often it looks. Both are well inside the hook's timeout, and the wait is over
-# a 256 KB tail rather than the transcript.
+# Quanto tempo um retorno síncrono pode esperar pela última resposta do subagente terminar de ser
+# escrita, e com que frequência ele olha. Ambos estão bem dentro do timeout do hook, e a espera é sobre
+# uma cauda de 256 KB em vez da transcrição.
 SETTLE_BUDGET = 1.0
 SETTLE_STEP = 0.15
 SETTLE_TAIL = 256 * 1024
-# What summing at report time may cost one event, shared by every agent that event names. With
-# several agents pending, the ones it does not reach keep their place and are summed next time.
+# O que somar no momento do relatório pode custar a um evento, compartilhado por todo agente que esse evento nomeia. Com
+# vários agentes pendentes, os que ele não alcança mantêm seu lugar e são somados na próxima vez.
 REPORT_BUDGET = 4.0
-# The least of that budget one agent is attempted with. Under it the agent waits for the next
-# event rather than being summed in a sliver of time and reported as having no figure.
+# O mínimo desse orçamento com que um agente é tentado. Abaixo disso o agente espera pelo
+# próximo evento em vez de ser somado numa fração de tempo e reportado como sem número.
 REPORT_SLICE = 0.5
-# How many events may try to sum one stop that still holds no response. A transcript that never
-# gains one is a fact, not a race, and retrying it forever would spend the budget on nothing.
+# Quantos eventos podem tentar somar um stop que ainda não tem resposta nenhuma. Uma transcrição que nunca
+# ganha uma é um fato, não uma corrida, e tentar de novo para sempre gastaria o orçamento à toa.
 UNSUMMED_TRIES = 3
 LOCK_WAIT = 2.0
-# A start with no stop this old is not running; something ended it without saying so.
+# Um start sem stop desta idade não está rodando; algo o terminou sem dizer isso.
 RUNNING_TTL = 3 * 3600
 FEED_TTL = 14 * 86400
 PRUNE_EVERY = 86400
 IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}\Z")
-# What an agent type may look like before it is allowed into injected text or the journal.
+# Como um tipo de agente pode se parecer antes de ser permitido em texto injetado ou no diário.
 AGENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
 UNNAMED = "other"
 MODES = ("off", "thresholds", "every-turn")
 
 
 def sibling(name):
-    """A module beside this hook, or None. A feed never fails loudly over an import."""
+    """Um módulo ao lado deste hook, ou None. Um feed nunca falha ruidosamente por causa de uma importação."""
     try:
         spec = importlib.util.spec_from_file_location(
             "harness_" + name.replace("-", "_"), str(HOOKS / (name + ".py")))
@@ -133,12 +133,12 @@ def sibling(name):
 
 
 def _open(path):
-    """The one place the parent transcript is opened, so a test can measure what a read costs."""
+    """O único lugar onde a transcrição pai é aberta, para que um teste possa medir o que uma leitura custa."""
     return open(str(path), "rb")
 
 
 def plural(number, noun):
-    """`1 tool call`, `15 tool calls`, `135,000 output tokens`. Every emitted number reads."""
+    """`1 tool call`, `15 tool calls`, `135,000 output tokens`. Todo número emitido faz sentido lido."""
     return "{:,}".format(number) + " " + noun + ("" if number == 1 else "s")
 
 
@@ -154,7 +154,7 @@ def feed_dir(env):
 
 
 def paths(session_id, env):
-    """`(state, journal, lock)` for one session, or None when the id is not a name we would write."""
+    """`(state, journal, lock)` para uma sessão, ou None quando o id não é um nome que escreveríamos."""
     if not isinstance(session_id, str) or not IDENTIFIER.match(session_id):
         return None
     directory = feed_dir(env)
@@ -175,7 +175,7 @@ def ensure_dir(directory):
 
 
 def journal_append(path, record):
-    """One line, one `os.write`, on an `O_APPEND` descriptor. Never read-modify-write."""
+    """Uma linha, um `os.write`, num descritor `O_APPEND`. Nunca lê-modifica-escreve."""
     data = (json.dumps(record, ensure_ascii=True) + "\n").encode("utf-8")
     if len(data) > MAX_LINE or not ensure_dir(path.parent):
         return False
@@ -187,8 +187,8 @@ def journal_append(path, record):
         written = os.write(handle, data)
         if written == len(data):
             return True
-        # A short write leaves a fragment. Terminating it is all that is owed: the reader drops
-        # an unparseable line, and the next record then starts on a line of its own.
+        # Uma escrita curta deixa um fragmento. Terminá-la é tudo o que se deve: o leitor descarta
+        # uma linha que não parseia, e o próximo registro então começa numa linha própria.
         if not data[:written].endswith(b"\n"):
             os.write(handle, b"\n")
         return False
@@ -214,7 +214,7 @@ def new_state():
 
 
 def load_state(path):
-    """The session's state, or a fresh one. A file we cannot read is a file we start over from."""
+    """O estado da sessão, ou um novo. Um arquivo que não conseguimos ler é um arquivo do qual recomeçamos."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -243,8 +243,8 @@ def load_state(path):
     unsummed = state.get("unsummed")
     state["unsummed"] = unsummed if isinstance(unsummed, dict) else {}
     for agent, entry in list(state["unsummed"].items()):
-        # `[journalled path, tries so far]`. A shape this does not recognise is a retry it
-        # cannot make, and dropping it only leaves the agent counted unknown.
+        # `[caminho registrado, tentativas até agora]`. Uma forma que isto não reconhece é uma tentativa que
+        # não pode fazer, e descartá-la só deixa o agente contado como desconhecido.
         if not (isinstance(entry, list) and len(entry) == 2 and isinstance(entry[0], str)
                 and isinstance(entry[1], int) and not isinstance(entry[1], bool)):
             del state["unsummed"][agent]
@@ -267,7 +267,7 @@ def load_state(path):
 
 
 def save_state(path, state):
-    """Atomic and private. Called before the slow read as well as after it."""
+    """Atômico e privado. Chamado antes da leitura lenta assim como depois dela."""
     state["pending"] = state.get("pending", [])[-MAX_PENDING:]
     state["counted"] = state.get("counted", [])[-MAX_COUNTED:]
     state["said_unknown"] = state.get("said_unknown", [])[-MAX_COUNTED:]
@@ -295,11 +295,11 @@ def save_state(path, state):
 
 
 class Lock(object):
-    """An exclusive `flock` with a bounded wait. Unavailable or contended means emit nothing.
+    """Um `flock` exclusivo com uma espera limitada. Indisponível ou disputado significa não emitir nada.
 
-    Every writer of the reader's state is a hook process with ten seconds for everything, and
-    nothing slow is ever done while this is held. Waiting longer than a couple of seconds for a
-    figure the next prompt will recompute anyway is worse than skipping the line.
+    Todo escritor do estado do leitor é um processo de hook com dez segundos para tudo, e
+    nada lento é feito enquanto isto é mantido. Esperar mais de alguns segundos por um
+    número que o próximo prompt vai recalcular de qualquer forma é pior que pular a linha.
     """
 
     def __init__(self, path, wait=LOCK_WAIT):
@@ -318,8 +318,8 @@ class Lock(object):
         while True:
             try:
                 fcntl.flock(self.handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                # A lock file is never written, so without this its age is its creation and the
-                # sweep below would eventually delete the file a live session is holding.
+                # Um arquivo de trava nunca é escrito, então sem isto sua idade é a de sua criação e a
+                # varredura abaixo acabaria apagando o arquivo que uma sessão ativa está segurando.
                 try:
                     os.utime(str(self.path), None)
                 except OSError:
@@ -346,11 +346,11 @@ class Lock(object):
 
 
 def prune(directory, state, keep, now=None):
-    """Once a day at most, drop the files of sessions nothing has touched in a fortnight.
+    """No máximo uma vez por dia, descarta os arquivos de sessões que nada tocou em duas semanas.
 
-    A session's three files go together or not at all, judged by the newest of them: a state
-    file rewritten every prompt beside a journal nobody appended to for a month is one live
-    session. `keep` is this session, which is never a candidate however old its files look.
+    Os três arquivos de uma sessão vão juntos ou nenhum, julgados pelo mais novo deles: um arquivo
+    de estado reescrito a cada prompt ao lado de um diário em que ninguém anexou por um mês ainda é uma sessão
+    ativa. `keep` é esta sessão, que nunca é candidata por mais velhos que seus arquivos pareçam.
     """
     now = time.time() if now is None else now
     if now - state.get("pruned", 0) < PRUNE_EVERY:
@@ -385,7 +385,7 @@ def prune(directory, state, keep, now=None):
 
 
 def _slot(state, mid):
-    """The open maximum for one message id, newest last, oldest evicted past the tail."""
+    """O máximo aberto para um id de mensagem, mais novo por último, mais velho descartado após a cauda."""
     entries = state["open"]
     if mid:
         for item in entries:
@@ -398,11 +398,11 @@ def _slot(state, mid):
 
 
 def _whole(value):
-    """A token figure as a whole number, or 0. Nothing a transcript can hold raises out of here.
+    """Um número de tokens como um inteiro, ou 0. Nada que uma transcrição possa conter levanta exceção daqui para fora.
 
-    `OverflowError` is the one that matters: JSON admits `1e400`, Python reads it as an infinity,
-    and `int()` on that raises. A record is read once, the offset past it is saved, and an
-    uncaught raise there would silence the feed for the rest of the session.
+    `OverflowError` é a que importa: JSON admite `1e400`, Python o lê como um infinito,
+    e `int()` nisso levanta exceção. Um registro é lido uma vez, o offset após ele é salvo, e uma
+    exceção não capturada ali silenciaria o feed pelo resto da sessão.
     """
     try:
         return int(value or 0)
@@ -410,14 +410,14 @@ def _whole(value):
         return 0
 
 
-#: What a response read, across the three fields it is reported in. They do not overlap:
-#: `input_tokens` is what was sent uncached, and the other two are the prefix read from the
-#: cache and the prefix written into it, so the context is their sum and not any one of them.
+#: O que uma resposta leu, através dos três campos em que é reportada. Eles não se sobrepõem:
+#: `input_tokens` é o que foi enviado sem cache, e os outros dois são o prefixo lido do
+#: cache e o prefixo escrito nele, então o contexto é a soma deles e não qualquer um isolado.
 CONTEXT_KEYS = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
 
 
 def _context(usage):
-    """One response's context size. Zero when the fields are absent, which is not a size."""
+    """O tamanho de contexto de uma resposta. Zero quando os campos estão ausentes, o que não é um tamanho."""
     total = 0
     for key in CONTEXT_KEYS:
         total += max(0, _whole(usage.get(key)))
@@ -425,7 +425,7 @@ def _context(usage):
 
 
 def _apply(state, entry):
-    """One transcript line against the running totals. Sidechain lines belong to a subagent."""
+    """Uma linha de transcrição contra os totais correntes. Linhas de sidechain pertencem a um subagente."""
     if not isinstance(entry, dict) or entry.get("isSidechain"):
         return
     kind = entry.get("type")
@@ -438,8 +438,8 @@ def _apply(state, entry):
             return
         if entry.get("isMeta") or entry.get("isCompactSummary"):
             return
-        # A real prompt closes the turn. An empty one is not a turn worth remembering, so it
-        # never displaces the last turn that spent anything.
+        # Um prompt real fecha o turno. Um vazio não é um turno que valha a pena lembrar, então ele
+        # nunca desloca o último turno que gastou algo.
         if state["turn"]["output"] or state["turn"]["tool_calls"]:
             state["previous_turn"] = state["turn"]
         state["turn"] = {"output": 0, "tool_calls": 0}
@@ -451,15 +451,15 @@ def _apply(state, entry):
     usage = usage if isinstance(usage, dict) else {}
     context = _context(usage)
     if context:
-        # What the next response will re-read, as of the newest response on file. Not summed
-        # and not a maximum: a context that shrank because the session was compacted has
-        # shrunk, and the older, larger figure describes a session that no longer exists.
+        # O que a próxima resposta vai reler, conforme a resposta mais nova registrada. Não somado
+        # e não um máximo: um contexto que encolheu porque a sessão foi compactada de fato
+        # encolheu, e o número mais velho e maior descreve uma sessão que não existe mais.
         state["context"] = context
     slot = _slot(state, mid)
     output = _whole(usage.get("output_tokens"))
     if output > slot[1]:
-        # Only the rise is added, so a partial streaming count followed by the true figure is
-        # one message counted once at its largest.
+        # Só o aumento é somado, então uma contagem parcial de streaming seguida do número
+        # verdadeiro é uma mensagem contada uma vez no seu maior valor.
         for name in ("session", "turn"):
             state[name]["output"] += output - slot[1]
         slot[1] = output
@@ -475,7 +475,7 @@ def _apply(state, entry):
 
 
 def _align(handle, offset, size):
-    """The next line start at or after `offset`. A saved offset mid-line re-aligns forward."""
+    """O início da próxima linha em ou após `offset`. Um offset salvo no meio de uma linha se realinha para frente."""
     if offset <= 0:
         return 0
     if offset >= size:
@@ -489,11 +489,11 @@ def _align(handle, offset, size):
 
 
 def _identity(handle):
-    """`(inode, head hash, size)`. A replaced transcript of any size fails this, not just a shorter one.
+    """`(inode, hash da cabeça, tamanho)`. Uma transcrição substituída de qualquer tamanho falha nisto, não só uma mais curta.
 
-    The hash covers the transcript's first line rather than a fixed 512 bytes, because a young
-    file shorter than that is still being appended to inside the window a fixed slice would
-    cover, and its identity would change under it every turn. A first record is written once.
+    O hash cobre a primeira linha da transcrição em vez de 512 bytes fixos, porque um arquivo
+    jovem mais curto que isso ainda está sendo anexado dentro da janela que uma fatia fixa
+    cobriria, e sua identidade mudaria sob ela a cada turno. Um primeiro registro é escrito uma vez.
     """
     stat = os.fstat(handle.fileno())
     handle.seek(0)
@@ -505,11 +505,11 @@ def _identity(handle):
 
 
 def advance(state, transcript, save=None, budget=READ_BUDGET):
-    """Read from the settled offset to EOF, bounded by `COLD_TAIL` and by the clock.
+    """Lê do offset estabelecido até o EOF, limitado por `COLD_TAIL` e pelo relógio.
 
-    `save` is called once the offset and the file identity are settled and before a single line
-    is parsed: a hook killed at its timeout must not leave the next one to repeat the same work
-    forever. `timed_out` on the returned state says the read gave up, and the caller stays quiet.
+    `save` é chamado assim que o offset e a identidade do arquivo estão estabelecidos e antes de uma única linha
+    ser parseada: um hook morto no seu timeout não deve deixar o próximo repetir o mesmo trabalho
+    para sempre. `timed_out` no estado retornado diz que a leitura desistiu, e o chamador fica quieto.
     """
     path = Path(os.path.expanduser(str(transcript)))
     try:
@@ -525,10 +525,10 @@ def advance(state, transcript, save=None, budget=READ_BUDGET):
             return state
         if (state.get("inode") != inode or state.get("head") != head
                 or state["offset"] > size or size < state["size"]):
-            # Compaction, a rotation, a replacement — of any size. What came before is unknowable
-            # about the transcript; what the journal recorded is still true and stays, and so is
-            # what has already been said. A reset that really did shrink the context re-arms the
-            # session nudge through the size itself, not by forgetting the line was fed.
+            # Compactação, uma rotação, uma substituição — de qualquer tamanho. O que veio antes é incognoscível
+            # sobre a transcrição; o que o diário registrou ainda é verdade e permanece, assim como
+            # o que já foi dito. Um reset que de fato encolheu o contexto rearma o empurrão
+            # de sessão através do próprio tamanho, não esquecendo que a linha foi alimentada.
             seen = state.get("inode") is not None
             kept = {key: state[key] for key in
                     ("journal_offset", "running", "pending", "counted", "figures", "unsummed",
@@ -550,8 +550,8 @@ def advance(state, transcript, save=None, budget=READ_BUDGET):
         deadline = time.monotonic() + budget
         handle.seek(position)
         for counted, raw in enumerate(handle):
-            # A line still being written is not a line; leaving it unconsumed is what makes the
-            # next read pick it up whole.
+            # Uma linha ainda sendo escrita não é uma linha; deixá-la não consumida é o que faz a
+            # próxima leitura pegá-la inteira.
             if not raw.endswith(b"\n"):
                 break
             position += len(raw)
@@ -571,11 +571,11 @@ def advance(state, transcript, save=None, budget=READ_BUDGET):
 
 
 def agent_transcript(transcript_path, session_id, agent_id):
-    """`<dirname(transcript)>/<session>/subagents/agent-<id>.jsonl`, or None.
+    """`<dirname(transcript)>/<session>/subagents/agent-<id>.jsonl`, ou None.
 
-    A Workflow-tool agent sits one level deeper, under `subagents/workflows/wf_*/`. Both places
-    are named, rather than walked: a recursive search of a session's whole subagent tree is
-    unbounded work for a question with two possible answers.
+    Um agente da ferramenta Workflow fica um nível mais fundo, sob `subagents/workflows/wf_*/`. Ambos os lugares
+    são nomeados, em vez de percorridos: uma busca recursiva de toda a árvore de subagentes de uma sessão é
+    trabalho ilimitado para uma pergunta com duas respostas possíveis.
     """
     if not (isinstance(agent_id, str) and IDENTIFIER.match(agent_id)):
         return None
@@ -595,11 +595,11 @@ def agent_transcript(transcript_path, session_id, agent_id):
 
 
 def readable(path):
-    """Whether a subagent transcript is there to be summed at all.
+    """Se uma transcrição de subagente está lá para ser somada, ponto final.
 
-    The one thing that separates `spend unknown` from `spend not yet recorded`: a file that is
-    not there is never going to yield a figure, while a file that is there and holds no response
-    yet is a flush this hook fired inside of.
+    A única coisa que separa `spend unknown` de `spend not yet recorded`: um arquivo que não
+    está lá nunca vai render um número, enquanto um arquivo que está lá e ainda não tem resposta
+    é um flush dentro do qual este hook disparou.
     """
     if not path:
         return False
@@ -610,11 +610,11 @@ def readable(path):
 
 
 def redact(path, env):
-    """A subagent transcript path fit to journal: the home prefix becomes `~`, or nothing at all.
+    """Um caminho de transcrição de subagente pronto para o diário: o prefixo home vira `~`, ou nada.
 
-    The journal is a record of counts, and a path under the user's home carries their account
-    name. A path that is not under this home is not written down; the reader re-derives it from
-    the session id instead, which is what `agent_transcript` already does.
+    O diário é um registro de contagens, e um caminho sob o home do usuário carrega o nome da
+    conta dele. Um caminho que não está sob este home não é gravado; o leitor o rederiva do
+    id de sessão em vez disso, que é o que `agent_transcript` já faz.
     """
     if not path:
         return ""
@@ -623,10 +623,10 @@ def redact(path, env):
 
 
 def expand(value, env, agent_id):
-    """The path a journalled `~/…` names, when it still names this agent's own transcript.
+    """O caminho que um `~/…` registrado no diário nomeia, quando ainda nomeia a própria transcrição deste agente.
 
-    The name is checked against the record's own id so that a journal line, whatever wrote it,
-    can only ever point this hook at the file it claims to be about.
+    O nome é checado contra o próprio id do registro para que uma linha do diário, seja lá quem a escreveu,
+    só possa apontar este hook para o arquivo que ela alega ser.
     """
     if not (isinstance(value, str) and value.startswith("~/")
             and isinstance(agent_id, str) and IDENTIFIER.match(agent_id)):
@@ -636,13 +636,13 @@ def expand(value, env, agent_id):
 
 
 def agent_totals(path, budget=None):
-    """`{output, tool_calls, agent_type, partial}` from the subagent's own transcript, or None.
+    """`{output, tool_calls, agent_type, partial}` a partir da própria transcrição do subagente, ou None.
 
-    The sum is `usage-log.py`'s per-agent row function, reused rather than reimplemented: it is
-    the code that already counts one message id once at its largest figure, which is the only
-    way past the last-response figure a tool response reports. It is given a byte cap and a
-    clock here, because this runs inside a hook timeout and a very large agent would otherwise
-    take the whole process down with it.
+    A soma é a função de linha por agente de `usage-log.py`, reutilizada em vez de reimplementada: é
+    o código que já conta um id de mensagem uma vez no seu maior valor, que é a única
+    forma de passar do número da última resposta que uma resposta de ferramenta reporta. Recebe um teto de bytes e um
+    relógio aqui, porque isto roda dentro de um timeout de hook e um agente muito grande de outra forma
+    derrubaria o processo inteiro junto com ele.
     """
     module = sibling("usage-log")
     if module is None or not path:
@@ -659,22 +659,22 @@ def agent_totals(path, budget=None):
 
 
 def tail_state(path, max_bytes=SETTLE_TAIL):
-    """`(a response is there, it has finished being written)` from the transcript's tail.
+    """`(há uma resposta, ela terminou de ser escrita)` a partir da cauda da transcrição.
 
-    Claude Code writes one API response as several records repeating its message id. The early
-    ones carry `stop_reason: null` and a partial streaming `output_tokens`; the record that ends
-    the response carries a reason. Counted over 1,418 message ids in real subagent transcripts,
-    the record carrying a reason held that id's largest figure every single time, and the files
-    whose last record carried none were runs that had been interrupted — so a reason on the last
-    record is the response being complete, and its absence is a response still arriving.
+    O Claude Code escreve uma resposta de API como vários registros repetindo seu id de mensagem. Os
+    primeiros carregam `stop_reason: null` e um `output_tokens` parcial de streaming; o registro que encerra
+    a resposta carrega um motivo. Contado em 1.418 ids de mensagem em transcrições reais de subagente,
+    o registro que carregava um motivo tinha o maior número daquele id todas as vezes, e os arquivos
+    cujo último registro não carregava nenhum eram execuções que tinham sido interrompidas — então um motivo no último
+    registro é a resposta estar completa, e sua ausência é uma resposta ainda chegando.
 
-    A record with no `stop_reason` key at all came from a writer whose streaming this cannot
-    judge, and is taken as it stands rather than waited on. Only the tail is read, so asking
-    costs the same on a large transcript as on a small one.
+    Um registro sem chave `stop_reason` nenhuma veio de um escritor cujo streaming isto não consegue
+    julgar, e é tomado como está em vez de esperado. Só a cauda é lida, então perguntar
+    custa o mesmo numa transcrição grande e numa pequena.
 
-    The first half of the pair is the one the flush race turns on: a transcript holding only
-    `user` and `attachment` records has no response to judge, which is not the same fact as a
-    response that has finished. An unreadable file reports neither — its caller asks `readable`.
+    A primeira metade do par é a que a corrida de flush depende: uma transcrição contendo só
+    registros `user` e `attachment` não tem resposta para julgar, o que não é o mesmo fato que uma
+    resposta que terminou. Um arquivo ilegível não reporta nenhum dos dois — seu chamador pergunta a `readable`.
     """
     try:
         with open(str(path), "rb") as handle:
@@ -689,7 +689,7 @@ def tail_state(path, max_bytes=SETTLE_TAIL):
         try:
             entry = json.loads(raw.decode("utf-8", "replace"))
         except ValueError:
-            continue  # A line still being written is not a line.
+            continue  # Uma linha ainda sendo escrita não é uma linha.
         if not isinstance(entry, dict) or entry.get("type") != "assistant":
             continue
         message = entry.get("message")
@@ -701,24 +701,24 @@ def tail_state(path, max_bytes=SETTLE_TAIL):
 
 
 def tail_settled(path, max_bytes=SETTLE_TAIL):
-    """Whether a subagent's transcript ends on a response that has finished being written."""
+    """Se a transcrição de um subagente termina numa resposta que terminou de ser escrita."""
     return tail_state(path, max_bytes)[1]
 
 
 def settled_totals(path, budget=None, step=None, clock=None, sleep=None, read_budget=None):
-    """`agent_totals` with `settled`, after a bounded wait for a finished response to land.
+    """`agent_totals` com `settled`, depois de uma espera limitada por uma resposta terminada chegar.
 
-    Only the cheap tail is polled while waiting; the transcript is summed once, afterwards, so
-    the whole wait costs one read and at most `budget` seconds however many times it looked. A
-    figure that stops moving is not taken as the end of the response — a partial streaming count
-    can repeat — so the response ending is the only thing that stops the wait early, and a wait
-    that runs out leaves the caller a figure to mark `(so far)`.
+    Só a cauda barata é consultada enquanto se espera; a transcrição é somada uma vez, depois, então
+    a espera inteira custa uma leitura e no máximo `budget` segundos por quantas vezes olhou. Um
+    número que para de se mover não é tomado como o fim da resposta — uma contagem parcial de streaming
+    pode repetir — então o fim da resposta é a única coisa que interrompe a espera antecipadamente, e uma espera
+    que se esgota deixa ao chamador um número para marcar `(so far)`.
 
-    No response at all yet is waited on the same way, and is what the wait is mostly for: a stop
-    fires while the agent's transcript still holds only the records the parent wrote into it.
-    A transcript that is not there is not waited on — no wait makes a missing file appear — and
-    a readable one that never gains a response returns None, which its caller reports as spend
-    not yet recorded rather than as spend unknown.
+    Nenhuma resposta ainda também é esperada da mesma forma, e é para isso que a espera serve principalmente: um stop
+    dispara enquanto a transcrição do agente ainda mantém só os registros que o pai escreveu nela.
+    Uma transcrição que não está lá não é esperada — nenhuma espera faz um arquivo faltando aparecer — e
+    uma legível que nunca ganha uma resposta retorna None, que seu chamador reporta como gasto
+    ainda não registrado em vez de gasto desconhecido.
     """
     if not readable(path):
         return None
@@ -737,19 +737,19 @@ def settled_totals(path, budget=None, step=None, clock=None, sleep=None, read_bu
     return totals
 
 
-#: What one agent's report-time sum came to. A totals dict is a figure; these two are not.
+#: A que a soma de um agente no momento do relatório chegou. Um dict de totais é um número; estes dois não são.
 PENDING = "pending"
 ABSENT = "absent"
 
 
 def settle_many(items, budget=None, clock=None, sleep=None):
-    """`{agent id: totals | PENDING | ABSENT}` for as many of `items` as one budget allows.
+    """`{agent id: totals | PENDING | ABSENT}` para quantos de `items` um orçamento permitir.
 
-    This is the whole cost of summing at report time, and it is spent once per event rather than
-    once per agent: a turn that retires eight subagents must not wait eight times. Each agent is
-    given what is left of the budget, and an agent the budget never reaches is simply absent from
-    the result — its stop keeps its place and is summed at the next event instead of this one
-    blowing the hook's timeout. Called before the lock is taken, never under it.
+    Este é o custo inteiro de somar no momento do relatório, e é gasto uma vez por evento em vez de
+    uma vez por agente: um turno que finaliza oito subagentes não deve esperar oito vezes. A cada agente é
+    dado o que resta do orçamento, e um agente que o orçamento nunca alcança está simplesmente ausente do
+    resultado — seu stop mantém seu lugar e é somado no próximo evento em vez deste
+    estourar o timeout do hook. Chamado antes da trava ser tomada, nunca sob ela.
     """
     clock = time.monotonic if clock is None else clock
     budget = REPORT_BUDGET if budget is None else budget
@@ -762,10 +762,10 @@ def settle_many(items, budget=None, clock=None, sleep=None):
             out[agent_id] = ABSENT
             continue
         left = deadline - clock()
-        # An agent is given at most half of what is left to wait and half to read, so the whole
-        # pass lands inside the budget whatever order the agents came in. Below the floor it is
-        # not attempted at all: a sum cut off after a tenth of a second would report a figure
-        # that exists as one that has not landed yet, which is worse than reporting it later.
+        # A um agente é dado no máximo metade do que resta para esperar e metade para ler, então a passagem
+        # inteira cabe dentro do orçamento seja qual for a ordem em que os agentes vieram. Abaixo do piso não
+        # é sequer tentado: uma soma cortada depois de um décimo de segundo reportaria um número
+        # que existe como um que ainda não chegou, o que é pior que reportá-lo depois.
         if left < REPORT_SLICE and out:
             break
         slice_ = max(left, REPORT_SLICE) / 2.0
@@ -776,7 +776,7 @@ def settle_many(items, budget=None, clock=None, sleep=None):
 
 
 def agent_name(value, fallback="unknown"):
-    """An agent type fit to inject and to journal. Free text becomes `other`, never itself."""
+    """Um tipo de agente pronto para injetar e para o diário. Texto livre vira `other`, nunca ele mesmo."""
     if value is None or value == "":
         return fallback
     if isinstance(value, str) and AGENT_NAME.match(value):
@@ -788,11 +788,11 @@ def agent_name(value, fallback="unknown"):
 
 
 def journal_records(journal_file, offset):
-    """Every whole record past `offset`, read and nothing else.
+    """Cada registro inteiro após `offset`, lido e nada mais.
 
-    `ingest` folds the same bytes into the locked state. This is the read that happens before
-    the lock, so the event knows which stops it is about to name and can sum them while nobody
-    is waiting on it.
+    `ingest` dobra os mesmos bytes para dentro do estado travado. Esta é a leitura que acontece antes
+    da trava, então o evento sabe quais stops está prestes a nomear e pode somá-los enquanto ninguém
+    está esperando por isso.
     """
     out = []
     try:
@@ -814,12 +814,12 @@ def journal_records(journal_file, offset):
 
 
 def needs_sum(record):
-    """Whether a journalled stop's figure is one to take as final.
+    """Se o número de um stop registrado no diário é um a se tomar como final.
 
-    Two stops are not: the one whose sum could not be made when it fired — the flush race, where
-    no response had been written yet — and the one whose figure was read out of a response still
-    being written or out of a transcript a cap cut short. Both are summed again when the agent
-    is reported.
+    Dois stops não são: aquele cuja soma não pôde ser feita quando disparou — a corrida de flush, onde
+    nenhuma resposta tinha sido escrita ainda — e aquele cujo número foi lido de uma resposta ainda
+    sendo escrita ou de uma transcrição que um teto cortou pela metade. Ambos são somados de novo quando o agente
+    é reportado.
     """
     if record.get("t") != "stop":
         return False
@@ -827,18 +827,18 @@ def needs_sum(record):
 
 
 def record_path(record, payload, env):
-    """Where a journalled stop's transcript is: what it wrote down, or where it would be."""
+    """Onde está a transcrição de um stop registrado no diário: o que ele anotou, ou onde estaria."""
     agent_id = record.get("id")
     return expand(record.get("path"), env, agent_id) or agent_transcript(
         payload.get("transcript_path"), payload.get("session_id"), agent_id)
 
 
 def to_settle(state, journal_file, payload, env, first=None):
-    """`[(agent id, path)]` worth summing before this event takes the lock, `first` at the head.
+    """`[(agent id, path)]` que valem a pena somar antes deste evento tomar a trava, `first` à frente.
 
-    Three sources, in the order they are worth the budget: the agent this event is returning,
-    the stops of earlier events that are still without a figure, and the stops this event is
-    about to ingest. A retry that has had its tries is dropped rather than asked again.
+    Três fontes, na ordem em que valem o orçamento: o agente que este evento está retornando,
+    os stops de eventos anteriores que ainda estão sem número, e os stops que este evento está
+    prestes a ingerir. Uma tentativa que já esgotou suas chances é descartada em vez de perguntada de novo.
     """
     items = [first] if first and first[0] else []
     seen = {agent for agent, _ in items}
@@ -870,13 +870,13 @@ def to_settle(state, journal_file, payload, env, first=None):
 
 
 def settle_before_lock(state_file, journal_file, payload, env, first=None):
-    """The whole of the slow work one main-thread event does, done with no lock held."""
+    """A totalidade do trabalho lento que um evento de thread principal faz, feito sem nenhuma trava mantida."""
     return settle_many(to_settle(load_state(state_file), journal_file, payload, env, first))
 
 
 def apply_settled(record, outcome):
-    """One report-time sum onto the stop it belongs to. A figure replaces a figure; nothing else
-    takes one away — a journalled partial is better than no number at all."""
+    """Uma soma no momento do relatório sobre o stop a que pertence. Um número substitui um número; nada
+    tira um — um parcial registrado no diário é melhor que nenhum número."""
     if isinstance(outcome, dict):
         record["output"], record["tool_calls"] = outcome["output"], outcome["tool_calls"]
         record["partial"] = bool(outcome.get("partial"))
@@ -885,22 +885,22 @@ def apply_settled(record, outcome):
         record.pop("not_yet", None)
         return record
     if record.get("output") is None and record.get("tool_calls") is None:
-        # A transcript that is not there is the only outcome that is final. Readable and still
-        # holding no response, and an agent the budget never reached, are both worth asking again.
+        # Uma transcrição que não está lá é o único desfecho que é final. Legível e ainda
+        # sem resposta, e um agente que o orçamento nunca alcançou, ambos valem a pena perguntar de novo.
         record["not_yet"] = outcome != ABSENT
     return record
 
 
 def ingest(state, journal_file, resolved=None):
-    """Fold the journal's new bytes into the locked state: running, pending and the totals.
+    """Dobra os novos bytes do diário para dentro do estado travado: running, pending e os totais.
 
-    Only new bytes, from a saved offset, because a session long enough to outgrow one read is
-    exactly the session whose totals must not start going down. A half-written last line is left
-    unconsumed and read whole next time.
+    Só bytes novos, a partir de um offset salvo, porque uma sessão longa o bastante para superar uma
+    leitura é exatamente a sessão cujos totais não devem começar a diminuir. Uma última linha
+    escrita pela metade é deixada não consumida e lida inteira na próxima vez.
 
-    `resolved` is what `settle_before_lock` summed for this event. A stop that needed summing
-    carries that figure into the totals and into the line; one that is still without a figure is
-    counted unknown and remembered, so a later event can reconcile it without naming it twice.
+    `resolved` é o que `settle_before_lock` somou para este evento. Um stop que precisava de soma
+    carrega esse número para dentro dos totais e para dentro da linha; um que ainda está sem número é
+    contado como desconhecido e lembrado, para que um evento posterior possa reconciliá-lo sem nomeá-lo duas vezes.
     """
     resolved = resolved or {}
     try:
@@ -910,7 +910,7 @@ def ingest(state, journal_file, resolved=None):
         return state
     offset = state["journal_offset"]
     if offset > size:
-        # A journal replaced under us: re-read it rather than trust an offset into another file.
+        # Um diário substituído debaixo de nós: relê em vez de confiar num offset para dentro de outro arquivo.
         offset = 0
     position = offset
     with handle:
@@ -933,15 +933,15 @@ def ingest(state, journal_file, resolved=None):
                 continue
             state["running"].pop(agent_id, None)
             round_number = bump_round(state, agent_id)
-            # A later round's stop is never taken at the figure it was journalled with. The
-            # transcript it was read from still ends on the previous round's finished response,
-            # so `summed` says final about a round whose own responses are not on disk yet.
+            # O stop de uma rodada posterior nunca é tomado no número com que foi registrado no diário. A
+            # transcrição de onde foi lido ainda termina na resposta terminada da rodada anterior,
+            # então `summed` diz final sobre uma rodada cujas próprias respostas ainda não estão em disco.
             if needs_sum(record) or round_number > 1:
                 apply_settled(record, resolved.get(agent_id))
             if agent_id in state["counted"]:
                 if agent_id in state["unsummed"] and record.get("output") is not None:
-                    # Announced with no figure, and the journal brought one: the totals take it
-                    # and the agent is not named again.
+                    # Anunciado sem número, e o diário trouxe um: os totais o assumem
+                    # e o agente não é nomeado de novo.
                     resolve_unknown(state, agent_id, figures_of(record))
                     del state["unsummed"][agent_id]
                 elif round_number < 2:
@@ -950,8 +950,8 @@ def ingest(state, journal_file, resolved=None):
                     open_round(state, record, round_number)
                 continue
             if agent_id in (state.get("said_unknown") or []):
-                # The reader's record of this agent was lost, not the fact of it: it has been
-                # counted once and named once, and neither is owed a second time.
+                # O registro do leitor sobre este agente se perdeu, não o fato em si: ele foi
+                # contado uma vez e nomeado uma vez, e nenhum dos dois é devido uma segunda vez.
                 state["counted"].append(agent_id)
                 if has_figure(record):
                     resolve_unknown(state, agent_id, figures_of(record))
@@ -966,7 +966,7 @@ def ingest(state, journal_file, resolved=None):
 
 
 def figures_of(record):
-    """`[output, tool_calls]` as whole numbers, whatever the record put there."""
+    """`[output, tool_calls]` como inteiros, seja lá o que o registro colocou ali."""
     out = []
     for key in ("output", "tool_calls"):
         try:
@@ -977,20 +977,20 @@ def figures_of(record):
 
 
 def risen(record):
-    """Whether a later round's cumulative figure has passed the one already reported.
+    """Se o número cumulativo de uma rodada posterior ultrapassou o já reportado.
 
-    It is the only thing that says a resumed agent's round is on disk. The sum covers every
-    round the agent has run, and the transcript ends on a finished response either way, so a
-    total that has not moved is a round whose responses have not been flushed yet.
+    É a única coisa que diz que a rodada de um agente retomado está em disco. A soma cobre toda
+    rodada que o agente rodou, e a transcrição termina numa resposta terminada de qualquer forma, então um
+    total que não se moveu é uma rodada cujas respostas ainda não foram gravadas.
     """
     return has_figure(record) and figures_of(record)[0] > record.get("floor", 0)
 
 
 def open_round(state, record, round_number):
-    """One completion of a resumed agent: kept until its own spend has landed, then named.
+    """Uma conclusão de um agente retomado: mantida até seu próprio gasto chegar, então nomeada.
 
-    Until it has, the record is re-summed at every event and nothing at all is said about it —
-    a line repeating the previous round's figure would be worse than a line a prompt later.
+    Até que chegue, o registro é re-somado a cada evento e nada é dito sobre ele —
+    uma linha repetindo o número da rodada anterior seria pior que uma linha um prompt depois.
     """
     record["round"] = round_number
     record["floor"] = (state["figures"].get(record.get("id")) or [0, 0])[0]
@@ -1003,11 +1003,11 @@ def open_round(state, record, round_number):
 
 
 def reconcile_rounds(state, resolved):
-    """Fold this event's sums into the later rounds whose own spend had not landed yet.
+    """Dobra as somas deste evento nas rodadas posteriores cujo próprio gasto ainda não tinha chegado.
 
-    A round is accepted the moment its figure passes the one already reported, and is named from
-    the pending list like any other. A transcript that has gone, and a round that has had its
-    tries, are dropped: nothing was ever said about either, so nothing has to be taken back.
+    Uma rodada é aceita no momento em que seu número ultrapassa o já reportado, e é nomeada a partir da
+    lista pending como qualquer outra. Uma transcrição que sumiu, e uma rodada que já esgotou suas
+    tentativas, são descartadas: nada foi jamais dito sobre nenhuma delas, então nada precisa ser retirado.
     """
     for record in list(state.get("pending") or []):
         if not record.get("awaiting"):
@@ -1024,17 +1024,17 @@ def reconcile_rounds(state, resolved):
 
 
 def has_figure(record):
-    """Whether a stop carries a number at all. Null counts are a sum that could not be made."""
+    """Se um stop carrega número nenhum, ponto final. Contagens nulas são uma soma que não pôde ser feita."""
     return not (record.get("output") is None and record.get("tool_calls") is None)
 
 
 def bump_round(state, agent_id):
-    """Which completion of this agent a journalled stop is, counting from one.
+    """Qual conclusão deste agente um stop registrado no diário é, contando a partir de um.
 
-    An agent resumed with a follow-up message stops once per round, against one agent id and one
-    transcript, so every round after the first was folded into the totals and never named: only
-    its first completion fed a line. The stop count is what tells a resumed round apart from the
-    settled copy of a round already reported — that one is still the same, first, stop.
+    Um agente retomado com uma mensagem de acompanhamento para uma vez por rodada, contra um id de agente e uma
+    transcrição, então toda rodada depois da primeira foi dobrada para dentro dos totais e nunca nomeada: só
+    a primeira conclusão dele alimentou uma linha. A contagem de stops é o que distingue uma rodada retomada da
+    cópia estabelecida de uma rodada já reportada — essa ainda é o mesmo, primeiro, stop.
     """
     rounds = state.setdefault("rounds", {})
     number = rounds.get(agent_id)
@@ -1044,7 +1044,7 @@ def bump_round(state, agent_id):
 
 
 def count(state, record):
-    """One finished agent against the session's subagent totals, exactly once."""
+    """Um agente terminado contra os totais de subagente da sessão, exatamente uma vez."""
     totals = state["subagents"]
     totals["count"] += 1
     if record.get("output") is None and record.get("tool_calls") is None:
@@ -1061,13 +1061,13 @@ def count(state, record):
 
 
 def reconcile(state, record):
-    """Raise the totals when a later, settled figure for an already-reported agent is larger.
+    """Eleva os totais quando um número posterior, estabelecido, para um agente já reportado é maior.
 
-    A synchronous return is reported at the moment it lands, which may be before the subagent's
-    last response was fully written. The journal's stop, computed later, is the settled figure:
-    saying the agent's line again would cost the orchestrator context for a number it already
-    has, so only the difference is added, and the session total is therefore never below the sum
-    of the final figures.
+    Um retorno síncrono é reportado no momento em que chega, o que pode ser antes da última
+    resposta do subagente ter sido totalmente escrita. O stop do diário, calculado depois, é o número
+    estabelecido: dizer a linha do agente de novo custaria contexto do orquestrador por um número que ele já
+    tem, então só a diferença é adicionada, e o total da sessão portanto nunca fica abaixo da soma
+    dos números finais.
     """
     agent_id = record.get("id")
     before = state["figures"].get(agent_id)
@@ -1082,11 +1082,11 @@ def reconcile(state, record):
 
 
 def remember_unsummed(state, agent_id, path):
-    """Keep an agent reported without a figure on the list a later event retries.
+    """Mantém um agente reportado sem número na lista que um evento posterior tenta de novo.
 
-    It has been counted — as unknown, so the session line says `(partial)` — and it has been
-    named, so it must never be named again. What is left is its number, and the retry exists so
-    that a transcript which gains its response a second later still reaches the session totals.
+    Ele foi contado — como desconhecido, então a linha da sessão diz `(partial)` — e foi
+    nomeado, então nunca deve ser nomeado de novo. O que resta é seu número, e a nova tentativa existe para
+    que uma transcrição que ganha sua resposta um segundo depois ainda chegue aos totais da sessão.
     """
     entry = state["unsummed"].get(agent_id)
     tries = entry[1] + 1 if isinstance(entry, list) else 1
@@ -1094,7 +1094,7 @@ def remember_unsummed(state, agent_id, path):
 
 
 def resolve_unknown(state, agent_id, figures):
-    """A figure that landed after its agent was counted unknown. The totals rise; nothing is said."""
+    """Um número que chegou depois que seu agente foi contado como desconhecido. Os totais sobem; nada é dito."""
     totals = state["subagents"]
     if totals["unknown"] > 0:
         totals["unknown"] -= 1
@@ -1104,12 +1104,12 @@ def resolve_unknown(state, agent_id, figures):
 
 
 def reconcile_unsummed(state, resolved):
-    """Fold this event's sums into the agents earlier events could not put a number on.
+    """Dobra as somas deste evento nos agentes em que eventos anteriores não conseguiram colocar um número.
 
-    None of them is named again: they were announced when they finished. A transcript that has
-    turned out not to exist stops being asked about, and so does one that has been asked about
-    `UNSUMMED_TRIES` times; both stay counted unknown, which is what the `(partial)` on the
-    session line is for.
+    Nenhum deles é nomeado de novo: foram anunciados quando terminaram. Uma transcrição que se
+    revelou inexistente para de ser perguntada, e o mesmo vale para uma que já foi perguntada
+    `UNSUMMED_TRIES` vezes; ambas permanecem contadas como desconhecidas, que é para o que o `(partial)` na
+    linha da sessão serve.
     """
     for agent_id, entry in list(state["unsummed"].items()):
         outcome = resolved.get(agent_id)
@@ -1126,7 +1126,7 @@ def reconcile_unsummed(state, resolved):
 
 
 def running_now(state, now=None):
-    """The agents still in flight, forgetting a start whose stop never came."""
+    """Os agentes ainda em voo, esquecendo um start cujo stop nunca chegou."""
     now = time.time() if now is None else now
     stale = [agent for agent, at in state["running"].items() if now - (at or 0) > RUNNING_TTL]
     for agent in stale:
@@ -1138,7 +1138,7 @@ def running_now(state, now=None):
 
 
 def settings(env):
-    """`(table, mode, nudges, width)` from the active cost variant, or the silent default."""
+    """`(table, mode, nudges, width)` a partir da variante de custo ativa, ou o padrão silencioso."""
     module = sibling("posture")
     if module is None:
         return None, "off", [], None
@@ -1158,7 +1158,7 @@ def settings(env):
 
 
 def session_nudges(table):
-    """The context sizes the posture calls a full session, smallest first; empty means silent."""
+    """Os tamanhos de contexto que a postura chama de sessão cheia, menor primeiro; vazio significa silencioso."""
     switches = table.get("switches") if isinstance(table, dict) else None
     switches = switches if isinstance(switches, dict) else {}
     return sorted(v for v in switches.get("session_nudge_at") or []
@@ -1166,7 +1166,7 @@ def session_nudges(table):
 
 
 def budgets(row):
-    """The row's two soft budgets, each only when it is a positive whole number."""
+    """Os dois orçamentos suaves da linha, cada um só quando é um número inteiro positivo."""
     if not isinstance(row, dict):
         return None, None
     out = []
@@ -1179,23 +1179,23 @@ def budgets(row):
 
 def agent_line(agent_type, output, calls, row, nudges, partial=False, provisional=False,
                not_yet=False, agent_id=None, round_number=1):
-    """`(line, ratio)` for one finished subagent; ratio is None when there is nothing to compare.
+    """`(line, ratio)` para um subagente terminado; ratio é None quando não há nada para comparar.
 
-    Null counts are what a sum that could not be computed leaves behind, and the line says so:
-    an agent reported at zero would read as an agent that did nothing. Which of the two things
-    it says is the difference between a transcript that is not there — `spend unknown`, final —
-    and one that is there and had no response written into it yet, whose figure a later turn can
-    still reconcile into the session totals. A row that budgets one
-    half of the unit names that half, because `n / None` would read as a figure to act on.
-    `provisional` is the figure of a response still being written: `(so far)`, never a number
-    presented as exact. `(partial)` subsumes it — a sum that was cut short is the larger caveat.
+    Contagens nulas são o que uma soma que não pôde ser calculada deixa para trás, e a linha diz isso:
+    um agente reportado em zero se leria como um agente que não fez nada. Qual das duas coisas
+    ela diz é a diferença entre uma transcrição que não está lá — `spend unknown`, final —
+    e uma que está lá e ainda não teve resposta escrita nela, cujo número um turno posterior ainda pode
+    reconciliar nos totais da sessão. Uma linha que orça só
+    metade da unidade nomeia essa metade, porque `n / None` se leria como um número para agir sobre.
+    `provisional` é o número de uma resposta ainda sendo escrita: `(so far)`, nunca um número
+    apresentado como exato. `(partial)` o inclui — uma soma que foi cortada pela metade é a ressalva maior.
 
-    `spend unknown` names the agent it is about, because it is the one line that carries no figure
-    to tell two of them apart: a session that emitted it once an hour and a session emitting it
-    every turn read identically until the id was in it.
+    `spend unknown` nomeia o agente sobre o qual fala, porque é a única linha que não carrega número
+    para distinguir duas: uma sessão que a emitiu uma vez por hora e uma sessão emitindo-a
+    a cada turno pareceriam idênticas até o id estar nela.
 
-    A round past the first is one completion of a resumed agent, and its figure is its whole
-    transcript rather than that round alone, so the line says `(cumulative)`.
+    Uma rodada além da primeira é uma conclusão de um agente retomado, e seu número é sua transcrição
+    inteira em vez de só aquela rodada, então a linha diz `(cumulative)`.
     """
     if output is None and calls is None:
         if not_yet:
@@ -1232,7 +1232,7 @@ def agent_line(agent_type, output, calls, row, nudges, partial=False, provisiona
 
 
 def width_line(running, width):
-    """One line when more agents are in flight than the posture's width. Never a decision."""
+    """Uma linha quando mais agentes estão em voo do que a largura da postura. Nunca uma decisão."""
     if width is None or len(running) <= width:
         return None
     return (PREFIX + plural(len(running), "subagent") + " running against a posture width of "
@@ -1240,12 +1240,12 @@ def width_line(running, width):
 
 
 def turn_line(state):
-    """The turn and the session so far, or None when it would say nothing new.
+    """O turno e a sessão até agora, ou None quando não diria nada novo.
 
-    A session's first prompt has no turn behind it, and a background agent's completion arrives
-    as a prompt of its own — several in a row, all reporting the turn before them. Repeating a
-    line the orchestrator has already read costs context and teaches it to skip the feed, so the
-    figures last printed are remembered and an unchanged turn is silence.
+    O primeiro prompt de uma sessão não tem turno atrás dele, e a conclusão de um agente em segundo
+    plano chega como um prompt próprio — vários em fileira, todos reportando o turno antes deles. Repetir uma
+    linha que o orquestrador já leu custa contexto e o ensina a pular o feed, então os
+    números impressos por último são lembrados e um turno inalterado é silêncio.
     """
     last = state["turn"] if (state["turn"]["output"] or state["turn"]["tool_calls"]) \
         else state["previous_turn"]
@@ -1265,21 +1265,21 @@ def turn_line(state):
 
 
 def session_line(state, thresholds):
-    """One line the first time the session's context passes a threshold, or None.
+    """Uma linha na primeira vez que o contexto da sessão passa de um limiar, ou None.
 
-    The turn line reports what a turn produced. What a long session costs is mostly the context
-    every further turn re-reads, which no figure in the feed shows, so this is the one line that
-    says continuing here is the expensive choice. It is soft: nothing is blocked.
+    A linha de turno reporta o que um turno produziu. O que uma sessão longa custa é sobretudo o contexto
+    que todo turno seguinte relê, o que nenhum número no feed mostra, então esta é a única linha que
+    diz que continuar aqui é a escolha cara. É suave: nada é bloqueado.
 
-    Once per threshold, never once per turn. Every threshold at or below the current size is
-    marked said, so a session that stays above one is silent until it reaches the next, and a
-    resume reads the same marks out of the same state file. A threshold the context has since
-    fallen back under is unmarked, because a compaction that halved the session and an hour of
-    work that filled it again is a crossing the orchestrator has not been told about.
+    Uma vez por limiar, nunca uma vez por turno. Todo limiar em ou abaixo do tamanho atual é
+    marcado como dito, então uma sessão que fica acima de um fica silenciosa até alcançar o próximo, e um
+    resume lê as mesmas marcas do mesmo arquivo de estado. Um limiar sob o qual o contexto desde então
+    voltou é desmarcado, porque uma compactação que reduziu a sessão pela metade e uma hora de
+    trabalho que a encheu de novo é uma travessia sobre a qual o orquestrador não foi informado.
 
-    A size no transcript line has supplied yet is not a crossing: the line would name a
-    threshold nothing was measured against, and reporting the context of an unread transcript
-    as zero would be a lie either way.
+    Um tamanho que nenhuma linha de transcrição ainda forneceu não é uma travessia: a linha nomearia um
+    limiar contra o qual nada foi medido, e reportar o contexto de uma transcrição não lida
+    como zero seria uma mentira de qualquer forma.
     """
     size = state.get("context")
     if not thresholds or not isinstance(size, int) or isinstance(size, bool) or size <= 0:
@@ -1290,15 +1290,15 @@ def session_line(state, thresholds):
     if not fresh:
         return None
     said.extend(fresh)
-    # The largest of the ones newly crossed, which is not the largest passed: a threshold
-    # already said is not news, and naming it would read as a line repeating itself.
+    # O maior dos recém-atravessados, que não é o maior ultrapassado: um limiar
+    # já dito não é novidade, e nomeá-lo se leria como uma linha se repetindo.
     return (PREFIX + "session context " + plural(size, "token") + ", past the fresh-session "
             "threshold of " + "{:,}".format(fresh[-1]) + " — finish the task, write the "
             "handoff, start a fresh session")
 
 
 def record_adherence(recommendation, session_id, turn, env):
-    """Record a recommendation this feed emitted. Nothing it does can change what the feed says."""
+    """Registra uma recomendação que este feed emitiu. Nada que faz pode mudar o que o feed diz."""
     module = sibling("adherence")
     if module is None:
         return
@@ -1309,7 +1309,7 @@ def record_adherence(recommendation, session_id, turn, env):
 
 
 def shows(mode, ratio, nudges):
-    """Whether a subagent's line is worth a line. `thresholds` wants the smallest nudge met."""
+    """Se a linha de um subagente vale uma linha. `thresholds` quer o menor empurrão atendido."""
     if mode == "every-turn":
         return True
     if mode != "thresholds" or not nudges or ratio is None:
@@ -1337,22 +1337,22 @@ def stop_line(table, nudges, record):
 
 
 def unknown_final(record):
-    """A stop whose spend nothing is going to recover: `spend unknown`, not `not yet recorded`."""
+    """Um stop cujo gasto nada vai recuperar: `spend unknown`, não `not yet recorded`."""
     return not has_figure(record) and not record.get("not_yet")
 
 
 def said_unknown(state, record):
-    """Whether this agent's `spend unknown` has already been fed, so it is never fed twice.
+    """Se o `spend unknown` deste agente já foi alimentado, para que nunca seja alimentado duas vezes.
 
-    The line carries no figure and cannot be reconciled, so nothing about the agent will ever
-    change it. Repeating it turn after turn — what a session whose reader state was rebuilt used
-    to do — spends the orchestrator's context on a fact it read the first time.
+    A linha não carrega número e não pode ser reconciliada, então nada sobre o agente jamais a
+    mudará. Repeti-la turno após turno — o que uma sessão cujo estado do leitor foi reconstruído costumava
+    fazer — gasta o contexto do orquestrador num fato que ele leu na primeira vez.
     """
     return unknown_final(record) and record.get("id") in (state.get("said_unknown") or [])
 
 
 def note_unknown(state, record):
-    """Remember a `spend unknown` that has just been fed, bounded like every other list here."""
+    """Lembra um `spend unknown` que acabou de ser alimentado, limitado como toda outra lista aqui."""
     if not unknown_final(record) or not isinstance(record.get("id"), str):
         return
     already = state.setdefault("said_unknown", [])
@@ -1360,15 +1360,15 @@ def note_unknown(state, record):
         already.append(record["id"])
 
 
-#: What the feed's numbers are, said once per session so they cannot be read as another measure.
-#: Reported live: one agent's line said 31,121 output tokens beside a task notification's
-#: `subagent_tokens 102398`, and both were right about different things.
+#: O que os números do feed são, dito uma vez por sessão para que não sejam lidos como outra medida.
+#: Reportado ao vivo: a linha de um agente dizia 31.121 tokens de saída ao lado do `subagent_tokens
+#: 102398` de uma notificação de tarefa, e ambos estavam certos sobre coisas diferentes.
 MEASURE = (PREFIX + "figures above are output tokens and tool calls summed from each agent's own "
            "transcript — not the task notification's subagent_tokens, which is another measure.")
 
 
 def legend(state):
-    """The measure line, the first time this session feeds a figure, and never again."""
+    """A linha de medida, na primeira vez que esta sessão alimenta um número, e nunca mais."""
     if state.get("said_measure"):
         return None
     state["said_measure"] = True
@@ -1379,19 +1379,19 @@ def legend(state):
 
 
 def on_subagent_event(payload, env, kind):
-    """Journal one subagent lifecycle event. Never emits and never takes the lock.
+    """Registra um evento de ciclo de vida de subagente no diário. Nunca emite e nunca toma a trava.
 
-    `SubagentStop`'s own `additionalContext` would reach the agent that has just finished, so
-    there is nothing to say here even when there is something to record. The stop is written in
-    a `finally`: an agent whose stop never landed would be counted as running for the rest of
-    the session, so a stop with nothing in it beats no stop at all.
+    O próprio `additionalContext` de `SubagentStop` chegaria ao agente que acabou de terminar, então
+    não há nada a dizer aqui mesmo quando há algo a registrar. O stop é escrito num
+    `finally`: um agente cujo stop nunca chegou seria contado como rodando pelo resto
+    da sessão, então um stop sem nada nele vence nenhum stop.
 
-    Nothing here waits. A stop fires the instant the agent ends, which can be before a single one
-    of its responses has been flushed to its transcript, and this event has no one to tell. So
-    the figure it can see is recorded as the figure it can see, and `summed` says whether that is
-    a number to trust: an empty read, or one taken out of a response still being written, is
-    journalled as not yet summed and the report-time sum makes it good. The transcript is
-    written down with the home prefix redacted so the reporter can find it again.
+    Nada aqui espera. Um stop dispara no instante em que o agente termina, o que pode ser antes de sequer
+    uma das suas respostas ter sido gravada em sua transcrição, e este evento não tem a quem contar. Então
+    o número que consegue ver é registrado como o número que consegue ver, e `summed` diz se isso é
+    um número em que confiar: uma leitura vazia, ou uma tirada de uma resposta ainda sendo escrita, é
+    registrada no diário como ainda não somada e a soma no momento do relatório a torna boa. A transcrição é
+    anotada com o prefixo home ofuscado para que o repórter possa encontrá-la de novo.
     """
     if payload.get("stop_hook_active"):
         return None
@@ -1427,9 +1427,9 @@ def on_subagent_event(payload, env, kind):
 
 
 def emit(state, lines, record, line):
-    """Add one subagent's line, unless it is a `spend unknown` this session has already said.
+    """Adiciona a linha de um subagente, a menos que seja um `spend unknown` que esta sessão já disse.
 
-    Returns whether the line carried a figure, which is what the measure line is owed to.
+    Retorna se a linha carregava um número, que é para o que a linha de medida é devida.
     """
     if said_unknown(state, record):
         return False
@@ -1439,12 +1439,12 @@ def emit(state, lines, record, line):
 
 
 def refresh(state_file, journal_file, resolved):
-    """The session's state with this event's sums folded in: the retries first, then the journal.
+    """O estado da sessão com as somas deste evento dobradas: as tentativas primeiro, depois o diário.
 
-    In that order because the two lists must not touch each other's work. A retry belongs to an
-    agent an earlier event already named; a stop the journal brings now has never been named.
-    Folding the journal first would hand a stop's brand-new retry entry straight to the retry
-    pass, which would count its one attempt twice.
+    Nessa ordem porque as duas listas não devem tocar no trabalho uma da outra. Uma tentativa pertence a um
+    agente que um evento anterior já nomeou; um stop que o diário traz agora nunca foi nomeado.
+    Dobrar o diário primeiro entregaria a entrada de tentativa nova em folha de um stop direto para a passagem
+    de tentativa, que contaria sua única tentativa duas vezes.
     """
     state = load_state(state_file)
     reconcile_unsummed(state, resolved)
@@ -1453,12 +1453,12 @@ def refresh(state_file, journal_file, resolved):
 
 
 def fresh_record(agent_id, response, outcome):
-    """The stop record a synchronous return makes for itself, or None when there is nothing to say.
+    """O registro de stop que um retorno síncrono faz para si mesmo, ou None quando não há nada a dizer.
 
-    `ABSENT` is the None: the return derives the transcript path from the session id, while the
-    stop that follows it is handed the path outright, so a file this one cannot find is a file
-    the journal may well find. Saying `spend unknown` here would retire the agent and throw that
-    away.
+    `ABSENT` é o None: o retorno deriva o caminho da transcrição a partir do id de sessão, enquanto o
+    stop que o segue recebe o caminho diretamente, então um arquivo que este não consegue encontrar é um arquivo
+    que o diário bem pode encontrar. Dizer `spend unknown` aqui aposentaria o agente e jogaria isso
+    fora.
     """
     record = {"id": agent_id, "output": None, "tool_calls": None, "partial": False,
               "type": agent_name(response.get("agentType"))}
@@ -1471,7 +1471,7 @@ def fresh_record(agent_id, response, outcome):
 
 
 def on_agent_return(payload, env):
-    """A synchronous `Agent` completion, reported once, plus the width note on any Agent call."""
+    """Uma conclusão síncrona de `Agent`, reportada uma vez, mais a nota de largura em qualquer chamada Agent."""
     response = payload.get("tool_response")
     response = response if isinstance(response, dict) else {}
     table, mode, nudges, width = settings(env)
@@ -1482,15 +1482,15 @@ def on_agent_return(payload, env):
         return None
     state_file, journal_file, lock_file = found
     agent_id = response.get("agentId")
-    # A background spawn's PostToolUse fires at launch with no totals at all; only the width
-    # note applies to it.
+    # O PostToolUse de um spawn em segundo plano dispara no lançamento sem totais nenhum; só a nota
+    # de largura se aplica a ele.
     synchronous = (not response.get("isAsync") and response.get("status") == "completed"
                    and isinstance(agent_id, str) and IDENTIFIER.match(agent_id))
-    # Before the lock, always: this is the one slow thing either main-thread event does, and a
-    # prompt waiting behind it would run out its wait and lose its line. The returning agent goes
-    # first, and whatever is left of the budget sums the stops this event is about to name. A
-    # launch names none of them — its only line is the width note — so it sums nothing and stays
-    # as quick as it was; what it ingests meanwhile is reconciled by the prompt that reports it.
+    # Antes da trava, sempre: esta é a única coisa lenta que qualquer evento de thread principal faz, e um
+    # prompt esperando atrás dele esgotaria sua espera e perderia sua linha. O agente retornando vai
+    # primeiro, e o que sobra do orçamento soma os stops que este evento está prestes a nomear. Um
+    # lançamento não nomeia nenhum deles — sua única linha é a nota de largura — então não soma nada e permanece
+    # tão rápido quanto era; o que ele ingere nesse meio tempo é reconciliado pelo prompt que o reporta.
     first, resolved = None, {}
     if synchronous:
         first = (agent_id, agent_transcript(payload.get("transcript_path"),
@@ -1510,9 +1510,9 @@ def on_agent_return(payload, env):
                     state["pending"].remove(record)
                     figured = emit(state, lines, record, line)
             elif agent_id not in state["counted"]:
-                # The stop has not been journalled yet. Reporting it now means counting it now,
-                # so the journal's copy is skipped when it arrives. An outcome of `ABSENT` is
-                # left to that copy instead: it is the one that was handed the transcript path.
+                # O stop ainda não foi registrado no diário. Reportá-lo agora significa contá-lo agora,
+                # então a cópia do diário é pulada quando chegar. Um desfecho de `ABSENT` é
+                # deixado para aquela cópia em vez disso: é ela que recebeu o caminho da transcrição.
                 fresh = fresh_record(agent_id, response, resolved.get(agent_id))
                 line, ratio = stop_line(table, nudges, fresh) if fresh else (None, None)
                 if fresh and shows(mode, ratio, nudges):
@@ -1534,7 +1534,7 @@ def on_agent_return(payload, env):
 
 
 def on_prompt(payload, env):
-    """The turn line, the session nudge, the width note, then the subagents that have finished."""
+    """A linha de turno, o empurrão de sessão, a nota de largura, e então os subagentes que terminaram."""
     table, mode, nudges, width = settings(env)
     if mode == "off":
         return None
@@ -1542,15 +1542,15 @@ def on_prompt(payload, env):
     if found is None:
         return None
     state_file, journal_file, lock_file = found
-    # Outside the lock, like the return's: the agents this prompt is about to name are summed
-    # before anything is held, within one budget for the lot of them.
+    # Fora da trava, como o do retorno: os agentes que este prompt está prestes a nomear são somados
+    # antes de qualquer coisa ser mantida, dentro de um orçamento para o lote inteiro.
     resolved = settle_before_lock(state_file, journal_file, payload, env)
     with Lock(lock_file) as held:
         if not held:
             return None
         state = refresh(state_file, journal_file, resolved)
-        # The session's prompt count, which an adherence event names as its turn. Before the
-        # read, so a read that gives up still counts the prompt it gave up on.
+        # A contagem de prompts da sessão, que um evento de adesão nomeia como seu turno. Antes da
+        # leitura, para que uma leitura que desiste ainda conte o prompt em que desistiu.
         state["turns"] += 1
         prune(state_file.parent, state, state_file.name.split(".", 1)[0])
         state = advance(state, payload.get("transcript_path"),
@@ -1560,7 +1560,7 @@ def on_prompt(payload, env):
             return None
         turn = turn_line(state) if mode == "every-turn" else None
         lines = [turn] if turn else []
-        # Not a subagent's line and not a figure to compare: it is said under `thresholds` too.
+        # Não é a linha de um subagente e não é um número para comparar: também é dita sob `thresholds`.
         nudge = session_line(state, session_nudges(table))
         if nudge:
             lines.append(nudge)
@@ -1571,17 +1571,17 @@ def on_prompt(payload, env):
         said = []
         for record in list(state["pending"]):
             if record.get("awaiting"):
-                continue     # a resumed round whose own spend has not landed yet
+                continue     # uma rodada retomada cujo próprio gasto ainda não chegou
             line, ratio = stop_line(table, nudges, record)
             if not shows(mode, ratio, nudges):
                 continue
             if said_unknown(state, record):
-                # Nothing will ever put a figure on it and the orchestrator has read it once.
+                # Nada jamais colocará um número nisso e o orquestrador já o leu uma vez.
                 state["pending"].remove(record)
                 continue
             said.append((record, line))
-        # Only the agents this turn actually names are retired. The cap bounds how much is said
-        # at once, so the rest are named at the next prompt rather than dropped unsaid.
+        # Só os agentes que este turno de fato nomeia são aposentados. O teto limita quanto é dito
+        # de uma vez, então o resto é nomeado no próximo prompt em vez de descartado sem ser dito.
         figured = False
         for record, line in said[:MAX_LISTED]:
             state["pending"].remove(record)
@@ -1597,11 +1597,11 @@ def on_prompt(payload, env):
 
 
 def run(payload, env=None):
-    """The lines one event produces, or None. The parent thread is the only place a feed runs."""
+    """As linhas que um evento produz, ou None. A thread pai é o único lugar onde um feed roda."""
     env = os.environ if env is None else env
     kind = payload.get("hook_event_name") or ""
     if kind in ("SubagentStop", "SubagentStart"):
-        # The only events whose `agent_id` names somebody else: they fire in the parent's hooks.
+        # Os únicos eventos cujo `agent_id` nomeia outra pessoa: eles disparam nos hooks do pai.
         return on_subagent_event(payload, env, "stop" if kind == "SubagentStop" else "start")
     if payload.get("agent_id"):
         return None

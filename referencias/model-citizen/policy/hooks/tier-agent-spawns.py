@@ -1,56 +1,58 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""PreToolUse hook: apply the delegation stance to every subagent spawn, whoever wrote the brief.
+"""Hook de PreToolUse: aplica a stance de delegação a todo disparo de subagente, seja lá quem escreveu o brief.
 
-The stance's tiers travel as frontmatter on the agents the harness ships, so they reach any
-spawn that names one. A spawn that names nothing — no `subagent_type`, or `general-purpose`,
-and no `model` — is what a planning framework or a plugin produces when its skill text says
-"launch a subagent", and nothing else in the harness reaches it. This hook does. A call that
-names an agent definition or passes `model` is left as it was, with one exception: the
-strongest class is reached through a role that declares it, never by request. A spawn that
-asks for it by `model` gets the model its agent definition names instead, or the class below
-when there is no definition to read — so neither an orchestrator nor a framework's skill text
-("run reviewers at the session's capability") can put ad-hoc work on the scarcest tier. The
-request is rewritten, never removed: a rewrite survives composition with other hooks.
+Os níveis da stance viajam como frontmatter nos agentes que o harness distribui, então alcançam
+qualquer disparo que nomeie um. Um disparo que não nomeia nada — sem `subagent_type`, ou
+`general-purpose`, e sem `model` — é o que um framework de planejamento ou um plugin produz
+quando o texto da sua skill diz "lance um subagente", e nada mais no harness o alcança. Este hook
+alcança. Uma chamada que nomeia uma definição de agente ou passa `model` é deixada como estava,
+com uma exceção: a classe mais forte é alcançada através de um papel que a declara, nunca por
+pedido. Um disparo que pede por ela via `model` recebe em vez disso o modelo que sua definição de
+agente nomeia, ou a classe abaixo quando não há definição para ler — para que nem um
+orquestrador nem o texto de skill de um framework ("rode revisores na capacidade da sessão")
+consiga colocar trabalho ad-hoc no nível mais escasso. O pedido é reescrito, nunca removido: uma
+reescrita sobrevive à composição com outros hooks.
 
-What a bare spawn gets depends on the `delegation` stance, which `posture.py` resolves for
-every hook alike:
+O que um disparo nu recebe depende da stance `delegation`, que `posture.py` resolve para todo
+hook igualmente:
 
-    tiered         route it to the cost variant's default band worker, on that band's class;
-                   with no default band, rewrite `model` to one tier below the session model,
-                   the weakest class on the ladder being the floor; refuse the top tier by request
-    session-model  leave it alone
-    off            deny every spawn, named or not, as the stance says; the lifecycle denies
-                   first and never invokes this hook, so this branch decides only a direct run
+    tiered         roteia-o para o band worker padrão da variante de custo, na classe daquela banda;
+                   sem banda padrão, reescreve `model` para um nível abaixo do modelo da sessão,
+                   sendo a classe mais fraca da escada o piso; recusa o nível mais alto por pedido
+    session-model  deixa-o em paz
+    off            nega todo disparo, nomeado ou não, como a stance diz; o ciclo de vida nega
+                   primeiro e nunca invoca este hook, então este ramo só decide uma execução direta
 
-The band workers exist because the `Agent` tool has no effort input: a spawn that names nothing
-inherits the session's effort, and only an agent definition can carry the posture's. So a spawn
-with no `subagent_type`, or `general-purpose`, is rewritten to `worker-a`, `worker-b` or
-`worker-c` — the variant's `default_band` — and the orchestrator that wanted a different band
-spawns that worker by name. A machine whose worker definitions are not installed is not routed
-at all: a `subagent_type` the tool cannot resolve would fail the spawn. Neither is a session
-that started before they were installed and has not been told about them since — so the reroute
-asks the session registry `posture.sessions_dir` describes and the reload the transcript
-announces, not the disk, and a reroute never turns a spawn that would have worked into one
-that fails.
+Os band workers existem porque a ferramenta `Agent` não tem entrada de esforço: um disparo que
+não nomeia nada herda o esforço da sessão, e só uma definição de agente pode carregar o da
+postura. Então um disparo sem `subagent_type`, ou `general-purpose`, é reescrito para
+`worker-a`, `worker-b` ou `worker-c` — o `default_band` da variante — e o orquestrador que
+queria uma banda diferente dispara aquele worker pelo nome. Uma máquina cujas definições de
+worker não estão instaladas não é roteada de forma alguma: um `subagent_type` que a ferramenta
+não consegue resolver falharia o disparo. Nem é uma sessão que começou antes de eles serem
+instalados e não foi avisada disso desde então — então o reroteamento pergunta ao registro de
+sessão que `posture.sessions_dir` descreve e ao recarregamento que o transcript anuncia, não ao
+disco, e um reroteamento nunca transforma um disparo que teria funcionado num que falha.
 
-The ladder is the adapter's `bindings.json` class table, strongest class first, matched as
-substrings of the model ids a transcript records; no model name is written here.
+A escada é a tabela de classes de `bindings.json` do adaptador, classe mais forte primeiro,
+comparada como substrings dos ids de modelo que um transcript registra; nenhum nome de modelo é
+escrito aqui.
 
-A repository that carries a planning framework is tiered like any other. The framework keeps
-its personas, prompts and review structure; model and effort are the harness's to choose, and
-the framework's override templates name the harness's roles where the recipe allows, which is
-what carries tools and effort.
+Um repositório que carrega um framework de planejamento é nivelado como qualquer outro. O
+framework mantém suas personas, prompts e estrutura de revisão; modelo e esforço são escolha do
+harness, e os templates de override do framework nomeiam os papéis do harness onde a receita
+permite, que é o que carrega ferramentas e esforço.
 
-The session model is read from the newest main-line assistant record in the transcript, which
-Claude Code writes once a response has started executing tools, so a spawn in a session's very
-first response is left alone: nothing else says what the session runs on (the `model` key in
-settings is a default the session may not be using). A session model the ladder does not know
-is left untouched rather than guessed, and the hook says so, because a new model name would
-otherwise switch tiering off without a sound. Never fails: every error falls through and the
-call runs as written.
+O modelo da sessão é lido do registro de assistente de linha principal mais novo no transcript,
+que o Claude Code escreve assim que uma resposta começa a executar ferramentas, então um disparo
+na primeiríssima resposta de uma sessão é deixado em paz: nada mais diz em que a sessão roda (a
+chave `model` nas settings é um padrão que a sessão pode não estar usando). Um modelo de sessão
+que a escada não conhece é deixado intocado em vez de adivinhado, e o hook diz isso, porque um
+nome de modelo novo de outra forma desligaria o nivelamento sem um som. Nunca falha: todo erro
+cai no fluxo normal e a chamada roda como foi escrita.
 
-Test: printf '%s' '{"tool_name":"Agent","tool_input":{"prompt":"x"}}' | HARNESS_STANCE_DELEGATION=off python3 tier-agent-spawns.py
+Teste: printf '%s' '{"tool_name":"Agent","tool_input":{"prompt":"x"}}' | HARNESS_STANCE_DELEGATION=off python3 tier-agent-spawns.py
 """
 import importlib.util
 import json
@@ -64,17 +66,17 @@ DEFAULT_STANCE = "tiered"
 TAIL_BYTES = 1 << 20
 HOOK = "tier-agent-spawns hook"
 AGENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
-# The two notices a session hears once rather than on every spawn: where an unnamed spawn goes,
-# and that the worker is on disk but this session's registry predates it. Both describe the
-# standing arrangement, so repeating them on each spawn is noise. A notice about something the
-# caller asked for being changed or refused stays per-occurrence.
+# Os dois avisos que uma sessão ouve uma vez em vez de a cada disparo: para onde um disparo sem
+# nome vai, e que o worker está em disco mas o registro desta sessão é anterior a ele. Ambos
+# descrevem o arranjo permanente, então repeti-los a cada disparo é ruído. Um aviso sobre algo
+# que o chamador pediu sendo mudado ou recusado continua por ocorrência.
 ROUTED_NOTICE = "routed-to-band"
 UNRESOLVABLE_NOTICE = "worker-unresolvable"
 _LOADED = {}
 
 
 def sibling(name):
-    """A module beside this hook, or None. A hook must never stop a spawn because an import failed."""
+    """Um módulo ao lado deste hook, ou None. Um hook nunca deve parar um disparo porque um import falhou."""
     try:
         spec = importlib.util.spec_from_file_location(
             "harness_" + name.replace("-", "_"), str(HOOKS / (name + ".py")))
@@ -86,14 +88,14 @@ def sibling(name):
 
 
 def posture_module():
-    """The shared sibling, loaded at most once a run: every question here asks the same copy."""
+    """O irmão compartilhado, carregado no máximo uma vez por execução: toda pergunta aqui pergunta à mesma cópia."""
     if "posture" not in _LOADED:
         _LOADED["posture"] = sibling("posture")
     return _LOADED["posture"]
 
 
 def log_route(payload, tool_input, route):
-    """Record which band an unnamed spawn was routed to. See `decisions.py`; never raises."""
+    """Registra para qual banda um disparo sem nome foi roteado. Veja `decisions.py`; nunca levanta exceção."""
     if "decisions" not in _LOADED:
         _LOADED["decisions"] = sibling("decisions")
     module = _LOADED["decisions"]
@@ -105,10 +107,10 @@ def log_route(payload, tool_input, route):
 
 
 def notice_once(session, key):
-    """Whether to say `key` in this session now; the session record is what remembers it.
+    """Se deve dizer `key` nesta sessão agora; o registro de sessão é o que o lembra.
 
-    Nothing that cannot be remembered is said, because a hook is a process per event and a
-    notice nobody records is a notice repeated on every spawn.
+    Nada que não pode ser lembrado é dito, porque um hook é um processo por evento e um aviso que
+    ninguém registra é um aviso repetido a cada disparo.
     """
     module = posture_module()
     try:
@@ -118,7 +120,7 @@ def notice_once(session, key):
 
 
 def tier_of(model, ladder):
-    """The ladder name inside a model id or alias, or None for anything the ladder lacks."""
+    """O nome de escada dentro de um id de modelo ou alias, ou None para qualquer coisa que a escada não tenha."""
     if not isinstance(model, str):
         return None
     low = model.lower()
@@ -129,7 +131,7 @@ def tier_of(model, ladder):
 
 
 def transcript_model(path):
-    """The model on the newest main-line assistant record, reading only the transcript's tail."""
+    """O modelo no registro de assistente de linha principal mais novo, lendo só o final do transcript."""
     if not path:
         return None
     try:
@@ -151,18 +153,18 @@ def transcript_model(path):
             continue
         message = record.get("message")
         model = message.get("model") if isinstance(message, dict) else None
-        # Placeholder records ("<synthetic>") name no model; anything else is the session's, known or not.
+        # Registros de placeholder ("<synthetic>") não nomeiam modelo; qualquer outra coisa é o da sessão, conhecido ou não.
         if isinstance(model, str) and model and not model.startswith("<"):
             return model
     return None
 
 
 def agents_dirs(cwd):
-    """`(project directories, the user's)` where Claude Code resolves an agent definition.
+    """`(diretórios de projeto, o do usuário)` onde o Claude Code resolve uma definição de agente.
 
-    Project before user, which is the tool's own precedence. `posture.user_agents_dir` holds the
-    user directory's rule, so this hook and the SessionStart policy read one directory; the same
-    expression stands in for the run where that sibling would not import.
+    Projeto antes de usuário, que é a própria precedência da ferramenta. `posture.user_agents_dir`
+    guarda a regra do diretório do usuário, então este hook e a política de SessionStart leem um
+    único diretório; a mesma expressão substitui na execução onde aquele irmão não importaria.
     """
     module = posture_module()
     if module is not None:
@@ -174,11 +176,12 @@ def agents_dirs(cwd):
 
 
 def definition(kind, cwd):
-    """The frontmatter of the definition a spawn of this type would resolve, or None.
+    """O frontmatter da definição que um disparo deste tipo resolveria, ou None.
 
-    One reader for every question this hook asks of an agent definition, so "which file would
-    the tool use" is answered once. A file that exists but will not parse ends the search the
-    way it always has: the tool would resolve it, so no weaker root stands in for it.
+    Um leitor para toda pergunta que este hook faz sobre uma definição de agente, para que "qual
+    arquivo a ferramenta usaria" seja respondida uma vez. Um arquivo que existe mas não parseia
+    encerra a busca do jeito que sempre encerrou: a ferramenta o resolveria, então nenhuma raiz
+    mais fraca o substitui.
     """
     if not isinstance(kind, str) or not AGENT_NAME.fullmatch(kind):
         return None
@@ -198,13 +201,13 @@ def definition(kind, cwd):
 
 
 def defined_tier(kind, cwd, ladder):
-    """The ladder name an agent definition's `model:` line carries, project before user, or None."""
+    """O nome de escada que a linha `model:` de uma definição de agente carrega, projeto antes de usuário, ou None."""
     fields = definition(kind, cwd)
     return tier_of(fields.get("model"), ladder) if fields else None
 
 
 def is_unnamed(tool_input):
-    """A spawn that named no agent definition, whatever model it asked for."""
+    """Um disparo que não nomeou nenhuma definição de agente, seja qual for o modelo que pediu."""
     kind = tool_input.get("subagent_type")
     return not kind or kind == "general-purpose"
 
@@ -214,14 +217,14 @@ def is_bare(tool_input):
 
 
 def announced(module, session, transcript, kind):
-    """Whether this session was told, after it started, that it resolves `kind`.
+    """Se esta sessão foi avisada, depois de ter começado, que resolve `kind`.
 
-    The runtime's own statement outranks the record written at session start, because it is
-    later and it is about this session: a session that reloaded nothing announces nothing, so
-    this can only ever widen what routes. The transcript is the discovery path and the record
-    is the memory — the tail read is bounded, so what it found is kept where the next spawn can
-    read it without the delta still being in the tail. An older `posture.py` beside this hook
-    answers no, which is the conservative gate.
+    A própria declaração do runtime tem prioridade sobre o registro escrito no início da sessão,
+    porque é mais recente e é sobre esta sessão: uma sessão que não recarregou nada não anuncia
+    nada, então isso só pode alargar o que roteia. O transcript é o caminho de descoberta e o
+    registro é a memória — a leitura do final é limitada, então o que encontrou é guardado onde o
+    próximo disparo consegue ler sem o delta ainda estar no final. Um `posture.py` mais antigo ao
+    lado deste hook não responde nada disso, que é o portão conservador.
     """
     if module is None:
         return False
@@ -240,20 +243,21 @@ def announced(module, session, transcript, kind):
 
 
 def routable(kind, cwd, session=None, announce=False, transcript=None):
-    """`(the user's definition, notice)` for a worker a reroute would name; one of them is None.
+    """`(a definição do usuário, aviso)` para um worker que um reroteamento nomearia; um dos dois é None.
 
-    A reroute must land on the definition the harness synced and on no other. A project-level
-    `.claude/agents/<worker>.md` outranks the user's, so a repository that ships one would put
-    its own instructions on every unnamed spawn of anyone who cloned it: that file is a reason
-    to route nothing, named out loud. A machine that has not synced the workers is the same
-    answer for the plainer reason that the tool could not resolve the type at all.
+    Um reroteamento precisa pousar na definição que o harness sincronizou e em nenhuma outra. Um
+    `.claude/agents/<worker>.md` em nível de projeto tem prioridade sobre o do usuário, então um
+    repositório que traz um colocaria suas próprias instruções em todo disparo sem nome de
+    qualquer um que o clonasse: esse arquivo é um motivo para não rotear nada, dito em voz alta.
+    Uma máquina que não sincronizou os workers é a mesma resposta pela razão mais simples de que
+    a ferramenta não conseguiria resolver o tipo de forma alguma.
 
-    A file on disk is not enough: a session resolves the registry it loaded, so this session
-    must also have recorded the worker at its own start (`posture.sessions_dir`) or have been
-    told about it since (`posture.transcript_agents`). With neither the spawn is left as it
-    was, because a `subagent_type` this session cannot resolve fails the call outright.
-    `announce` is the caller that speaks — the spawn hook, not the pricing one — and only it
-    spends the once-per-session memory on that notice.
+    Um arquivo em disco não basta: uma sessão resolve o registro que carregou, então esta sessão
+    também precisa ter registrado o worker no próprio início (`posture.sessions_dir`) ou ter sido
+    avisada sobre ele desde então (`posture.transcript_agents`). Sem nenhum dos dois o disparo é
+    deixado como estava, porque um `subagent_type` que esta sessão não consegue resolver falha a
+    chamada de vez. `announce` é o chamador que fala — o hook de disparo, não o de precificação —
+    e só ele gasta a memória de uma-vez-por-sessão nesse aviso.
     """
     if not isinstance(kind, str) or not AGENT_NAME.fullmatch(kind):
         return None, None
@@ -270,8 +274,8 @@ def routable(kind, cwd, session=None, announce=False, transcript=None):
     module = posture_module()
     known = module.session_agents(session) if module else None
     if known is not None:
-        # Reading the record is evidence this session is alive, which keeps a long-running one
-        # out of another session's sweep.
+        # Ler o registro é evidência de que esta sessão está viva, o que mantém uma sessão de
+        # longa duração fora da varredura de outra sessão.
         module.refresh_session_record(session)
     if known is None or kind not in known:
         if announced(module, session, transcript, kind):
@@ -285,10 +289,11 @@ def routable(kind, cwd, session=None, announce=False, transcript=None):
 
 
 def switched_off(posture, role):
-    """Whether the selection in force switches `role` off; a `posture.py` that cannot say means no.
+    """Se a seleção em vigor desliga `role`; um `posture.py` que não consegue dizer significa não.
 
-    Sync withholds an `off` role's definition, but a session or project layer can switch one off
-    without a sync, and the file the last sync wrote is still on disk. The selection decides.
+    A sincronização retém a definição de um papel `off`, mas uma camada de sessão ou de projeto
+    pode desligar um sem uma sincronização, e o arquivo que a última sincronização escreveu ainda
+    está em disco. A seleção decide.
     """
     reader = getattr(posture, "selection", None)
     if reader is None:
@@ -300,19 +305,20 @@ def switched_off(posture, role):
 
 
 def band_route(posture, models, cwd, table=None, session=None, announce=False, transcript=None):
-    """`(route, notice)` for a spawn that named nothing; a route is None when nothing routes it.
+    """`(route, notice)` para um disparo que não nomeou nada; a rota é None quando nada a roteia.
 
-    The cost table is read here and nowhere else in this hook, so a spawn that named a role
-    never pays for it. A variant with no `default_band` — and a table that would not resolve —
-    routes nothing, which is what keeps 0.10.0 behaviour byte for byte.
+    A tabela de custo é lida aqui e em nenhum outro lugar deste hook, então um disparo que nomeou
+    um papel nunca paga por ela. Uma variante sem `default_band` — e uma tabela que não
+    resolveria — não roteia nada, que é o que mantém o comportamento da 0.10.0 byte a byte.
 
-    `brief-guard` calls this to price a spawn by the worker it is about to be routed to, and
-    passes the table it has already built rather than making this build a second one; one
-    answer to "where does an unnamed spawn go" is the point of the shared function.
+    `brief-guard` chama isto para precificar um disparo pelo worker para o qual está prestes a
+    ser roteado, e passa a tabela que já construiu em vez de fazer isto construir uma segunda;
+    uma resposta para "para onde vai um disparo sem nome" é o propósito da função compartilhada.
 
-    The effort a rerouted spawn actually runs at is the installed definition's, because effort
-    is written at sync and the `Agent` tool takes none; the row's is what the selected variant
-    would write at the next sync. The route carries both so the notice can name the difference.
+    O esforço em que um disparo reroteado de fato roda é o da definição instalada, porque esforço
+    é escrito na sincronização e a ferramenta `Agent` não recebe nenhum; o da linha é o que a
+    variante selecionada escreveria na próxima sincronização. A rota carrega os dois para que o
+    aviso possa nomear a diferença.
     """
     try:
         table = posture.cost_table() if table is None else table
@@ -336,16 +342,16 @@ def band_route(posture, models, cwd, table=None, session=None, announce=False, t
 
 
 def one_rung(payload, ladder):
-    """Today's rule for a spawn that named nothing: `(model one class below, message)`.
+    """A regra de hoje para um disparo que não nomeou nada: `(modelo um nível abaixo, mensagem)`.
 
-    A model of None with a message is a spawn this hook decided not to move and said why; both
-    None is a spawn it has nothing to say about — the session is already on the weakest class,
-    or the transcript does not yet name a model.
+    Um modelo None com uma mensagem é um disparo que este hook decidiu não mover e disse por quê;
+    ambos None é um disparo sobre o qual não tem nada a dizer — a sessão já está na classe mais
+    fraca, ou o transcript ainda não nomeia um modelo.
     """
     session = transcript_model(payload.get("transcript_path"))
     current = tier_of(session, ladder)
     if session and current is None:
-        # A lineup change the ladder has not caught up with must not pass for "nothing to do".
+        # Uma mudança de alinhamento que a escada não acompanhou não deve passar como "nada a fazer".
         return None, (f"the session model {session} is not on the ladder "
                       f"({', '.join(ladder)}), so this bare subagent stays on it; name a model or a role")
     if current is None or current == ladder[-1]:
@@ -355,7 +361,7 @@ def one_rung(payload, ladder):
 
 
 def routed_message(route, model, requested):
-    """Where the spawn went, on what, and how to choose next time; the hook's prefix is the caller's."""
+    """Para onde o disparo foi, em que, e como escolher da próxima vez; o prefixo do hook é do chamador."""
     detail = [("model " + requested + " as asked") if requested
               else (route["row"].get("class") or model)]
     if route.get("effort"):
@@ -395,19 +401,20 @@ def main():
         return
     if variant != "tiered":
         return
-    # Strongest class first, from the adapter's bindings. Without it there is no tier to move a
-    # spawn to, so the call runs as written and says why, exactly as an unknown model does.
+    # Classe mais forte primeiro, a partir dos bindings do adaptador. Sem isso não há nível para
+    # o qual mover um disparo, então a chamada roda como foi escrita e diz por quê, exatamente
+    # como um modelo desconhecido faz.
     models = posture.tier_models() if posture and hasattr(posture, "tier_models") else {}
     ladder = list(models.values())
     if len(ladder) < 2:
-        # Only a call whose model this hook would have decided — a bare spawn, or one asking for
-        # a class by name — is worth a notice; a named role with its own model is not this hook's.
+        # Só uma chamada cujo modelo este hook teria decidido — um disparo nu, ou um pedindo uma
+        # classe pelo nome — vale um aviso; um papel nomeado com seu próprio modelo não é deste hook.
         if is_bare(tool_input) or tool_input.get("model"):
             print(json.dumps({"systemMessage": f"{HOOK}: the adapter's class table names no tier to move a "
                               "spawn to, so this one runs as written; check the harness installation"}))
         return
-    # Where a spawn that named nothing goes, which only the cost table knows. Built here and
-    # only here, so a spawn naming a role never reads a sidecar.
+    # Para onde vai um disparo que não nomeou nada, que só a tabela de custo conhece. Construída
+    # aqui e só aqui, para que um disparo que nomeia um papel nunca leia um sidecar.
     route = notice = None
     if posture and is_unnamed(tool_input) and hasattr(posture, "row_for"):
         try:
@@ -415,10 +422,10 @@ def main():
                                        payload.get("session_id"), True,
                                        payload.get("transcript_path"))
         except Exception:
-            # An older `posture.py` beside a newer hook answers none of this. The whole routing
-            # decision is one all-or-nothing question, and the safe answer is the behaviour
-            # this hook had before bands existed: do not route, say nothing about it. An
-            # exception escaping here reaches the coordinator, which denies the spawn.
+            # Um `posture.py` mais antigo ao lado de um hook mais novo não responde nada disso. A
+            # decisão de roteamento inteira é uma única pergunta tudo-ou-nada, e a resposta segura
+            # é o comportamento que este hook tinha antes de bandas existirem: não rotear, não
+            # dizer nada sobre isso. Uma exceção escapando aqui alcança o coordenador, que nega o disparo.
             route = notice = None
     top = tier_of(tool_input.get("model"), ladder) == ladder[0]
     if top and not route:
@@ -426,7 +433,7 @@ def main():
         named = bool(kind) and kind != "general-purpose"
         declared = defined_tier(kind, payload.get("cwd"), ladder) if named else None
         if declared == ladder[0]:
-            return  # the role declares the top class itself; the request only repeats it
+            return  # o papel declara a classe mais alta por conta própria; o pedido só a repete
         updated = dict(tool_input, model=declared or ladder[1])
         emit({"updatedInput": updated},
              system_message=f"{HOOK}: {ladder[0]} is reached through a role that declares it, not by request; "
@@ -436,9 +443,10 @@ def main():
     if route:
         log_route(payload, tool_input, route)
         updated = dict(tool_input, subagent_type=route["worker"])
-        # A request for the top class is not a model this spawn named: it is a request the hook
-        # refuses, and refusing it by demoting one rung would let an unnamed spawn beat a band
-        # priced below that rung. So the band's own class decides, exactly as if none were asked.
+        # Um pedido pela classe mais alta não é um modelo que este disparo nomeou: é um pedido que
+        # o hook recusa, e recusá-lo rebaixando um nível deixaria um disparo sem nome superar uma
+        # banda precificada abaixo daquele nível. Então a própria classe da banda decide,
+        # exatamente como se nenhuma tivesse sido pedida.
         requested = None if top else tool_input.get("model")
         message = None
         if not requested:
@@ -446,12 +454,13 @@ def main():
             if route["model"]:
                 updated["model"] = route["model"]
             else:
-                # The band names no class this adapter maps, so the spawn falls to today's rule.
+                # A banda não nomeia classe nenhuma que este adaptador mapeia, então o disparo
+                # cai na regra de hoje.
                 fallback, message = one_rung(payload, ladder)
                 if fallback:
                     updated["model"] = fallback
-        # Where an unnamed spawn goes is the standing arrangement, said once a session. What the
-        # caller asked for and did not get is said every time it happens.
+        # Para onde vai um disparo sem nome é o arranjo permanente, dito uma vez por sessão. O
+        # que o chamador pediu e não recebeu é dito toda vez que acontece.
         parts = []
         if notice_once(payload.get("session_id"), ROUTED_NOTICE):
             parts.append(routed_message(route, updated.get("model"), requested))

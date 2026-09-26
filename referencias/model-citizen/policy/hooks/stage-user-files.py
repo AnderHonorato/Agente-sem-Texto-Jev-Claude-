@@ -1,26 +1,30 @@
 #!/usr/bin/env python3
-"""PreToolUse hook: copy each file `SendUserFile` names from outside the session's working
-directory into it, so a Remote Control client can open the file.
+"""Hook de PreToolUse: copia para dentro cada arquivo que `SendUserFile` nomeia de fora do
+diretório de trabalho da sessão, para que um cliente Remote Control consiga abrir o arquivo.
 
-In a Remote Control session the tool uploads nothing. The app keeps the path and asks the session
-for the file when you open it, and Claude Code serves it only when the file's real path is under
-the directory the session started in or a directory added to it. Agents write reports, renders
-and screenshots to temp directories, scratch directories and other worktrees, so without this the
-app refuses most of what they send with "Couldn't load this file".
+Numa sessão de Remote Control a ferramenta não envia upload de nada. O app guarda o caminho e
+pede o arquivo à sessão quando você o abre, e o Claude Code o serve só quando o caminho real do
+arquivo está sob o diretório em que a sessão começou ou um diretório adicionado a ele. Agentes
+escrevem relatórios, renderizações e capturas de tela em diretórios temporários, diretórios de
+scratch e outras worktrees, então sem isso o app recusa a maior parte do que enviam com "Couldn't
+load this file".
 
-A file whose real path is outside the hook's working directory, which Claude Code keeps inside
-the session's working directories, is copied to `.agent-harness/outbox/<digest>/<name>` there,
-and the path is rewritten to the copy. The digest covers the source's real path, size and
-modification and change times, so sending an unchanged file again reuses its copy and any rewrite,
-even one that restores the modification time, gets a new one. The outbox carries a `.gitignore` that ignores everything in it, so in a repository a
-copy never shows in `git status`, a commit or the lint. Directories untouched for KEEP_DAYS are
-removed when something new is staged, and `harness task` leaves the outbox out of its fingerprint.
+Um arquivo cujo caminho real está fora do diretório de trabalho do hook, que o Claude Code mantém
+dentro dos diretórios de trabalho da sessão, é copiado para
+`.agent-harness/outbox/<digest>/<name>` ali, e o caminho é reescrito para a cópia. O digest cobre
+o caminho real, tamanho e horários de modificação e alteração da fonte, então enviar um arquivo
+inalterado de novo reutiliza sua cópia e qualquer reescrita, mesmo uma que restaure o horário de
+modificação, recebe uma nova. O outbox traz um `.gitignore` que ignora tudo dentro dele, então
+num repositório uma cópia nunca aparece no `git status`, num commit ou no lint. Diretórios
+intocados por KEEP_DAYS são removidos quando algo novo é preparado, e `harness task` deixa o
+outbox fora da sua fingerprint.
 
-A file already inside, a missing path and a directory are left alone; the tool reports its own
-error for a path it cannot send. A file past the call's byte or time budget, or one that cannot be
-copied, is left alone with a notice. This hook never denies: on any failure the call runs unchanged.
+Um arquivo já dentro, um caminho ausente e um diretório são deixados em paz; a ferramenta reporta
+seu próprio erro para um caminho que não consegue enviar. Um arquivo além do orçamento de bytes
+ou tempo da chamada, ou um que não pode ser copiado, é deixado em paz com um aviso. Este hook
+nunca nega: em qualquer falha a chamada roda inalterada.
 
-Test: echo '{"tool_name":"SendUserFile","cwd":"'"$PWD"'","tool_input":{"files":["/etc/hosts"]}}' | python3 stage-user-files.py
+Teste: echo '{"tool_name":"SendUserFile","cwd":"'"$PWD"'","tool_input":{"files":["/etc/hosts"]}}' | python3 stage-user-files.py
 """
 import hashlib
 import json
@@ -33,9 +37,9 @@ import time
 from pathlib import Path
 
 OUTBOX = Path(".agent-harness") / "outbox"
-# What one call may copy, in bytes and in seconds, against the coordinator's ten-second
-# PreToolUse budget. Time is checked between files, so one slow source can still outrun it; the
-# hook is then stopped and the call goes through unchanged.
+# O que uma chamada pode copiar, em bytes e em segundos, contra o orçamento de dez segundos de
+# PreToolUse do coordenador. O tempo é checado entre arquivos, então uma fonte lenta ainda pode
+# ultrapassá-lo; o hook então é parado e a chamada segue inalterada.
 MAX_BYTES = 64 * 1024 * 1024
 DEADLINE_SECONDS = 4
 KEEP_DAYS = 14
@@ -47,7 +51,7 @@ def real(path):
 
 
 def outbox(root):
-    """The outbox under `root`, created on first use; None when any part of it is a link."""
+    """O outbox sob `root`, criado no primeiro uso; None quando qualquer parte dele é um link."""
     box = root / OUTBOX
     ignore = box / ".gitignore"
     if any(p.is_symlink() for p in (root / OUTBOX.parent, box, ignore)):
@@ -96,7 +100,7 @@ def prune(box, now):
 
 
 def decide(payload):
-    """The hook output for one PreToolUse payload, or None to leave the call as it is."""
+    """A saída do hook para um payload de PreToolUse, ou None para deixar a chamada como está."""
     if not isinstance(payload, dict) or payload.get("tool_name") != "SendUserFile":
         return None
     inputs = payload.get("tool_input")

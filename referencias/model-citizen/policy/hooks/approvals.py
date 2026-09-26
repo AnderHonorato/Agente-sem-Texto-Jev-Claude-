@@ -1,35 +1,39 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""UserPromptSubmit hook, and the library behind it: one-use approvals the user types in chat.
+"""Hook de UserPromptSubmit, e a biblioteca por trás dele: aprovações de uso único que o usuário digita no chat.
 
-Why: in `auto` mode a hook's `ask` is ignored, so `grade-bash` has to deny, and the auto-mode
-classifier refuses any command the agent prefixes with the confirm marker as an attempt to bypass
-a safety hook. The only channel the agent cannot produce is the user's own prompt, so the user
-approves a refused command by replying `approve <code>`, and nothing else can create an approval.
+Por quê: no modo `auto` o `ask` de um hook é ignorado, então `grade-bash` precisa negar, e o
+classificador do modo auto recusa qualquer comando que o agente prefixe com o marcador de
+confirmação como uma tentativa de contornar um hook de segurança. O único canal que o agente não
+consegue produzir é o próprio prompt do usuário, então o usuário aprova um comando recusado
+respondendo `approve <code>`, e nada mais pode criar uma aprovação.
 
-- `code_for(session_id, command)` is the first six base32 characters of
-  `sha256(session_id + "\\n" + command)`, over the raw command text. The same command in the same
-  session always gets the same code, so there is no pending store to protect: knowing a code is
-  worth nothing without an approval recorded from a prompt.
-- `record(session_id, prompt)` keeps the prompt's approvals in
-  `~/.local/state/agent-harness/approvals/<session_id>.json` with their time, but only when the
-  whole prompt is `approve <code>` tokens (case-insensitive, several allowed, separated by
-  whitespace or commas). Any other text records nothing: UserPromptSubmit also fires on turns the
-  user never typed, such as task notifications, subagent hand-backs and cross-session messages,
-  and those carry agent-controlled text that could otherwise smuggle in an approval.
-- `consume(session_id, code)` marks one unused approval younger than `TTL` seconds used and says
-  whether it found one. An approval confirms one run of one command in one session.
-- The store is the user's alone: `grade-bash` grades a Bash write to it 3, and the dispatcher
-  denies a file-tool write to it (`file_write_deny`).
+- `code_for(session_id, command)` são os primeiros seis caracteres base32 de
+  `sha256(session_id + "\\n" + command)`, sobre o texto bruto do comando. O mesmo comando na mesma
+  sessão sempre recebe o mesmo código, então não há armazenamento pendente a proteger: conhecer um
+  código não vale nada sem uma aprovação registrada a partir de um prompt.
+- `record(session_id, prompt)` guarda as aprovações do prompt em
+  `~/.local/state/agent-harness/approvals/<session_id>.json` com seu horário, mas só quando o
+  prompt inteiro é composto de tokens `approve <code>` (sem diferenciar maiúsculas/minúsculas,
+  vários permitidos, separados por espaço ou vírgula). Qualquer outro texto não registra nada:
+  UserPromptSubmit também dispara em turnos que o usuário nunca digitou, como notificações de
+  tarefa, passagens de bastão de subagente e mensagens entre sessões, e esses carregam texto
+  controlado pelo agente que de outra forma poderia contrabandear uma aprovação.
+- `consume(session_id, code)` marca uma aprovação viva de `code` mais nova que `TTL` segundos como
+  usada e diz se encontrou uma. Uma aprovação confirma uma execução de um comando numa sessão.
+- O armazenamento é só do usuário: `grade-bash` avalia uma escrita Bash nele em 3, e o dispatcher
+  nega uma escrita de ferramenta de arquivo nele (`file_write_deny`).
 
-Each `record` and `consume` holds an exclusive `flock` on `<session_id>.lock` beside the file
-for its whole read-modify-write, so two consumers cannot both use one approval and a consume
-cannot drop an approval a record just added. A lock that cannot be taken fails closed.
+Cada `record` e `consume` segura um `flock` exclusivo em `<session_id>.lock` ao lado do arquivo
+por toda a sua leitura-modificação-escrita, então dois consumidores não podem usar a mesma
+aprovação e um consume não pode descartar uma aprovação que um record acabou de adicionar. Um
+lock que não pode ser obtido falha fechado.
 
-Every read and write is wrapped, so a store that cannot be read is no approval and a store that
-cannot be written records nothing; neither ever raises into the hook that called it.
+Toda leitura e escrita é envolvida, então um armazenamento que não pode ser lido não tem aprovação
+nenhuma e um armazenamento que não pode ser escrito não registra nada; nenhum dos dois jamais
+levanta exceção para o hook que o chamou.
 
-Test: echo '{"hook_event_name":"UserPromptSubmit","session_id":"s1","prompt":"approve ABC234"}' | python3 approvals.py
+Teste: echo '{"hook_event_name":"UserPromptSubmit","session_id":"s1","prompt":"approve ABC234"}' | python3 approvals.py
 """
 import base64
 import contextlib
@@ -43,20 +47,20 @@ from pathlib import Path
 
 try:
     import fcntl
-except ImportError:  # no advisory locks here, so the store neither records nor consumes
+except ImportError:  # nenhum lock consultivo aqui, então o armazenamento nem registra nem consome
     fcntl = None
 
 CODE_LENGTH = 6
 TTL = 30 * 60
 SESSION_ID_MAX = 128
-# Bounded so a long session cannot grow its file without limit; the oldest approvals go first.
+# Limitado para que uma sessão longa não faça seu arquivo crescer sem limite; as aprovações mais antigas saem primeiro.
 KEEP = 64
 TOKEN = r"approve\s+([A-Za-z2-7]{%d})" % CODE_LENGTH
 APPROVE_RE = re.compile(TOKEN, re.I)
-# The whole prompt, stripped: one or more tokens and nothing else.
+# O prompt inteiro, aparado: um ou mais tokens e nada mais.
 ONLY_TOKENS_RE = re.compile(r"(?:%s)(?:[\s,]+%s)*" % (TOKEN, TOKEN), re.I)
-# A Bash command naming the store in any of these spellings is treated as a write to it once it
-# is anything but read-only; see `mentions_store`.
+# Um comando Bash que nomeia o armazenamento em qualquer uma dessas grafias é tratado como uma
+# escrita nele assim que for qualquer coisa além de somente leitura; veja `mentions_store`.
 STORE_RE = re.compile(r"agent-harness[/\\]+approvals(?=$|[/\\\s\"'`;|&)<>])|\.local[/\\]+state[/\\]+agent-harness"
                       r"(?=[\s\S]*approvals)")
 FILE_DENY = ("The approvals store is written only from the user's own prompt, so no tool may write "
@@ -72,7 +76,7 @@ def store_dir():
 
 
 def _session_ok(value):
-    """A session id safe to make a file name of: no separator, no traversal, bounded."""
+    """Um id de sessão seguro para virar um nome de arquivo: sem separador, sem travessia, limitado."""
     return (isinstance(value, str) and value.isascii() and 0 < len(value) <= SESSION_ID_MAX
             and value[0].isalnum() and all(c.isalnum() or c in "._-" for c in value))
 
@@ -87,8 +91,8 @@ def code_for(session_id, command):
 
 
 def codes_in(prompt):
-    """The codes a prompt approves, upper-cased, in order, without repeats; none unless the
-    stripped prompt is nothing but `approve <code>` tokens."""
+    """Os códigos que um prompt aprova, em maiúsculas, em ordem, sem repetições; nenhum a menos
+    que o prompt aparado seja só tokens `approve <code>`."""
     seen = []
     text = prompt.strip() if isinstance(prompt, str) else ""
     if not ONLY_TOKENS_RE.fullmatch(text):
@@ -129,7 +133,7 @@ def _write(path, entries):
 
 @contextlib.contextmanager
 def _locked(path):
-    """Hold an exclusive lock for `path`'s session; yields False when none could be taken."""
+    """Segura um lock exclusivo para a sessão de `path`; produz False quando nenhum pôde ser obtido."""
     fd = None
     try:
         if fcntl is not None:
@@ -145,18 +149,18 @@ def _locked(path):
         yield fd is not None
     finally:
         if fd is not None:
-            os.close(fd)  # closing the descriptor releases the lock
+            os.close(fd)  # fechar o descritor libera o lock
 
 
 def _live(entry, now):
     created = entry.get("created")
-    # A created time a little past `now` is a record that took the lock after this call read
-    # the clock, not a forgery: only a user prompt writes the store.
+    # Um horário de criação um pouco além de `now` é um registro que obteve o lock depois que
+    # esta chamada leu o relógio, não uma falsificação: só um prompt do usuário escreve o armazenamento.
     return isinstance(created, (int, float)) and not entry.get("used") and now - created <= TTL
 
 
 def record(session_id, prompt, now=None):
-    """Record the prompt's `approve <code>` tokens for this session; the codes recorded."""
+    """Registra os tokens `approve <code>` do prompt para esta sessão; os códigos registrados."""
     path = store_path(session_id)
     codes = codes_in(prompt)
     if path is None or not codes:
@@ -171,12 +175,12 @@ def record(session_id, prompt, now=None):
 
 
 def consume(session_id, code, now=None):
-    """Use one live approval of `code` in this session; True when there was one to use."""
+    """Usa uma aprovação viva de `code` nesta sessão; True quando havia uma para usar."""
     path = store_path(session_id)
     if path is None or not isinstance(code, str):
         return False
     if not path.exists():
-        return False  # nothing was ever recorded: no lock file for a session with no approvals
+        return False  # nada jamais foi registrado: nenhum arquivo de lock para uma sessão sem aprovações
     now = time.time() if now is None else now
     with _locked(path) as held:
         if not held:
@@ -195,7 +199,7 @@ def mentions_store(text):
 
 
 def under_store(path):
-    """Whether a file path, resolved, is the store or inside it."""
+    """Se um caminho de arquivo, resolvido, é o armazenamento ou está dentro dele."""
     try:
         target = os.path.realpath(os.path.expanduser(str(path)))
         root = os.path.realpath(str(store_dir()))
@@ -205,7 +209,7 @@ def under_store(path):
 
 
 def file_write_deny(paths):
-    """The deny for a file-tool write whose paths reach into the store, or None."""
+    """A negação para uma escrita de ferramenta de arquivo cujos caminhos alcançam o armazenamento, ou None."""
     if any(under_store(p) for p in paths):
         return {"hookSpecificOutput": {"permissionDecision": "deny",
                                        "permissionDecisionReason": FILE_DENY}}
@@ -226,4 +230,4 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        pass  # a recorder fault costs an approval, never the user's prompt
+        pass  # uma falha do registrador custa uma aprovação, nunca o prompt do usuário

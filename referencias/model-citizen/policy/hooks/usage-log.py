@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""SessionEnd hook: record a session's token usage in ~/.local/state/agent-harness/usage.jsonl.
+"""Hook de SessionEnd: registra o uso de tokens de uma sessão em ~/.local/state/agent-harness/usage.jsonl.
 
-One local file, and nothing over the network unless a `telemetry` block turns export on — see
-`telemetry.py` and docs/telemetry.md. SessionEnd shares a 1.5-second budget, so the hook
-spawns a detached worker and returns; the worker streams the transcript line by line and upserts
-one row for the session, one for each subagent it spawned and one for each recent role-run
-worker. Read it with `harness usage`.
+Um arquivo local, e nada pela rede a menos que um bloco `telemetry` ligue a exportação — veja
+`telemetry.py` e docs/telemetry.md. SessionEnd compartilha um orçamento de 1,5 segundo, então o hook
+lança um worker desacoplado e retorna; o worker faz streaming da transcrição linha por linha e faz upsert de
+uma linha para a sessão, uma para cada subagente que ela lançou e uma para cada worker de
+execução de papel recente. Leia com `harness usage`.
 
-The same pass builds the event list `rule-detectors.py` documents, so the rule telemetry costs
-one read of the transcript rather than two: the record gains `rules`, `counts` and `stances`.
-A registry that will not import costs the record its `rules` key and nothing else.
+A mesma passagem constrói a lista de eventos que `rule-detectors.py` documenta, então a telemetria de regras custa
+uma leitura da transcrição em vez de duas: o registro ganha `rules`, `counts` e `stances`.
+Um registro que não importa custa ao registro só sua chave `rules` e nada mais.
 
-Codex is read from its rollout files instead, by `scan_codex`, and the two runtimes disagree
-about what a parent's tokens mean: see `codex_totals` and `cmd_usage` in `bin/harness`.
+O Codex é lido a partir de seus arquivos rollout em vez disso, por `scan_codex`, e os dois runtimes discordam
+sobre o que os tokens de um pai significam: veja `codex_totals` e `cmd_usage` em `bin/harness`.
 
-Every row names the `harness_version` that wrote it, a session row names the `effort` that
-covered most of its output, and a session row carries per-day slices in `days` so a session
-that ran for a fortnight is not charged to the day it ended. See `harness_version`, `dominant`
-and `daily`.
+Toda linha nomeia o `harness_version` que a escreveu, uma linha de sessão nomeia o `effort` que
+cobriu a maior parte da sua saída, e uma linha de sessão carrega fatias por dia em `days` para que uma sessão
+que rodou por duas semanas não seja debitada ao dia em que terminou. Veja `harness_version`, `dominant`
+e `daily`.
 """
 import importlib.util
 import json
@@ -37,23 +37,23 @@ FIELDS = (
     ("cache_write", "cache_creation_input_tokens"),
 )
 
-# A cache write is priced by its time to live — 1.25x base input for five minutes, 2x for an
-# hour — and Claude Code reports the split under `cache_creation` beside the single
-# `cache_creation_input_tokens` total. The row records both tiers so `harness usage` can price
-# each at its own rate. The keys are additive and only written when a tier is non-zero: a row
-# from before this release carries neither and is priced at the 5-minute rate, which understates
-# a 1-hour write. See policy/prices.json.
+# Uma escrita de cache é precificada pelo seu tempo de vida — 1,25x o input base por cinco minutos, 2x por
+# uma hora — e o Claude Code reporta a divisão sob `cache_creation` ao lado do total único
+# `cache_creation_input_tokens`. A linha registra ambas as camadas para que `harness usage` possa precificar
+# cada uma na sua própria taxa. As chaves são aditivas e só escritas quando uma camada é não-zero: uma linha
+# de antes deste lançamento não carrega nenhuma e é precificada na taxa de 5 minutos, o que subestima
+# uma escrita de 1 hora. Veja policy/prices.json.
 CACHE_TIERS = (("cache_write_5m", "ephemeral_5m_input_tokens"),
                ("cache_write_1h", "ephemeral_1h_input_tokens"))
 
-# A tool result worth keeping the text of: the two the detectors read. 64 KB is far past any
-# brief or fenced block and far short of a transcript's largest result.
+# Um resultado de ferramenta cujo texto vale a pena manter: os dois que os detectores leem. 64 KB está bem além de qualquer
+# brief ou bloco cercado e bem aquém do maior resultado de uma transcrição.
 TEXT_KEPT_FOR = ("Bash", "Agent")
 MAX_RESULT_TEXT = 64 * 1024
 
 
 def sibling(name, required=True):
-    """A module beside this one. Raises when required, so the caller can record why it is absent."""
+    """Um módulo ao lado deste. Levanta exceção quando obrigatório, para o chamador registrar por que está ausente."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name + ".py")
     try:
         spec = importlib.util.spec_from_file_location("harness_" + name.replace("-", "_"), path)
@@ -67,76 +67,76 @@ def sibling(name, required=True):
 
 
 def detectors():
-    """The sibling detector registry. Raises, so the caller can record why it is absent."""
+    """O registro de detectores irmão. Levanta exceção, para o chamador registrar por que está ausente."""
     return sibling("rule-detectors")
 
 
 def stances(env=None):
-    """The resolved `{dimension: variant}` map, from `posture.py` and nowhere else.
+    """O mapa resolvido `{dimension: variant}`, a partir de `posture.py` e de mais nenhum lugar.
 
-    A copy of this hook running away from its sibling resolver records no stances rather
-    than a second opinion about them; the record keeps every other field.
+    Uma cópia deste hook rodando longe do seu resolvedor irmão não registra posturas em vez
+    de uma segunda opinião sobre elas; o registro mantém todo outro campo.
     """
     module = sibling("posture", required=False)
     return module.resolve(env, strict=False)["stances"] if module else {}
 
 
-# Re-exported, not re-declared: the defaults are `posture.py`'s, and a reader of a usage record
-# should not have to know which file holds them.
+# Reexportado, não redeclarado: os padrões são de `posture.py`, e um leitor de um registro de uso
+# não deveria precisar saber qual arquivo os guarda.
 DEFAULT_STANCES = getattr(sibling("posture", required=False), "DEFAULT_STANCES", {})
 
-# The keys a subagent row carries its soft budget under, so an overrun is a subtraction on one
-# row rather than a join against the cost table as it stands today. Written as `null` when
-# nothing prices the role: a zero would say the spawn was budgeted nothing.
+# As chaves sob as quais uma linha de subagente carrega seu orçamento suave, para que um estouro seja uma subtração numa
+# linha em vez de um join contra a tabela de custo como ela está hoje. Escrito como `null` quando
+# nada precifica o papel: um zero diria que o spawn foi orçado com nada.
 BUDGET_KEYS = ("budget_output_tokens", "budget_tool_calls")
 _COST = []
 
-# The two things a return is measured for, on the same row the budget sits on: whether it handed
-# back a path a reader can open instead of the payload, and whether it stayed inside the word cap
-# its brief stated. Both are `null` when the scan could not measure them — no parent call to join
-# on, no return text, no cap it can know, a runtime that reports no return at all.
+# As duas coisas para as quais um retorno é medido, na mesma linha em que o orçamento fica: se ele devolveu
+# um caminho que um leitor pode abrir em vez do payload, e se ficou dentro do teto de palavras que
+# seu brief declarava. Ambos são `null` quando a varredura não conseguiu medi-los — nenhuma chamada pai para
+# unir, nenhum texto de retorno, nenhum teto que possa conhecer, um runtime que não reporta retorno nenhum.
 RETURN_KEYS = ("return_path", "return_over_budget")
-# Why a return was not measured, when the reason is one a reader would otherwise mistake for a
-# short return: a result the scan kept only the first 64 KB of is not a return it can count the
-# words of, and saying so beats a figure taken over part of the text.
+# Por que um retorno não foi medido, quando o motivo é um que um leitor de outra forma confundiria com um
+# retorno curto: um resultado do qual a varredura manteve só os primeiros 64 KB não é um retorno cujas
+# palavras ela pode contar, e dizer isso vence um número tirado sobre parte do texto.
 MEASURED_KEY = "return_measured"
-# A path as a return writes one: inside a fence, inside backticks, or bare in prose. The three
-# differ in what proves a token is a path at all. Quoted text is taken at its word; bare prose
-# is not, because `pass/fail`, `24/7`, `2026/09/22` and `they/them` are prose and every one of
-# them carries a separator. There a token counts only when it carries a path's own shape.
+# Um caminho como um retorno o escreve: dentro de uma cerca, dentro de crases, ou nu em prosa. Os três
+# diferem no que prova que um token é um caminho, ponto final. Texto entre aspas é tomado ao pé da letra; prosa
+# nua não, porque `pass/fail`, `24/7`, `2026/09/22` e `they/them` são prosa e cada um
+# deles carrega um separador. Ali um token conta só quando carrega a forma própria de um caminho.
 QUOTED = re.compile(r"`{3,}[^\n]*\n(.*?)(?:`{3,}|\Z)|`([^`\n]+)`", re.S)
 PATH_TOKEN = re.compile(r"[^\s`'\"<>|*?,;:()\[\]{}]*/[^\s`'\"<>|*?,;:()\[\]{}]*")
-# Trailing only: a leading `.` is `./notes`, and stripping it would make the path absolute and
-# send it looking in the root of the filesystem.
+# Só à direita: um `.` à esquerda é `./notes`, e removê-lo tornaria o caminho absoluto e
+# o mandaria procurar na raiz do sistema de arquivos.
 PATH_TRIM = ".,;:!?'\")]}>"
 PATH_ROOTS = ("/", "./", "../", "~/")
 PATH_EXTENSION = re.compile(r"\.[A-Za-z0-9]{1,8}\Z")
-# A URL names someone else's file, so it contributes nothing at all — not even its path part.
+# Uma URL nomeia o arquivo de outra pessoa, então não contribui com nada, ponto final — nem mesmo sua parte de caminho.
 URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://\S+")
-# What counts as a word when a return is measured against its cap: a token carrying a letter or
-# a digit. A fence line, a bullet's `-` and a `·` separator are punctuation, and counting them
-# would put a return over a cap it kept.
+# O que conta como palavra quando um retorno é medido contra seu teto: um token carregando uma letra ou
+# um dígito. Uma linha de cerca, o `-` de um marcador e um separador `·` são pontuação, e contá-los
+# colocaria um retorno acima de um teto que ele respeitou.
 WORD = re.compile(r"[A-Za-z0-9]")
-# The number a cap states is the one beside the word `words`, not the first in the sentence:
-# "cap each of the 3 sections at 200 words" is a 200-word cap.
+# O número que um teto declara é o que está ao lado da palavra `words`, não o primeiro na frase:
+# "cap each of the 3 sections at 200 words" é um teto de 200 palavras.
 CAP_NUMBER = re.compile(r"(?i)(\d+)\s*[- ]?words?|word\s+cap\s*(?:of\s+)?(\d+)")
-# How many candidates one return is checked against the filesystem. A return that named forty
-# paths and resolved none of them is not answered differently by its forty-first.
+# Quantos candidatos um retorno é checado contra o sistema de arquivos. Um retorno que nomeou quarenta
+# caminhos e não resolveu nenhum deles não é respondido de forma diferente pelo seu quadragésimo primeiro.
 MAX_CANDIDATES = 40
-# A number this large is prose about something else, not a return bound.
+# Um número deste tamanho é prosa sobre outra coisa, não um limite de retorno.
 MAX_WORD_CAP = 100000
 _RETURN_RULES = []
 
 
 def budget_fields(role):
-    """The soft budget a spawn of `role` ran under, as the row's own keys.
+    """O orçamento suave sob o qual um spawn de `role` rodou, como as próprias chaves da linha.
 
-    The figures are `posture.py`'s, read from the same table `brief-guard` prices a brief with,
-    once per scan: a rescan of a hundred transcripts must not walk every sidecar a hundred
-    times. The table is today's, which is what the row can know — the brief the spawn was given
-    is not recorded anywhere the scan can read — so a row written after the variant changed
-    names the budget the role carries now. A missing sibling, an unpriced role and a table that
-    will not build are all `null`.
+    Os números são de `posture.py`, lidos da mesma tabela com que `brief-guard` precifica um brief,
+    uma vez por varredura: uma revarredura de cem transcrições não deve percorrer todo sidecar cem
+    vezes. A tabela é a de hoje, que é o que a linha pode saber — o brief que o spawn recebeu
+    não é registrado em lugar nenhum que a varredura possa ler — então uma linha escrita depois que a variante mudou
+    nomeia o orçamento que o papel carrega agora. Um irmão ausente, um papel não precificado e uma tabela que
+    não vai construir são todos `null`.
     """
     fields = dict((key, None) for key in BUDGET_KEYS)
     if not _COST:
@@ -156,12 +156,12 @@ def budget_fields(role):
 
 
 def harness_version():
-    """The version `harness --version` prints, read from the same `VERSION` file at the root.
+    """A versão que `harness --version` imprime, lida do mesmo arquivo `VERSION` na raiz.
 
-    The hook runs as a standalone script, so it walks up from its own real path — through the
-    `claude/hooks -> ../policy/hooks` symlink and through `~/.claude/hooks/harness` — to the
-    checkout that holds both a `VERSION` file and `bin/harness`, and never imports the CLI.
-    A copy of this hook running outside a checkout records no version rather than a guess.
+    O hook roda como um script independente, então sobe a partir do seu próprio caminho real — através do
+    symlink `claude/hooks -> ../policy/hooks` e através de `~/.claude/hooks/harness` — até o
+    checkout que carrega um arquivo `VERSION` e `bin/harness`, e nunca importa a CLI.
+    Uma cópia deste hook rodando fora de um checkout não registra versão em vez de um chute.
     """
     here = Path(os.path.realpath(__file__)).parent
     for parent in [here] + list(here.parents):
@@ -175,11 +175,11 @@ def harness_version():
 
 
 def stamped_version(rescan):
-    """The version to stamp on a row: none at all when the row is a backfill.
+    """A versão a carimbar numa linha: nenhuma, ponto final, quando a linha é um preenchimento retroativo.
 
-    A rescan reads a transcript written by whatever version was installed at the time, which is
-    unknowable from the file, so the row carries `null` beside its `stances_source: "rescan"`.
-    Stamping the current version would make every past session look like today's release.
+    Uma revarredura lê uma transcrição escrita por qualquer versão que estava instalada na época, o que é
+    incognoscível a partir do arquivo, então a linha carrega `null` ao lado do seu `stances_source: "rescan"`.
+    Carimbar a versão atual faria toda sessão passada parecer o lançamento de hoje.
     """
     return None if rescan else harness_version()
 
@@ -188,14 +188,14 @@ def usage_path():
     return Path.home() / ".local" / "state" / "agent-harness" / "usage.jsonl"
 
 
-# The ledger grows compatibly: a change adds a field, a rename ships a fold, and nothing is
-# removed in place. Every row written from this version on names the schema it was written
-# under; a row without the key predates it and is read as version 0. Bump the version with any
-# change to what a row carries, and add a rename to FIELD_FOLDS as `old name: new name`, never
-# by rewriting old rows. See docs/usage.md, "Ledger schema".
+# O razão cresce de forma compatível: uma mudança adiciona um campo, uma renomeação distribui uma dobra, e nada é
+# removido no lugar. Toda linha escrita a partir desta versão nomeia o esquema sob o qual foi escrita;
+# uma linha sem a chave é anterior a isso e é lida como versão 0. Suba a versão a cada
+# mudança no que uma linha carrega, e adicione uma renomeação a FIELD_FOLDS como `nome antigo: nome novo`, nunca
+# reescrevendo linhas antigas. Veja docs/usage.md, "Ledger schema".
 SCHEMA_KEY = "schema_version"
-# Version 1 is first released in v0.14.0 and carries every field that release adds,
-# `profile_fingerprint` among them.
+# A versão 1 é lançada primeiro na v0.14.0 e carrega todo campo que esse lançamento adiciona,
+# `profile_fingerprint` entre eles.
 SCHEMA_VERSION = 1
 FIELD_FOLDS = {}
 FINGERPRINT_KEY = "profile_fingerprint"
@@ -203,10 +203,10 @@ _POSTURE = []
 
 
 def profile_fingerprint():
-    """The fingerprint of the profile in force, from `posture.py`; None when it cannot be had.
+    """A impressão digital do perfil em vigor, a partir de `posture.py`; None quando não pode ser obtida.
 
-    A copy of this hook away from its resolver, or a resolver that fails, stamps null: an
-    unattributed row, never a guessed one. The resolver remembers the answer for the process.
+    Uma cópia deste hook longe do seu resolvedor, ou um resolvedor que falha, carimba null: uma
+    linha não atribuída, nunca uma adivinhada. O resolvedor lembra a resposta para o processo.
     """
     if not _POSTURE:
         _POSTURE.append(sibling("posture", required=False))
@@ -217,11 +217,11 @@ def profile_fingerprint():
 
 
 def stamped(record):
-    """A copy of `record` naming the schema and the profile. The caller's dict is untouched.
+    """Uma cópia de `record` nomeando o esquema e o perfil. O dict do chamador fica intocado.
 
-    A record that already names its profile keeps it, null included: a worker's row carries the
-    profile its run started under, and a backfilled row carries only what the ledger already
-    knew, so neither is stamped with the profile of whoever happens to write it.
+    Um registro que já nomeia seu perfil o mantém, null incluso: a linha de um worker carrega o
+    perfil sob o qual sua execução começou, e uma linha preenchida retroativamente carrega só o que o razão já
+    sabia, então nenhuma das duas é carimbada com o perfil de quem quer que a escreva.
     """
     out = dict(record, **{SCHEMA_KEY: SCHEMA_VERSION})
     if FINGERPRINT_KEY not in out:
@@ -233,9 +233,9 @@ ATTRIBUTION_KEY = "context_attribution"
 
 
 def context_attribution():
-    """Per-module context tokens for the selection in force, from `posture.py`; None without it.
+    """Tokens de contexto por módulo para a seleção em vigor, a partir de `posture.py`; None sem ele.
 
-    A soft estimate, labelled with its method: see `posture.context_attribution`.
+    Uma estimativa suave, rotulada com seu método: veja `posture.context_attribution`.
     """
     if not _POSTURE:
         _POSTURE.append(sibling("posture", required=False))
@@ -246,11 +246,11 @@ def context_attribution():
 
 
 def attributed(record, prior=None, rescan=False):
-    """Give a session row its context attribution: the ledger's own, a live read, or none.
+    """Dá a uma linha de sessão sua atribuição de contexto: a própria do razão, uma leitura ao vivo, ou nenhuma.
 
-    The same rule as the fingerprint's. A transcript does not say which modules its session
-    loaded, so a rescan keeps what the ledger already holds for that session and otherwise
-    leaves the field out, rather than attributing a past session to this minute's selection.
+    A mesma regra da impressão digital. Uma transcrição não diz quais módulos sua sessão
+    carregou, então uma revarredura mantém o que o razão já guarda para aquela sessão e caso contrário
+    deixa o campo de fora, em vez de atribuir uma sessão passada à seleção deste minuto.
     """
     known = prior.get(ATTRIBUTION_KEY) if isinstance(prior, dict) else None
     if isinstance(known, dict):
@@ -263,11 +263,11 @@ def attributed(record, prior=None, rescan=False):
 
 
 def fold(row, folds=None):
-    """A copy of `row` with every renamed field under its current name.
+    """Uma cópia de `row` com todo campo renomeado sob seu nome atual.
 
-    A field whose current name is already present keeps that value: the row was written after
-    the rename, and the old key is only a leftover. Unknown fields pass through untouched, so a
-    row from a newer writer reads with everything it carries.
+    Um campo cujo nome atual já está presente mantém esse valor: a linha foi escrita depois
+    da renomeação, e a chave antiga é só um resto. Campos desconhecidos passam intocados, então uma
+    linha de um escritor mais novo é lida com tudo o que carrega.
     """
     folds = FIELD_FOLDS if folds is None else folds
     out = dict(row)
@@ -279,10 +279,10 @@ def fold(row, folds=None):
 
 
 def ledger_rows(text, folds=None):
-    """The rows a ledger's text holds, folded, oldest first.
+    """As linhas que o texto de um razão contém, dobradas, mais antigas primeiro.
 
-    A line that is not a JSON object is skipped rather than fatal, and a row is never refused
-    for a field or a schema version this reader does not know.
+    Uma linha que não é um objeto JSON é pulada em vez de fatal, e uma linha nunca é recusada
+    por um campo ou uma versão de esquema que este leitor não conhece.
     """
     rows = []
     for line in text.splitlines():
@@ -308,12 +308,12 @@ def git(cwd, *args):
 
 
 def _result_parts(content, tool_name):
-    """A tool result's text and whether it was cut, from a string or a block list alike.
+    """O texto de um resultado de ferramenta e se foi cortado, de uma string ou de uma lista de blocos igualmente.
 
-    Only the two tools a detector reads keep their text, and only the first 64 KB of it: the
-    event list is held whole in memory, and a `Read` of a large file would otherwise be carried
-    through the entire scan for nothing. Whether the cut bit is returned beside the text,
-    because a measurement taken over the head of a result is not a measurement of the result.
+    Só as duas ferramentas que um detector lê mantêm seu texto, e só os primeiros 64 KB dele: a
+    lista de eventos é mantida inteira em memória, e um `Read` de um arquivo grande de outra forma seria carregado
+    por toda a varredura à toa. Se o bit de corte é retornado ao lado do texto,
+    porque uma medição tomada sobre o começo de um resultado não é uma medição do resultado.
     """
     if tool_name not in TEXT_KEPT_FOR:
         return "", False
@@ -328,15 +328,15 @@ def _result_parts(content, tool_name):
 
 
 def _result_text(content, tool_name):
-    """The text alone, for a caller that does not care whether it was cut."""
+    """Só o texto, para um chamador que não se importa se foi cortado."""
     return _result_parts(content, tool_name)[0]
 
 
 def merge_slot(per_message, old_key, new_key):
-    """Fold one slot into another field-wise, the way `record_usage` keeps a figure.
+    """Dobra um slot para dentro de outro campo a campo, do jeito que `record_usage` mantém um número.
 
-    Used when a request id that had opened a slot of its own turns out to name a message id,
-    which happens whenever the id-bearing records of a call are read after its id-less ones.
+    Usado quando um id de requisição que tinha aberto um slot próprio acaba nomeando um id de mensagem,
+    o que acontece sempre que os registros com id de uma chamada são lidos depois dos sem id.
     """
     slot = per_message.pop(old_key, None)
     if slot is None:
@@ -355,15 +355,15 @@ def merge_slot(per_message, old_key, new_key):
 
 
 def usage_key(links, maps, mid, request_id):
-    """The slot an assistant record's usage is counted under, and the slot that key replaces.
+    """O slot sob o qual o uso de um registro de assistente é contado, e o slot que essa chave substitui.
 
-    A message id is the key, as ever. A record with no id but a `requestId` keys on that
-    instead, unscoped by file: the id names one API call, so the same call written into both a
-    session file and a subagent file is one response, and a call whose other records do carry a
-    message id joins their slot rather than opening a second one. `links` remembers which key a
-    request id resolved to, and `maps` are the slot maps to fold a superseded slot into, because
-    the files are not read in the order they were written. A record with neither id is unknown
-    rather than a duplicate, so it is not deduplicated at all and the caller counts it.
+    Um id de mensagem é a chave, como sempre. Um registro sem id mas com `requestId` indexa por
+    ele em vez disso, sem escopo por arquivo: o id nomeia uma chamada de API, então a mesma chamada escrita tanto num
+    arquivo de sessão quanto num arquivo de subagente é uma resposta, e uma chamada cujos outros registros carregam um
+    id de mensagem se junta ao slot deles em vez de abrir um segundo. `links` lembra para qual chave um
+    id de requisição resolveu, e `maps` são os mapas de slot nos quais dobrar um slot substituído, porque
+    os arquivos não são lidos na ordem em que foram escritos. Um registro sem nenhum dos dois ids é desconhecido
+    em vez de um duplicado, então não é deduplicado de jeito nenhum e o chamador o conta.
     """
     request_id = request_id.strip() if isinstance(request_id, str) else ""
     if not mid and not request_id:
@@ -373,8 +373,8 @@ def usage_key(links, maps, mid, request_id):
     linked = links.get(request_id)
     key = mid or linked or ("request", request_id)
     superseded = None
-    # Only a slot this function opened is ever folded away; two message ids under one request
-    # id are two messages, whatever the runtime meant by it.
+    # Só um slot que esta função abriu é jamais dobrado para fora; dois ids de mensagem sob um id
+    # de requisição são duas mensagens, seja lá o que o runtime quis dizer com isso.
     if isinstance(linked, tuple) and linked != key:
         superseded = linked
         for per_message in maps:
@@ -384,20 +384,20 @@ def usage_key(links, maps, mid, request_id):
 
 
 def record_usage(per_message, key, usage, day="", model=""):
-    """Keep the largest figure a message id ever reported for each field.
+    """Mantém o maior número que um id de mensagem já reportou para cada campo.
 
-    One API response is written as several records. The early ones carry a partial streaming
-    `output_tokens` and the last carries the true figure, so taking the first undercounts the
-    response badly — on a real subagent transcript, 7,126 output tokens against 40,868. The
-    field-wise maximum keeps the final figure without trusting the file's order, which a
-    reordered or truncated tail would otherwise lower.
+    Uma resposta de API é escrita como vários registros. Os primeiros carregam um `output_tokens`
+    parcial de streaming e o último carrega o número verdadeiro, então tomar o primeiro subconta a
+    resposta seriamente — numa transcrição real de subagente, 7.126 tokens de saída contra 40.868. O
+    máximo campo a campo mantém o número final sem confiar na ordem do arquivo, que uma
+    cauda reordenada ou truncada de outra forma diminuiria.
 
-    `day` is that record's UTC date, kept on the slot so the per-day slices are cut from the
-    same deduplicated map the totals are summed over and cannot disagree with them. The first
-    date a message id is seen under is the one that holds: a response written across midnight
-    is one message and belongs to one day.
+    `day` é a data UTC daquele registro, mantida no slot para que as fatias por dia sejam cortadas do
+    mesmo mapa deduplicado sobre o qual os totais são somados e não possam discordar deles. A primeira
+    data sob a qual um id de mensagem é visto é a que vale: uma resposta escrita atravessando a meia-noite
+    é uma mensagem e pertence a um dia.
 
-    `model` is kept the same way and for the same reason: the per-model breakdown is cut from
+    `model` é mantido da mesma forma e pelo mesmo motivo: a divisão por modelo é cortada de
     this one deduplicated map, so it cannot disagree with the totals summed over it.
     """
     slot = per_message.setdefault(key, dict([(name, 0) for name, _ in FIELDS]
@@ -424,14 +424,14 @@ def record_usage(per_message, key, usage, day="", model=""):
                 slot[name] = value
 
 
-# What a row says when nothing measured its raw figure: a Codex row, a worker row, a row
-# written before this release. Never 1.0 by default — that would claim the deduplication
-# removed nothing, which is a measurement nobody made.
+# O que uma linha diz quando nada mediu seu número bruto: uma linha do Codex, uma linha de worker, uma linha
+# escrita antes deste lançamento. Nunca 1.0 por padrão — isso alegaria que a deduplicação
+# não removeu nada, o que é uma medição que ninguém fez.
 RAW_UNKNOWN = "unknown"
 
 
 def add_raw(raw, usage):
-    """Sum one record's usage as written, before any deduplication. See `inflation`."""
+    """Soma o uso de um registro como escrito, antes de qualquer deduplicação. Veja `inflation`."""
     if raw is None:
         return
     for name, field in FIELDS:
@@ -444,12 +444,12 @@ def add_raw(raw, usage):
 
 
 def inflation(raw, totals):
-    """The raw per-line sum over the deduplicated total, across the four token fields together.
+    """A soma bruta por linha sobre o total deduplicado, através dos quatro campos de token juntos.
 
-    One ratio rather than one per field: the fields are deduplicated by the same slots, so four
-    figures would be four views of one measurement, and the row already carries every field for
-    a reader who wants them apart. A transcript with nothing to remove measures 1.0, which is
-    the finding — not the default, which is `RAW_UNKNOWN`.
+    Um único ratio em vez de um por campo: os campos são deduplicados pelos mesmos slots, então quatro
+    números seriam quatro visões de uma medição, e a linha já carrega todo campo para
+    um leitor que os queira separados. Uma transcrição sem nada para remover mede 1.0, que é
+    o resultado — não o padrão, que é `RAW_UNKNOWN`.
     """
     if not raw:
         return RAW_UNKNOWN
@@ -460,11 +460,11 @@ def inflation(raw, totals):
 
 
 def summed(per_message):
-    """The four token totals over the messages, each counted once at its largest figure.
+    """Os quatro totais de token sobre as mensagens, cada um contado uma vez no seu maior valor.
 
-    The cache-write tiers ride along when any message reported one, so a row that can be priced
-    tier by tier says so and one that cannot carries neither key rather than a pair of zeros
-    that would read as writes at the cheaper rate.
+    As camadas de escrita de cache pegam carona quando qualquer mensagem reportou uma, então uma linha que pode ser precificada
+    camada a camada diz isso e uma que não pode carrega nenhuma das chaves em vez de um par de zeros
+    que se leria como escritas na taxa mais barata.
     """
     totals = {name: sum(slot[name] for slot in per_message.values()) for name, _ in FIELDS}
     tiers = {name: sum(slot.get(name) or 0 for slot in per_message.values())
@@ -478,18 +478,18 @@ def empty_slice():
     return dict([(name, 0) for name, _ in FIELDS] + [("turns", 0)])
 
 
-# Every token field a per-model part can carry: the four columns and the two cache-write tiers.
+# Todo campo de token que uma parte por modelo pode carregar: as quatro colunas e as duas camadas de escrita de cache.
 PART_FIELDS = tuple(name for name, _ in FIELDS) + tuple(name for name, _ in CACHE_TIERS)
 
 
 def by_model(per_message):
-    """Token totals per model id, cut from the same map the row's totals are summed over.
+    """Totais de token por id de modelo, cortados do mesmo mapa sobre o qual os totais da linha são somados.
 
-    A session that switched models — a compaction on a cheaper one, a subagent on another —
-    holds one set of totals and several rates, so without this map it can only be reported in
-    tokens. A record naming no model at all makes the map unattributable rather than short, so
-    the whole map is dropped: `harness usage` would rather report the row unpriced than price
-    part of it.
+    Uma sessão que trocou de modelos — uma compactação num mais barato, um subagente noutro —
+    mantém um conjunto de totais e várias taxas, então sem este mapa só pode ser reportada em
+    tokens. Um registro que não nomeia modelo nenhum torna o mapa não atribuível em vez de curto, então
+    o mapa inteiro é descartado: `harness usage` preferiria reportar a linha sem preço a precificar
+    parte dela.
     """
     out = {}
     for slot in per_message.values():
@@ -505,11 +505,11 @@ def by_model(per_message):
 
 
 def models_agree(parts, totals):
-    """Whether a per-model breakdown adds up to the row's own totals, field by field.
+    """Se uma divisão por modelo soma até os próprios totais da linha, campo a campo.
 
-    The same test `slices_agree` applies to the day slices, for the same reason: a breakdown
-    that disagreed with the row it sits on would price part of a session twice or not at all.
-    A field the runtime never reported is unknown on both sides and is not compared.
+    O mesmo teste que `slices_agree` aplica às fatias por dia, pelo mesmo motivo: uma divisão
+    que discordasse da linha em que se apoia precificaria parte de uma sessão duas vezes ou nenhuma vez.
+    Um campo que o runtime nunca reportou é desconhecido de ambos os lados e não é comparado.
     """
     if not parts:
         return False
@@ -523,14 +523,14 @@ def models_agree(parts, totals):
 
 
 def daily(per_message, turns_by_day, fallback=""):
-    """The `days` map: four token totals and a turn count per UTC date.
+    """O mapa `days`: quatro totais de token e uma contagem de turnos por data UTC.
 
-    Cut from the same message-id map the row's totals are summed over, so for Claude Code a
-    day's slice **includes that day's subagent tokens** exactly as the session total does —
-    the session row has one meaning, and a slice that excluded them would not add up to it.
-    A message whose record carried no timestamp falls to `fallback`, the session's end date,
-    rather than being left out of every slice; with no fallback either there are no slices,
-    because a partial one would read as a day that cost less than it did.
+    Cortado do mesmo mapa de id de mensagem sobre o qual os totais da linha são somados, então para o Claude Code
+    a fatia de um dia **inclui os tokens de subagente daquele dia** exatamente como o total da sessão faz —
+    a linha de sessão tem um único significado, e uma fatia que os excluísse não somaria até ele.
+    Uma mensagem cujo registro não carregava timestamp cai em `fallback`, a data de término da sessão,
+    em vez de ser deixada de fora de toda fatia; sem fallback nenhum também não há fatias,
+    porque uma parcial se leria como um dia que custou menos do que custou.
     """
     days = {}
     for slot in per_message.values():
@@ -548,11 +548,11 @@ def daily(per_message, turns_by_day, fallback=""):
 
 
 def slices_agree(days, totals):
-    """Whether the slices add up to the row's own totals, field by field.
+    """Se as fatias somam até os próprios totais da linha, campo a campo.
 
-    Checked before the map is written, never after: a `days` map that disagrees with the row it
-    sits on would be read as the truth about a date and silently double or lose a day's spend.
-    A row whose slices do not agree carries none and falls back to its end date in the report.
+    Checado antes do mapa ser escrito, nunca depois: um mapa `days` que discorda da linha em que
+    se apoia seria lido como a verdade sobre uma data e silenciosamente dobraria ou perderia o gasto de um dia.
+    Uma linha cujas fatias não concordam não carrega nenhuma e recai na sua data de término no relatório.
     """
     if not days:
         return False
@@ -563,12 +563,12 @@ def slices_agree(days, totals):
 
 
 def dominant(weights):
-    """The key covering the most output tokens, or "" when nothing was weighed.
+    """A chave que cobre a maior parte dos tokens de saída, ou "" quando nada foi pesado.
 
-    Effort changes mid-session in both runtimes — 14 of 112 Claude Code transcripts and 4 of 44
-    Codex rollouts measured on one machine — so a row records the value that covered the most
-    output rather than the first or the last, and `effort_source` names where it was read.
-    Ties break on the name so two reads of one transcript agree.
+    O esforço muda no meio da sessão em ambos os runtimes — 14 de 112 transcrições do Claude Code e 4 de 44
+    rollouts do Codex medidos numa máquina — então uma linha registra o valor que cobriu a maior parte
+    da saída em vez do primeiro ou do último, e `effort_source` nomeia de onde foi lido.
+    Empates se resolvem pelo nome para que duas leituras de uma transcrição concordem.
     """
     weights = dict((key, value) for key, value in weights.items() if key)
     if not weights:
@@ -577,11 +577,11 @@ def dominant(weights):
 
 
 def reported_model(counts):
-    """The model a transcript's assistant records name most often; the later one on a tie.
+    """O modelo que os registros de assistente de uma transcrição nomeiam com mais frequência; o mais recente em caso de empate.
 
-    A record is one vote, so a response written as several records weighs as much as it cost to
-    write. The tie-break is the last model seen, because a session that changed model mid-run
-    ran most recently on the later one.
+    Um registro é um voto, então uma resposta escrita como vários registros pesa tanto quanto custou para
+    escrever. O desempate é o último modelo visto, porque uma sessão que mudou de modelo no meio da execução
+    rodou mais recentemente no mais recente.
     """
     if not counts:
         return ""
@@ -589,7 +589,7 @@ def reported_model(counts):
 
 
 def note_model(counts, name, order):
-    """One assistant record's model against the tally: `{name: (hits, last seen)}`."""
+    """O modelo de um registro de assistente contra a contagem: `{name: (hits, last seen)}`."""
     if not isinstance(name, str) or not name:
         return
     hits = counts.get(name, (0, 0))[0]
@@ -598,27 +598,27 @@ def note_model(counts, name, order):
 
 def _agent_row(path, shared=None, budget=None, max_bytes=None, version=None, links=None,
                raw=None):
-    """One `kind: "subagent"` row from one `agent-<id>.jsonl`, or None when it holds no turn.
+    """Uma linha `kind: "subagent"` de um `agent-<id>.jsonl`, ou None quando não contém turno.
 
-    The sibling `agent-<id>.meta.json` names the agent type and the spawn depth; the transcript
-    carries the tokens, the tool calls, the model and, on some records, the effort. Counts only:
-    no prompt text and no command text reaches the record.
+    O `agent-<id>.meta.json` irmão nomeia o tipo do agente e a profundidade do spawn; a transcrição
+    carrega os tokens, as chamadas de ferramenta, o modelo e, em alguns registros, o esforço. Só contagens:
+    nenhum texto de prompt e nenhum texto de comando chega ao registro.
 
-    The model is the transcript's, not the meta file's: a routed spawn's meta carries the alias
-    the spawn hook asked for while a directly spawned agent's carries the full id, and
-    one model under two names splits `usage --by model` in half. The alias is the fallback for
-    an agent that recorded no model at all.
+    O modelo é o da transcrição, não o do arquivo de meta: o meta de um spawn roteado carrega o alias
+    que o hook de spawn pediu enquanto o de um agente lançado diretamente carrega o id completo, e
+    um modelo sob dois nomes divide `usage --by model` ao meio. O alias é o fallback para
+    um agente que não registrou modelo nenhum.
 
-    `shared` is the session's message-id map. The row keeps its own total, but the session's
-    total is taken over that shared map, so a message id written both here and as a sidechain
-    line in the session file is one message and is paid for once. `raw` is that map's
-    undeduplicated counterpart: this file's records are in the session's totals, so they are in
-    the session's `raw_vs_deduped` too.
+    `shared` é o mapa de id de mensagem da sessão. A linha mantém seu próprio total, mas o total
+    da sessão é tomado sobre esse mapa compartilhado, então um id de mensagem escrito tanto aqui quanto como uma
+    linha de sidechain no arquivo de sessão é uma mensagem e é pago uma vez. `raw` é a contraparte
+    não deduplicada desse mapa: os registros deste arquivo estão nos totais da sessão, então estão em
+    `raw_vs_deduped` da sessão também.
 
-    `budget` in seconds and `max_bytes` from the tail are for a caller working against a hook
-    timeout: the detached `SessionEnd` worker has all the time in the world and passes neither,
-    while a live hook cannot be killed halfway through a very large agent's file. When either
-    bites, the row carries `partial: True` and its totals are of the part that was read.
+    `budget` em segundos e `max_bytes` a partir da cauda são para um chamador trabalhando contra um timeout
+    de hook: o worker desacoplado de `SessionEnd` tem todo o tempo do mundo e não passa nenhum dos dois,
+    enquanto um hook ao vivo não pode ser morto no meio de um arquivo de agente muito grande. Quando um dos dois
+    morde, a linha carrega `partial: True` e seus totais são da parte que foi lida.
     """
     per_message, idless = {}, 0
     links = {} if links is None else links
@@ -645,8 +645,8 @@ def _agent_row(path, shared=None, budget=None, max_bytes=None, version=None, lin
             except OSError:
                 size = 0
             if size > max_bytes:
-                # The tail, because the last responses carry the largest figures and a file
-                # this size will not be finished inside a hook's timeout either way.
+                # A cauda, porque as últimas respostas carregam os maiores números e um arquivo
+                # deste tamanho não vai terminar dentro do timeout de um hook de qualquer forma.
                 handle.seek(size - max_bytes)
                 handle.readline()
                 partial = True
@@ -675,8 +675,8 @@ def _agent_row(path, shared=None, budget=None, max_bytes=None, version=None, lin
             records += 1
             note_model(models, message.get("model"), records)
             for index, block in enumerate(message.get("content") or []):
-                # The same block-repetition the session scan guards against: one API response
-                # is written as several lines that repeat its blocks.
+                # A mesma repetição de bloco contra a qual a varredura de sessão se protege: uma resposta de API
+                # é escrita como várias linhas que repetem seus blocos.
                 if not isinstance(block, dict) or block.get("type") != "tool_use":
                     continue
                 key = block.get("id") or (mid, block.get("apiBlockIndex", index))
@@ -687,15 +687,15 @@ def _agent_row(path, shared=None, budget=None, max_bytes=None, version=None, lin
             usage = message.get("usage") or {}
             key, superseded = usage_key(links, maps, mid, entry.get("requestId"))
             if key is None:
-                # Nothing identifies this record, so nothing may be merged into it. Its key
-                # names the file and the line, as it always has, and it is counted as unknown.
+                # Nada identifica este registro, então nada pode ser mesclado nele. Sua chave
+                # nomeia o arquivo e a linha, como sempre fez, e é contado como desconhecido.
                 idless += 1
                 key = ("line", str(path), idless)
             record_usage(per_message, key, usage, stamp[:10], message.get("model") or "")
             add_raw(raw, usage)
             if shared is not None:
                 record_usage(shared, key, usage, stamp[:10], message.get("model") or "")
-            # A slot folded into another keeps the turn it was already counted for.
+            # Um slot dobrado para dentro de outro mantém o turno para o qual já foi contado.
             if superseded is not None and superseded in seen:
                 seen.discard(superseded)
                 seen.add(key)
@@ -704,36 +704,36 @@ def _agent_row(path, shared=None, budget=None, max_bytes=None, version=None, lin
             seen.add(key)
             turns += 1
     if not turns:
-        # Nothing readable, whether the file held no turn or the budget stopped before one:
-        # the caller records that as spend unknown rather than as zero.
+        # Nada legível, seja porque o arquivo não continha turno ou porque o orçamento parou antes de um:
+        # o chamador registra isso como gasto desconhecido em vez de zero.
         return None
     workflow = path.parent.name if path.parent.name.startswith("wf_") else None
     row = {"kind": "subagent", "runtime": "claude-code", "harness_version": version,
            "session_id": "", "repo": "",
            "agent_id": path.stem[len("agent-"):],
-           # A Workflow-tool agent may have no meta file at all; unnamed is a fact about the
-           # record, and "unknown" says so where an empty string would read as a missing field.
+           # Um agente da ferramenta Workflow pode não ter arquivo de meta nenhum; sem nome é um fato sobre o
+           # registro, e "unknown" diz isso onde uma string vazia se leria como um campo faltando.
            "agent_type": meta.get("agentType") or "unknown",
            "model": reported_model(models) or meta.get("model") or "",
            "effort": effort or meta.get("effort") or "",
            "tool_calls": calls, "spawn_depth": meta.get("spawnDepth"), "workflow": workflow,
-           # `mark_reroutes` fills these from the parent's record of the call, joined on this id.
+           # `mark_reroutes` preenche estes a partir do registro do pai da chamada, unidos por este id.
            "tool_use_id": meta.get("toolUseId") or "",
            "requested_type": "", "rerouted": False,
-           # `mark_returns` fills these from the parent's record of the return, joined on the
-           # same id. Null is "not measured", never "measured and found nothing", and
-           # `return_measured` names the reason where one would otherwise be mistaken for it.
+           # `mark_returns` preenche estes a partir do registro do pai do retorno, unidos pelo
+           # mesmo id. Null é "não medido", nunca "medido e nada encontrado", e
+           # `return_measured` nomeia o motivo onde um de outra forma seria confundido com o outro.
            "return_path": None, "return_over_budget": None, "return_measured": None,
            "turns": turns, "started": started, "ended": ended}
     if partial:
         row["partial"] = True
-    # Records this row's totals include that nothing identified — neither a message id nor a
-    # request id — so a reader can tell a row that was deduplicated from one that could not be.
+    # Registros que os totais desta linha incluem que nada identificou — nem id de mensagem nem
+    # id de requisição — para que um leitor possa distinguir uma linha que foi deduplicada de uma que não pôde ser.
     if idless:
         row["idless_records"] = idless
     if workflow:
-        # A Workflow-tool agent is launched by the tool, not spawned: no spawn hook routed it and
-        # no brief stated it a budget, so a role name it happens to carry prices it at nothing.
+        # Um agente da ferramenta Workflow é lançado pela ferramenta, não gerado por spawn: nenhum hook de spawn o roteou e
+        # nenhum brief lhe declarou um orçamento, então um nome de papel que ele por acaso carregue o precifica a nada.
         row["unconfined"] = True
         row.update(dict((key, None) for key in BUDGET_KEYS))
     else:
@@ -742,37 +742,37 @@ def _agent_row(path, shared=None, budget=None, max_bytes=None, version=None, lin
     return row
 
 
-# The two spellings of "this spawn named no agent definition"; they are one request, so a spawn
-# that ran as `general-purpose` after asking for nothing was not rerouted.
+# As duas grafias de "este spawn não nomeou definição de agente nenhuma"; são um só pedido, então um spawn
+# que rodou como `general-purpose` depois de pedir nada não foi roteado de novo.
 UNNAMED_TYPES = ("", "general-purpose")
-# A requested type is model-authored text. Only a name the tool could actually have resolved is
-# kept; anything else is recorded as the fact that it was something else, because a usage row is
-# a count and must not become a place free text is stored.
+# Um tipo pedido é texto escrito pelo modelo. Só um nome que a ferramenta poderia de fato ter resolvido é
+# mantido; qualquer outra coisa é registrada como o fato de que era outra coisa, porque uma linha de uso é
+# uma contagem e não deve virar um lugar onde texto livre é armazenado.
 AGENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 
 
 def refused_spawns(agents, errored):
-    """The `Agent` call ids in `errored` that never ran: no subagent row names them.
+    """Os ids de chamada `Agent` em `errored` que nunca rodaram: nenhuma linha de subagente os nomeia.
 
-    A spawn a `PreToolUse` hook denied comes back as an error result and writes no subagent
-    transcript, so counting it as a subagent reports work nobody did. A spawn that ran and then
-    failed also comes back as an error, but it left a transcript whose meta names the call, and
-    it stays counted. A subagent file whose meta names no call is still one row in `agents`,
-    and the session's count is never below that, so it is counted either way.
+    Um spawn que um hook `PreToolUse` recusou volta como um resultado de erro e não escreve
+    transcrição de subagente, então contá-lo como subagente reporta trabalho que ninguém fez. Um spawn que rodou e então
+    falhou também volta como um erro, mas deixou uma transcrição cujo meta nomeia a chamada, e
+    permanece contado. Um arquivo de subagente cujo meta não nomeia chamada nenhuma ainda é uma linha em `agents`,
+    e a contagem da sessão nunca fica abaixo disso, então é contado de qualquer forma.
     """
     ran = set(row.get("tool_use_id") for row in agents or [] if row.get("tool_use_id"))
     return set(use_id for use_id in errored if use_id not in ran)
 
 
 def mark_reroutes(agents, requested):
-    """Fill `requested_type` and `rerouted` from the parent's `Agent` inputs, joined on tool use id.
+    """Preenche `requested_type` e `rerouted` a partir dos inputs `Agent` do pai, unidos pelo id de uso de ferramenta.
 
-    A transcript records a tool input as the model wrote it, before any `PreToolUse` hook
-    rewrote it, while the subagent's `.meta.json` records the type it actually ran as. The two
-    disagreeing is the reroute — measured from what happened, never announced by the hook that
-    did it, so orchestrator compliance is a number and not a claim. Verified on a real
-    transcript: the parent recorded `general-purpose`, the subagent's meta said `Explore`,
-    under the one tool use id.
+    Uma transcrição registra um input de ferramenta como o modelo o escreveu, antes de qualquer hook `PreToolUse`
+    reescrevê-lo, enquanto o `.meta.json` do subagente registra o tipo com que de fato rodou. Os dois
+    discordarem é o reroteamento — medido a partir do que aconteceu, nunca anunciado pelo hook que
+    o fez, então a conformidade do orquestrador é um número e não uma alegação. Verificado numa transcrição
+    real: o pai registrou `general-purpose`, o meta do subagente dizia `Explore`,
+    sob o mesmo id de uso de ferramenta.
     """
     for row in agents:
         use_id = row.get("tool_use_id")
@@ -787,13 +787,13 @@ def mark_reroutes(agents, requested):
 
 
 def return_rules():
-    """`(cap pattern, agents whose definition carries the cap, the default cap)`, read once.
+    """`(padrão de teto, agentes cuja definição carrega o teto, o teto padrão)`, lido uma vez.
 
-    All three are the siblings' own: `rule-detectors` decides what counts as a stated bound and
-    which agents need not repeat one, and `brief-guard`'s `BOUND` is the cap it appends to every
-    brief that states none. A second copy here would sooner or later measure returns against a
-    cap no brief ever carried. A sibling that will not import leaves the cap unknown, which the
-    row records as unmeasured.
+    Os três são dos próprios irmãos: `rule-detectors` decide o que conta como um limite declarado e
+    quais agentes não precisam repetir um, e o `BOUND` de `brief-guard` é o teto que ele anexa a todo
+    brief que não declara nenhum. Uma segunda cópia aqui mediria mais cedo ou mais tarde retornos contra um
+    teto que nenhum brief jamais carregou. Um irmão que não importa deixa o teto desconhecido, que a
+    linha registra como não medido.
     """
     if not _RETURN_RULES:
         rules = sibling("rule-detectors", required=False)
@@ -806,17 +806,17 @@ def return_rules():
 
 
 def return_cap(brief, agent_type):
-    """The word cap a return was owed, or None when the scan cannot know one.
+    """O teto de palavras que um retorno devia, ou None quando a varredura não pode saber um.
 
-    A brief that states a cap is measured against the number beside the word `words`, which is
-    not always the first number in the sentence. A brief that states none was capped by
-    `brief-guard` at its own default before it reached the agent — the transcript records the
-    call as the model wrote it, not as the hook rewrote it (#324) — so that default is the cap.
+    Um brief que declara um teto é medido contra o número ao lado da palavra `words`, que
+    nem sempre é o primeiro número na frase. Um brief que não declara nenhum foi limitado por
+    `brief-guard` ao seu próprio padrão antes de chegar ao agente — a transcrição registra a
+    chamada como o modelo a escreveu, não como o hook a reescreveu (#324) — então esse padrão é o teto.
 
-    Two briefs get no cap at all, because the hook appends none to them: an empty prompt, and a
-    spawn of an agent whose own definition carries the cap. `agent_type` there is the type the
-    call asked for, as the hook reads it, and not the type the spawn ran as — a reroute must not
-    move a return onto a cap its brief never carried.
+    Dois briefs não recebem teto nenhum, porque o hook não anexa nenhum a eles: um prompt vazio, e um
+    spawn de um agente cuja própria definição carrega o teto. `agent_type` ali é o tipo que a
+    chamada pediu, como o hook o lê, e não o tipo com que o spawn rodou — um reroteamento não deve
+    mover um retorno para um teto que seu brief nunca carregou.
     """
     pattern, capped, default = return_rules()
     if pattern is None or not (brief or "").strip():
@@ -832,11 +832,11 @@ def return_cap(brief, agent_type):
 
 
 def return_roots(cwd, top):
-    """Where a path a return names may resolve: the worktree it ran in, and the scratchpad.
+    """Onde um caminho que um retorno nomeia pode resolver: a worktree onde rodou, e o scratchpad.
 
-    The scratchpad is the temporary directory, which is where `transcript-hygiene` says the long
-    version goes. A path that resolves outside both — a system file, another checkout — is not
-    the detail this return was asked to write down, so it does not count as one.
+    O scratchpad é o diretório temporário, que é onde `transcript-hygiene` diz que a versão
+    longa vai. Um caminho que resolve fora de ambos — um arquivo de sistema, outro checkout — não é
+    o detalhe que este retorno foi pedido para anotar, então não conta como um.
     """
     roots = []
     for base in (top, cwd, tempfile.gettempdir()):
@@ -852,15 +852,15 @@ def return_roots(cwd, top):
 
 
 def path_shaped(token):
-    """True when a token carries a path's own shape rather than a slash between two words."""
+    """True quando um token carrega a forma própria de um caminho em vez de uma barra entre duas palavras."""
     return token.startswith(PATH_ROOTS) or bool(PATH_EXTENSION.search(token.rsplit("/", 1)[-1]))
 
 
 def path_candidates(text):
-    """Every path-shaped token in a return, in order, without repeats.
+    """Todo token com forma de caminho num retorno, em ordem, sem repetições.
 
-    Quoted text — a fenced block or inline backticks — is taken at its word: a token written
-    inside it with a separator in it was written as a path. Bare prose has to look like one.
+    Texto entre aspas — um bloco cercado ou crases em linha — é tomado ao pé da letra: um token escrito
+    dentro dele com um separador nele foi escrito como um caminho. Prosa nua precisa parecer um.
     """
     body = URL.sub(" ", text or "")
     quoted = [(m.start(), m.end()) for m in QUOTED.finditer(body)]
@@ -881,12 +881,12 @@ def path_candidates(text):
 
 
 def resolves(token, roots):
-    """True when `token` names something that exists now under one of `roots`.
+    """True quando `token` nomeia algo que existe agora sob uma das `roots`.
 
-    A relative path is tried against each root, which is how a return that wrote
-    `notes/dimension-a.md` is read. Resolution is taken at the moment the ledger row is written:
-    a path that has since been deleted did not resolve, and the row says so rather than
-    guessing what was there when the agent returned.
+    Um caminho relativo é tentado contra cada raiz, que é como um retorno que escreveu
+    `notes/dimension-a.md` é lido. A resolução é tomada no momento em que a linha do razão é escrita:
+    um caminho que desde então foi apagado não resolveu, e a linha diz isso em vez de
+    adivinhar o que estava lá quando o agente retornou.
     """
     try:
         expanded = os.path.expanduser(token)
@@ -904,16 +904,16 @@ def resolves(token, roots):
 
 
 def word_count(text):
-    """The words a cap counts: tokens carrying a letter or a digit, and no punctuation alone."""
+    """As palavras que um teto conta: tokens carregando uma letra ou um dígito, nunca só pontuação."""
     return sum(1 for token in (text or "").split() if WORD.search(token))
 
 
 def path_state(text, roots):
-    """`"resolvable"`, `"unresolvable"` or `"none"` for one return's text.
+    """`"resolvable"`, `"unresolvable"` ou `"none"` para o texto de um retorno.
 
-    A return that named no path at all carries none. That is a fact about the return and not a
-    failure — a one-line verdict owes no file — and the report counts it apart from a return
-    whose path went nowhere.
+    Um retorno que não nomeou caminho nenhum carrega none. Isso é um fato sobre o retorno e não uma
+    falha — um veredito de uma linha não deve arquivo nenhum — e o relatório o conta separado de um retorno
+    cujo caminho não levou a lugar nenhum.
     """
     candidates = path_candidates(text)
     if not candidates:
@@ -922,15 +922,15 @@ def path_state(text, roots):
 
 
 def mark_returns(agents, briefs, returns, roots):
-    """Fill `return_path` and `return_over_budget` from the parent's `Agent` call and its result.
+    """Preenche `return_path` e `return_over_budget` a partir da chamada `Agent` do pai e do seu resultado.
 
-    Deterministic throughout: a string match for the paths, `os.path.exists` for whether one
-    resolves, a word count against the cap the brief stated. Nothing here judges what the return
-    said — that is #157's question, and these two fields are the labelled input it needs.
+    Determinístico do início ao fim: um match de string para os caminhos, `os.path.exists` para se um
+    resolve, uma contagem de palavras contra o teto que o brief declarava. Nada aqui julga o que o retorno
+    disse — essa é a pergunta da #157, e estes dois campos são o input rotulado de que ela precisa.
 
-    A row whose parent call is not in this transcript keeps both fields `null`. So does a return
-    that arrived empty, and one the scan kept only the head of: a truncated result is recorded
-    as `return_measured: "truncated"` rather than measured over the part that was read.
+    Uma linha cuja chamada pai não está nesta transcrição mantém ambos os campos `null`. O mesmo vale para um retorno
+    que chegou vazio, e um do qual a varredura manteve só o começo: um resultado truncado é registrado
+    como `return_measured: "truncated"` em vez de medido sobre a parte que foi lida.
     """
     for row in agents:
         use_id = row.get("tool_use_id")
@@ -949,13 +949,13 @@ def mark_returns(agents, briefs, returns, roots):
 
 
 def agent_rows(transcript, session_id="", shared=None, version=None, links=None, raw=None):
-    """Every subagent row belonging to one session transcript, by path.
+    """Toda linha de subagente pertencente a uma transcrição de sessão, por caminho.
 
-    Claude Code writes each subagent to `<session>/subagents/agent-<id>.jsonl` beside the
-    session's own `<session>.jsonl`, and a Workflow-tool agent one level deeper still, under
-    `subagents/workflows/wf_<id>/`. The walk is recursive for that reason. Those tokens were
-    spent by this session, so the session row counts them too; the per-agent rows are what
-    makes `usage --by role` true.
+    O Claude Code escreve cada subagente em `<session>/subagents/agent-<id>.jsonl` ao lado do
+    próprio `<session>.jsonl` da sessão, e um agente da ferramenta Workflow um nível ainda mais fundo, sob
+    `subagents/workflows/wf_<id>/`. A busca é recursiva por esse motivo. Esses tokens foram
+    gastos por esta sessão, então a linha de sessão também os conta; as linhas por agente são o que
+    torna `usage --by role` verdadeiro.
     """
     path = Path(os.path.expanduser(str(transcript)))
     rows = []
@@ -972,7 +972,7 @@ def agent_rows(transcript, session_id="", shared=None, version=None, links=None,
 
 
 def scan_all(transcript, session_id="", cwd="", prior=None, rescan=False):
-    """Every row one transcript yields: the session first, then one row per subagent."""
+    """Toda linha que uma transcrição produz: a sessão primeiro, então uma linha por subagente."""
     shared, links, raw = {}, {}, {}
     agents = agent_rows(transcript, session_id, shared, version=stamped_version(rescan),
                         links=links, raw=raw)
@@ -990,30 +990,30 @@ def scan_all(transcript, session_id="", cwd="", prior=None, rescan=False):
 
 def scan(transcript, session_id="", cwd="", prior=None, rescan=False, agents=None, shared=None,
          links=None, raw=None):
-    """One record from one transcript, or None when there is nothing worth recording.
+    """Um registro de uma transcrição, ou None quando não há nada que valha a pena registrar.
 
-    `prior` is the record this session already has, when there is one; `rescan` says the read
-    is a backfill rather than the session's own end. Together they decide the `stances` field,
-    which a backfill can only guess at. `agents` is the subagent rows when the caller has
-    already read them, so `scan_all` reads each subagent file once rather than twice, and
-    `shared` is the message-id map those reads filled.
+    `prior` é o registro que esta sessão já tem, quando existe um; `rescan` diz que a leitura
+    é um preenchimento retroativo em vez do fim da própria sessão. Juntos eles decidem o campo `stances`,
+    que um preenchimento retroativo só pode adivinhar. `agents` são as linhas de subagente quando o chamador já
+    as leu, para que `scan_all` leia cada arquivo de subagente uma vez em vez de duas, e
+    `shared` é o mapa de id de mensagem que essas leituras preencheram.
 
-    The session's totals are taken over that one map, never as a sum of two sources. Older
-    Claude Code wrote a subagent's turns into the session file as sidechain lines while newer
-    Claude Code writes them to the subagent's own file; a transcript carrying both would pay
-    for every delegated token twice if the two were added.
+    Os totais da sessão são tomados sobre esse único mapa, nunca como uma soma de duas fontes. O Claude
+    Code mais antigo escrevia os turnos de um subagente no arquivo de sessão como linhas de sidechain enquanto o
+    mais novo os escreve no próprio arquivo do subagente; uma transcrição carregando ambos pagaria
+    por todo token delegado duas vezes se os dois fossem somados.
     """
     per_message = {} if shared is None else shared
     links = {} if links is None else links
-    # The same records as `per_message`, summed per line instead of per slot: the row reports
-    # the two against each other as `raw_vs_deduped` rather than discarding the raw figure.
+    # Os mesmos registros de `per_message`, somados por linha em vez de por slot: a linha reporta
+    # os dois contra o outro como `raw_vs_deduped` em vez de descartar o número bruto.
     raw = {} if raw is None else raw
     idless = 0
     models, agent_calls, seen, requested = [], set(), set(), {}
-    # `Agent` calls whose result came back as an error: a spawn a hook refused, or one that
-    # failed after it ran. `refused_spawns` tells the two apart when the row is counted, but
-    # only by subagent files: a session file holding sidechain lines is the older format, where
-    # a spawn that ran and failed has no file either, so there every errored call stays counted.
+    # Chamadas `Agent` cujo resultado voltou como erro: um spawn que um hook recusou, ou um que
+    # falhou depois de rodar. `refused_spawns` distingue os dois quando a linha é contada, mas
+    # só por arquivos de subagente: um arquivo de sessão contendo linhas de sidechain é o formato mais antigo, onde
+    # um spawn que rodou e falhou também não tem arquivo, então ali toda chamada com erro permanece contada.
     errored_calls = set()
     legacy_sidechains = False
     briefs = {}
@@ -1041,9 +1041,9 @@ def scan(transcript, session_id="", cwd="", prior=None, rescan=False, agents=Non
                 continue
             if not isinstance(entry, dict):
                 continue
-            # A subagent has its own transcript file today, but older Claude Code wrote its
-            # turns into this one as sidechain lines. They are that agent's work, so they make
-            # no event here; their tokens were spent by this session and are summed as ever.
+            # Um subagente tem seu próprio arquivo de transcrição hoje, mas o Claude Code mais antigo escrevia seus
+            # turnos neste como linhas de sidechain. São trabalho daquele agente, então não geram
+            # evento nenhum aqui; seus tokens foram gastos por esta sessão e são somados como sempre.
             sidechain = bool(entry.get("isSidechain"))
             legacy_sidechains = legacy_sidechains or sidechain
             stamp = entry.get("timestamp") or ""
@@ -1086,15 +1086,15 @@ def scan(transcript, session_id="", cwd="", prior=None, rescan=False, agents=Non
                 continue
             if kind != "assistant":
                 continue
-            # A record whose `message` is not a dict holds no usage, no model and no blocks,
-            # and reading one as a mapping used to abort the scan of the whole transcript;
-            # `_agent_row` has always skipped it.
+            # Um registro cujo `message` não é um dict não contém uso, nem modelo, nem blocos,
+            # e lê-lo como um mapeamento costumava abortar a varredura da transcrição inteira;
+            # `_agent_row` sempre o pulou.
             if not isinstance(message, dict):
                 continue
             model = message.get("model")
             for index, block in enumerate(content or []):
-                # One API response is written as several lines that repeat the same message id,
-                # each carrying one block; a block seen twice is one block, not two events.
+                # Uma resposta de API é escrita como várias linhas que repetem o mesmo id de mensagem,
+                # cada uma carregando um bloco; um bloco visto duas vezes é um bloco, não dois eventos.
                 if sidechain or not isinstance(block, dict):
                     continue
                 if block.get("type") == "text":
@@ -1122,31 +1122,31 @@ def scan(transcript, session_id="", cwd="", prior=None, rescan=False, agents=Non
                     called = block.get("input")
                     if block.get("id") and isinstance(called, dict):
                         requested.setdefault(block["id"], called.get("subagent_type") or "")
-                        # The brief as the model wrote it, kept only long enough to read the
-                        # word cap off it. No row holds it: see `mark_returns`.
+                        # O brief como o modelo o escreveu, mantido só o suficiente para ler o
+                        # teto de palavras dele. Nenhuma linha o guarda: veja `mark_returns`.
                         brief = called.get("prompt")
                         briefs.setdefault(block["id"], brief if isinstance(brief, str) else "")
-            # The same repetition is why the token sums are taken once per message id, not once
-            # per line, and at that id's largest figure rather than its first: the early lines
-            # of one response carry a partial streaming count.
+            # A mesma repetição é por que as somas de token são tomadas uma vez por id de mensagem, não uma
+            # vez por linha, e no maior número daquele id em vez do primeiro: as linhas iniciais
+            # de uma resposta carregam uma contagem parcial de streaming.
             key, superseded = usage_key(links, [per_message], mid, entry.get("requestId"))
             if key is None:
-                # Nothing identifies this record, so nothing may be merged into it. Its key
-                # names the line it came from, and it is counted as unknown rather than
-                # silently deduplicated against a record it may have nothing to do with.
+                # Nada identifica este registro, então nada pode ser mesclado nele. Sua chave
+                # nomeia a linha de onde veio, e é contado como desconhecido em vez de
+                # silenciosamente deduplicado contra um registro com o qual pode não ter nada a ver.
                 idless += 1
                 key = ("line", "session", idless)
             usage = message.get("usage") or {}
             record_usage(per_message, key, usage, stamp[:10], model or "")
             add_raw(raw, usage)
-            # Claude Code writes the effort in force on every assistant record, as `effort` and
-            # again as `perTurnEffort`; a sidechain line carries the subagent's, not this
-            # session's, so only the session's own records are weighed.
+            # O Claude Code escreve o esforço em vigor em todo registro de assistente, como `effort` e
+            # de novo como `perTurnEffort`; uma linha de sidechain carrega o do subagente, não o desta
+            # sessão, então só os próprios registros da sessão são pesados.
             if mid and not sidechain:
                 chosen = entry.get("effort") or entry.get("perTurnEffort")
                 if isinstance(chosen, str) and chosen.strip():
                     efforts.setdefault(mid, chosen.strip())
-            # A slot folded into another keeps the turn it was already counted for.
+            # Um slot dobrado para dentro de outro mantém o turno para o qual já foi contado.
             if superseded is not None and superseded in seen:
                 seen.discard(superseded)
                 seen.add(key)
@@ -1154,7 +1154,7 @@ def scan(transcript, session_id="", cwd="", prior=None, rescan=False, agents=Non
                 continue
             seen.add(key)
             turns += 1
-            # Counted exactly where `turns` is, so the slices' turn counts add up to the row's.
+            # Contado exatamente onde `turns` está, para que as contagens de turno das fatias somem até a da linha.
             turns_by_day[stamp[:10]] = turns_by_day.get(stamp[:10], 0) + 1
             if model and model not in models:
                 models.append(model)
@@ -1165,9 +1165,9 @@ def scan(transcript, session_id="", cwd="", prior=None, rescan=False, agents=Non
         return None
     totals = summed(per_message)
     top = git(cwd, "rev-parse", "--show-toplevel") if cwd and os.path.isdir(cwd) else ""
-    # After `top`, because a return's paths are resolved against the worktree it ran in. The
-    # results are the ones the event list already kept for the detectors, so measuring a return
-    # costs no second read of the transcript.
+    # Depois de `top`, porque os caminhos de um retorno são resolvidos contra a worktree onde rodou. Os
+    # resultados são os que a lista de eventos já guardou para os detectores, então medir um retorno
+    # não custa uma segunda leitura da transcrição.
     mark_returns(agents, briefs,
                  dict((e["tool_use_id"], (e["text"], e.get("truncated")))
                       for e in events
@@ -1185,9 +1185,9 @@ def scan(transcript, session_id="", cwd="", prior=None, rescan=False, agents=Non
         "started": started,
         "ended": ended,
     }
-    # A subagent's tokens are the session's bill, so the session row carries them — once,
-    # because `totals` is taken over the one map both reads filled. The per-agent rows carry
-    # the same tokens again, attributed, which is why no grouping sums both.
+    # Os tokens de um subagente são a conta da sessão, então a linha de sessão os carrega — uma vez,
+    # porque `totals` é tomado sobre o único mapa que ambas as leituras preencheram. As linhas por agente carregam
+    # os mesmos tokens de novo, atribuídos, o que é por que nenhum agrupamento soma os dois.
     for name, _ in FIELDS:
         record[name] = totals[name]
     for name, _ in CACHE_TIERS:
@@ -1196,14 +1196,14 @@ def scan(transcript, session_id="", cwd="", prior=None, rescan=False, agents=Non
     refused = set() if legacy_sidechains else refused_spawns(agents, errored_calls)
     record["subagents"] = max(len(agents), len(agent_calls - refused))
     record["turns"] = turns
-    # Every record these totals include that nothing identified — neither a message id nor a
-    # request id — this session's own and those of the subagent files folded into it, since
-    # the totals include both. A row without the key was deduplicated whole.
+    # Todo registro que estes totais incluem que nada identificou — nem id de mensagem nem
+    # id de requisição — os próprios desta sessão e os dos arquivos de subagente dobrados nela, já que
+    # os totais incluem ambos. Uma linha sem a chave foi deduplicada por inteiro.
     unknown = idless + sum(int(row.get("idless_records") or 0) for row in agents or [])
     if unknown:
         record["idless_records"] = unknown
-    # How much the deduplication above removed, over the same slots: the totals include the
-    # subagent files, so the raw figure does too.
+    # Quanto a deduplicação acima removeu, sobre os mesmos slots: os totais incluem os
+    # arquivos de subagente, então o número bruto também.
     record["raw_vs_deduped"] = inflation(raw, totals)
     weights = {}
     for mid, chosen in efforts.items():
@@ -1216,9 +1216,9 @@ def scan(transcript, session_id="", cwd="", prior=None, rescan=False, agents=Non
     parts = by_model(per_message)
     if models_agree(parts, totals):
         record["by_model"] = parts
-    # A live SessionEnd write knows the stances the session actually ran under. A rescan does
-    # not — the environment it reads is this minute's — so it keeps whatever the record already
-    # carries, and stamps a record that has none as a guess, which the report then excludes.
+    # Uma escrita ao vivo de SessionEnd sabe as posturas sob as quais a sessão de fato rodou. Uma revarredura
+    # não sabe — o ambiente que lê é o deste minuto — então mantém o que o registro já
+    # carrega, e carimba um registro que não tem nenhuma como um chute, que o relatório então exclui.
     prior_stances = (prior or {}).get("stances") if isinstance(prior, dict) else None
     if isinstance(prior_stances, dict) and prior_stances:
         record["stances"] = prior_stances
@@ -1238,17 +1238,17 @@ def scan(transcript, session_id="", cwd="", prior=None, rescan=False, agents=Non
         if errors:
             record["rules_errors"] = errors
     except Exception as exc:
-        # A registry that is missing, broken or a version apart costs the record its rule
-        # fields and nothing else; the gap is named so a report never reads it as a quiet zero.
+        # Um registro que está faltando, quebrado ou uma versão à parte custa ao registro seus campos
+        # de regra e nada mais; a lacuna é nomeada para que um relatório nunca a leia como um zero silencioso.
         record.pop("counts", None)
         record.pop("rules", None)
         record["rules_error"] = "{}: {}".format(type(exc).__name__, exc).split("\n")[0][:200]
     return record
 
 
-# Codex names its token fields differently from Claude Code's and reports `input_tokens`
-# inclusive of the cached part, so the mapping lives in one place and `codex_totals` is the only
-# reader of it.
+# O Codex nomeia seus campos de token de forma diferente do Claude Code e reporta `input_tokens`
+# incluindo a parte em cache, então o mapeamento mora num só lugar e `codex_totals` é o único
+# leitor dele.
 CODEX_FIELDS = (("input", "input_tokens"), ("output", "output_tokens"),
                 ("cache_read", "cached_input_tokens"),
                 ("cache_write", "cache_write_input_tokens"))
@@ -1259,18 +1259,18 @@ def codex_home():
 
 
 def codex_spawn(meta):
-    """The `thread_spawn` record of a Codex subagent rollout, or None for a top-level session.
+    """O registro `thread_spawn` de um rollout de subagente do Codex, ou None para uma sessão de topo.
 
-    Codex writes a subagent to a rollout file of its own rather than beside its parent's, so
-    the `session_meta` is the only thing that tells the two apart: a top-level rollout's
-    `payload.source` is a string naming the front end — `"vscode"`, `"cli"`, `"exec"` — while a
-    subagent's is the object `{"subagent": {"thread_spawn": {...}}}`. Measured on one machine,
-    307 of 438 rollouts are subagent threads, every one of them recorded as a session until
-    this test existed.
+    O Codex escreve um subagente num arquivo de rollout próprio em vez de ao lado do seu pai, então
+    o `session_meta` é a única coisa que distingue os dois: o `payload.source` de um rollout de topo
+    é uma string nomeando o front end — `"vscode"`, `"cli"`, `"exec"` — enquanto o de um
+    subagente é o objeto `{"subagent": {"thread_spawn": {...}}}`. Medido numa máquina,
+    307 de 438 rollouts são threads de subagente, todos registrados como uma sessão até
+    este teste existir.
 
-    The meta's own `parent_thread_id` under `thread_source: "subagent"` is the fallback, so a
-    Codex that moves or renames `source` degrades to a joined row rather than to a false
-    session; the depth it cannot supply is recorded as unknown rather than guessed at 1.
+    O próprio `parent_thread_id` do meta sob `thread_source: "subagent"` é o fallback, então um
+    Codex que move ou renomeia `source` degrada para uma linha unida em vez de para uma falsa
+    sessão; a profundidade que não consegue fornecer é registrada como desconhecida em vez de adivinhada como 1.
     """
     source = meta.get("source")
     if isinstance(source, dict):
@@ -1285,18 +1285,18 @@ def codex_spawn(meta):
 
 
 def codex_totals(record, totals):
-    """Fill a Codex row's token fields from the last `total_token_usage` snapshot.
+    """Preenche os campos de token de uma linha do Codex a partir do último snapshot `total_token_usage`.
 
-    `input_tokens` is inclusive of `cached_input_tokens` and `total_tokens` is input plus
-    output: checked over the 349 rollouts on one machine that carry a typed split, with no
-    exception. `reasoning_output_tokens` is part of `output_tokens` rather than beside it, so
-    it is never added anywhere.
+    `input_tokens` inclui `cached_input_tokens` e `total_tokens` é input mais
+    output: checado nos 349 rollouts numa máquina que carregam uma divisão tipada, sem
+    exceção. `reasoning_output_tokens` é parte de `output_tokens` em vez de ao lado dele, então
+    nunca é somado em lugar nenhum.
 
-    Codex Desktop often writes a snapshot whose typed fields are all zero and whose
-    `total_tokens` alone is set — 85 of 107 top-level Desktop rollouts here. Reading that as a
-    session that spent nothing would be an error in the direction of free, so the row keeps
-    `total` alone, carries `partial`, and leaves every typed field unknown for the report to
-    exclude from its sums.
+    O Codex Desktop frequentemente escreve um snapshot cujos campos tipados são todos zero e cujo
+    `total_tokens` sozinho está definido — 85 de 107 rollouts de topo do Desktop aqui. Ler isso como uma
+    sessão que não gastou nada seria um erro na direção de grátis, então a linha mantém
+    só `total`, carrega `partial`, e deixa todo campo tipado desconhecido para o relatório
+    excluir das suas somas.
     """
     if not isinstance(totals, dict):
         return
@@ -1316,12 +1316,12 @@ def codex_totals(record, totals):
 
 
 def codex_days(raw_days, turns_by_day, record):
-    """A Codex row's `days` map, from the deltas between its cumulative snapshots.
+    """O mapa `days` de uma linha do Codex, a partir dos deltas entre seus snapshots cumulativos.
 
-    A row whose typed fields are unknown — the Codex Desktop snapshot carrying `total_tokens`
-    alone — gets no slices at all: there is nothing to slice, and a map of zeros would read as
-    days that cost nothing. `input` is made net of the cached part per day, exactly as
-    `codex_totals` makes the row's own.
+    Uma linha cujos campos tipados são desconhecidos — o snapshot do Codex Desktop carregando só
+    `total_tokens` — não ganha fatia nenhuma: não há nada a fatiar, e um mapa de zeros se leria como
+    dias que não custaram nada. `input` é feito líquido da parte em cache por dia, exatamente como
+    `codex_totals` faz para o da própria linha.
     """
     if any(not isinstance(record.get(name), int) for name, _ in FIELDS):
         return {}
@@ -1341,13 +1341,13 @@ def codex_days(raw_days, turns_by_day, record):
 
 
 def codex_by_model(raw_models, record):
-    """A Codex row's per-model breakdown, from the deltas between its cumulative snapshots.
+    """A divisão por modelo de uma linha do Codex, a partir dos deltas entre seus snapshots cumulativos.
 
-    `input` is made net of the cached part per model, exactly as `codex_totals` makes the row's
-    own, so a model's part is charged the same way the row is. A field the rollout never
-    reported — `cache_write`, on every Codex rollout measured — is left off the parts as it is
-    left off the row, rather than written as a zero the row does not claim. A row whose typed
-    fields are all unknown gets no breakdown: there is nothing to attribute.
+    `input` é feito líquido da parte em cache por modelo, exatamente como `codex_totals` faz para
+    o da própria linha, então a parte de um modelo é cobrada da mesma forma que a linha é. Um campo que o rollout nunca
+    reportou — `cache_write`, em todo rollout do Codex medido — é deixado de fora das partes como é
+    deixado de fora da linha, em vez de escrito como um zero que a linha não alega. Uma linha cujos campos
+    tipados são todos desconhecidos não ganha divisão nenhuma: não há nada a atribuir.
     """
     fields = [name for name, _ in FIELDS if isinstance(record.get(name), int)]
     if not fields:
@@ -1364,23 +1364,23 @@ def codex_by_model(raw_models, record):
 
 
 def scan_codex(transcript, session_id="", cwd="", prior=None, rescan=False):
-    """One row from one Codex rollout: a session, or a subagent thread when it was spawned.
+    """Uma linha de um rollout do Codex: uma sessão, ou uma thread de subagente quando foi lançada por spawn.
 
-    Which of the two it is comes from `codex_spawn` and nothing else. A subagent row is shaped
-    like the Claude Code one `_agent_row` builds, so `usage --by role` reads both without
-    knowing which runtime wrote them.
+    Qual dos dois é vem de `codex_spawn` e de mais nada. Uma linha de subagente tem a mesma forma
+    da que `_agent_row` constrói para o Claude Code, então `usage --by role` lê ambas sem
+    saber qual runtime as escreveu.
     """
     events, models, totals, meta = [], [], None, {}
     started = ended = effort = ""
     turn = 0
     tool_names = {}
     malformed = 0
-    # Codex writes a cumulative snapshot rather than a per-turn figure, so a day's spend and an
-    # effort's are the differences between consecutive snapshots, attributed to the date of the
-    # snapshot that closed them and to the effort in force when it was written.
+    # O Codex escreve um snapshot cumulativo em vez de um número por turno, então o gasto de um dia e o de um
+    # esforço são as diferenças entre snapshots consecutivos, atribuídas à data do
+    # snapshot que os fechou e ao esforço em vigor quando foi escrito.
     weights, raw_days, turns_by_day, last = {}, {}, {}, dict((name, 0) for name, _ in CODEX_FIELDS)
-    # The same delta, attributed a second way: to the model `turn_context` last named. Codex
-    # changes model mid-thread, and a thread that did cannot be priced from its totals alone.
+    # O mesmo delta, atribuído de uma segunda forma: ao modelo que `turn_context` nomeou por último. O Codex
+    # muda de modelo no meio de uma thread, e uma thread que o fez não pode ser precificada só pelos seus totais.
     raw_models, model_now = {}, ""
     with open(transcript, encoding="utf-8", errors="replace") as stream:
         for line in stream:
@@ -1396,10 +1396,10 @@ def scan_codex(transcript, session_id="", cwd="", prior=None, rescan=False):
             started = started or timestamp
             ended = timestamp or ended
             if item.get("type") == "session_meta":
-                # The first `session_meta` is this rollout's own. A subagent that inherited its
-                # parent's history carries the parent's meta further down — 36 of 307 here —
-                # and reading that one would hand the child the parent's id and the parent's
-                # string `source`, which is how a subagent was last classified as a session.
+                # O primeiro `session_meta` é o próprio deste rollout. Um subagente que herdou o
+                # histórico do seu pai carrega o meta do pai mais adiante — 36 de 307 aqui —
+                # e ler esse entregaria ao filho o id do pai e a string `source` do
+                # pai, que é como um subagente foi classificado como sessão da última vez.
                 if meta:
                     continue
                 meta = payload
@@ -1412,14 +1412,14 @@ def scan_codex(transcript, session_id="", cwd="", prior=None, rescan=False):
                     model_now = payload["model"]
                     if model_now not in models:
                         models.append(model_now)
-                # The effort in force from here on: Codex records it per turn and it changes
-                # mid-session, `ultra` and `max` among the values seen.
+                # O esforço em vigor daqui em diante: o Codex o registra por turno e ele muda
+                # no meio da sessão, `ultra` e `max` entre os valores vistos.
                 if isinstance(payload.get("effort"), str) and payload["effort"].strip():
                     effort = payload["effort"].strip()
             elif item.get("type") == "event_msg" and payload.get("type") == "token_count":
                 value = (payload.get("info") or {}).get("total_token_usage")
                 if isinstance(value, dict):
-                    totals = value  # Cumulative snapshot; summing snapshots double counts usage.
+                    totals = value  # Snapshot cumulativo; somar snapshots conta o uso em dobro.
                     slice_ = raw_days.setdefault(timestamp[:10], empty_slice())
                     part = raw_models.setdefault(model_now, empty_slice()) if model_now else None
                     for name, field in CODEX_FIELDS:
@@ -1460,32 +1460,32 @@ def scan_codex(transcript, session_id="", cwd="", prior=None, rescan=False):
     if not session_id:
         return None
     spawn = codex_spawn(meta)
-    # A subagent whose parent cannot be named would join to nothing and appear in no report, so
-    # it is kept as the session it was recorded as rather than turned into an invisible row.
+    # Um subagente cujo pai não pode ser nomeado se uniria a nada e não apareceria em relatório nenhum, então
+    # é mantido como a sessão sob a qual foi registrado em vez de virar uma linha invisível.
     parent = (spawn or {}).get("parent_thread_id") or meta.get("session_id") or ""
     if spawn and parent and parent != session_id:
         row = {
             "kind": "subagent", "runtime": "codex",
             "runtime_version": meta.get("cli_version"),
             "harness_version": stamped_version(rescan),
-            # `session_id` is the thread that spawned this one, which at depth 1 is the session
-            # and deeper is another subagent; `spawn_depth` is what says which.
+            # `session_id` é a thread que gerou esta, que na profundidade 1 é a sessão
+            # e mais fundo é outro subagente; `spawn_depth` é o que diz qual.
             "session_id": parent, "agent_id": session_id,
             "repo": Path(cwd).name,
-            # Codex leaves `agent_role` null and names the thread on every rollout measured
-            # here, so the nickname is the fallback that actually carries the report.
+            # O Codex deixa `agent_role` nulo e nomeia a thread em todo rollout medido
+            # aqui, então o apelido é o fallback que de fato carrega o relatório.
             "agent_type": spawn.get("agent_role") or spawn.get("agent_nickname")
                           or meta.get("agent_nickname") or "unknown",
             "model": models[-1] if models else "",
             "effort": dominant(weights) or effort,
             "tool_calls": sum(1 for e in events if e["kind"] == "tool_use"),
             "spawn_depth": spawn.get("depth"), "workflow": None,
-            # Codex records no parent-side tool use id on the child, so there is nothing to
-            # join a reroute on; null is that absence, not a measurement of no reroute.
+            # O Codex não registra id de uso de ferramenta do lado do pai no filho, então não há nada para
+            # unir um reroteamento a; null é essa ausência, não uma medição de nenhum reroteamento.
             "tool_use_id": None, "requested_type": None, "rerouted": False,
-            # Codex raises no subagent-return event on the parent thread and writes the child to
-            # a rollout of its own, so no return is joined to this row and none is measured;
-            # `adapters/codex/capabilities.json` names the gap.
+            # O Codex não dispara evento de retorno de subagente na thread pai e escreve o filho num
+            # rollout próprio, então nenhum retorno é unido a esta linha e nenhum é medido;
+            # `adapters/codex/capabilities.json` nomeia a lacuna.
             "return_path": None, "return_over_budget": None, "return_measured": None,
             "turns": turn, "started": started, "ended": ended,
             "parse_failures": malformed,
@@ -1507,8 +1507,8 @@ def scan_codex(transcript, session_id="", cwd="", prior=None, rescan=False):
     chosen = dominant(weights) or effort
     record["effort"] = chosen or None
     record["effort_source"] = "turn_context" if chosen else None
-    # Codex reports cumulative snapshots, not a figure per record, so there is no per-line sum
-    # to measure a deduplication against and none is invented.
+    # O Codex reporta snapshots cumulativos, não um número por registro, então não há soma por linha
+    # contra a qual medir uma deduplicação e nenhuma é inventada.
     record["raw_vs_deduped"] = RAW_UNKNOWN
     days = codex_days(raw_days, turns_by_day, record)
     if slices_agree(days, record):
@@ -1529,19 +1529,19 @@ def scan_codex(transcript, session_id="", cwd="", prior=None, rescan=False):
 
 
 def row_key(row):
-    """What identifies a row. A row written before `kind` existed is a session, as it was."""
+    """O que identifica uma linha. Uma linha escrita antes de `kind` existir é uma sessão, como sempre foi."""
     return (row.get("session_id"), row.get("runtime", "claude-code"),
             row.get("kind") or "session", row.get("agent_id") or "")
 
 
 def upsert(record, path=None, drop=()):
-    """Replace the rows these records identify, or append them. Takes one record or many.
+    """Substitui as linhas que estes registros identificam, ou as anexa. Aceita um registro ou vários.
 
-    A batch keeps the last record for a key, so one locked rewrite is what a whole rescan costs.
+    Um lote mantém o último registro para uma chave, então uma reescrita travada é tudo o que uma revarredura inteira custa.
 
-    `drop` is the keys to delete outright. A row that changes `kind` changes its key, so an
-    upsert alone would leave the old row beside the new one and the ledger would carry the same
-    thread twice; naming the stale key is how a reclassification migrates rather than doubles.
+    `drop` são as chaves a apagar diretamente. Uma linha que muda de `kind` muda sua chave, então um
+    upsert sozinho deixaria a linha antiga ao lado da nova e o razão carregaria a mesma
+    thread duas vezes; nomear a chave obsoleta é como uma reclassificação migra em vez de dobrar.
     """
     records = [stamped(record)] if isinstance(record, dict) else list(
         {row_key(r): stamped(r) for r in record}.values())
@@ -1561,8 +1561,8 @@ def upsert(record, path=None, drop=()):
             text = path.read_text(encoding="utf-8")
         except OSError:
             text = ""
-        # An existing row is kept exactly as it was written, and matched on its folded key:
-        # the rewrite replaces records, it does not migrate anyone else's.
+        # Uma linha existente é mantida exatamente como foi escrita, e comparada pela sua chave dobrada:
+        # a reescrita substitui registros, não migra os de mais ninguém.
         for line in text.splitlines():
             try:
                 row = json.loads(line)
@@ -1580,7 +1580,7 @@ def upsert(record, path=None, drop=()):
 
 
 def acquire(path):
-    """The lock file beside the ledger, held, or None when another writer would not let go."""
+    """O arquivo de trava ao lado do razão, mantido, ou None quando outro escritor não o soltaria."""
     lock = path.with_name(path.name + ".lock")
     for _ in range(20):
         try:
@@ -1602,16 +1602,16 @@ def release(lock, held=True):
 
 
 def errors_path(path=None):
-    """`usage.errors.jsonl` beside the ledger this path names."""
+    """`usage.errors.jsonl` ao lado do razão que este caminho nomeia."""
     return (Path(path) if path else usage_path()).with_suffix(".errors.jsonl")
 
 
 def record_error(error, path=None, where=""):
-    """Append one swallowed failure beside the ledger. Never raises.
+    """Anexa uma falha engolida ao lado do razão. Nunca levanta exceção.
 
-    The same file this hook's own crash lands in, because a write that failed silently is
-    unknown rather than absent: a report with no rows in it has somewhere to be explained. The
-    exception type, never its message — a message can carry a path or a value.
+    O mesmo arquivo em que a própria falha deste hook cai, porque uma escrita que falhou silenciosamente é
+    desconhecida em vez de ausente: um relatório sem linhas nele tem um lugar para ser explicado. O
+    tipo da exceção, nunca sua mensagem — uma mensagem pode carregar um caminho ou um valor.
     """
     entry = {"time": time.time(), "error": type(error).__name__ if isinstance(error, BaseException)
              else str(error)}
@@ -1628,13 +1628,13 @@ def record_error(error, path=None, where=""):
 
 
 def append_row(record, path=None):
-    """Append one row to the ledger without rewriting it, and return its path.
+    """Anexa uma linha ao razão sem reescrevê-lo, e retorna seu caminho.
 
-    For a row nothing ever replaces. `upsert` reads and rewrites the whole file, which is right
-    for a session record refreshed while the session runs and wrong for a row written once
-    inside a hook's budget: a ledger of tens of thousands of lines would be re-read and
-    rewritten on every provider call. The append is one write of one line, under the same lock,
-    so a concurrent rewrite can neither interleave with it nor drop it.
+    Para uma linha que nada jamais substitui. `upsert` lê e reescreve o arquivo inteiro, o que é certo
+    para um registro de sessão atualizado enquanto a sessão roda e errado para uma linha escrita uma vez
+    dentro do orçamento de um hook: um razão de dezenas de milhares de linhas seria relido e
+    reescrito a cada chamada de provedor. O append é uma escrita de uma linha, sob a mesma trava,
+    então uma reescrita concorrente não pode se intercalar com ela nem perdê-la.
     """
     path = Path(path) if path else usage_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1650,11 +1650,11 @@ def append_row(record, path=None):
 
 
 def export(records):
-    """Offer rows to a configured OTLP endpoint, after the ledger already holds them.
+    """Oferece linhas a um endpoint OTLP configurado, depois que o razão já as contém.
 
-    Off by default, and silent in every failure mode: the row is on disk, so a collector that
-    is down, slow or misconfigured costs a line in `usage.errors.jsonl` and nothing else.
-    `harness usage export --since` replays what was missed. See `telemetry.py`.
+    Desligado por padrão, e silencioso em todo modo de falha: a linha está em disco, então um coletor que
+    está caído, lento ou mal configurado custa uma linha em `usage.errors.jsonl` e nada mais.
+    `harness usage export --since` reproduz o que foi perdido. Veja `telemetry.py`.
     """
     module = sibling("telemetry", required=False)
     if module is None:
@@ -1667,7 +1667,7 @@ def export(records):
 
 
 def recorded(path=None):
-    """The records already on file, by session id, so a rescan can keep what it cannot know."""
+    """Os registros já em arquivo, por id de sessão, para uma revarredura poder manter o que não pode saber."""
     try:
         text = (Path(path) if path else usage_path()).read_text(encoding="utf-8")
     except OSError:
@@ -1691,18 +1691,18 @@ def stamp(epoch):
 
 
 def worker_rows(cutoff=0.0):
-    """One `kind: "worker"` row per `harness role run` worker, from its own `status.json`.
+    """Uma linha `kind: "worker"` por worker de `harness role run`, do seu próprio `status.json`.
 
-    A worker is an isolated CLI session whose runtime reports its own token totals; `workers.py`
-    writes them into the status record. A worker that reported none keeps its row and leaves the
-    token fields unknown, which the report then excludes from its sums rather than reading as
-    zero. The role name is the agent type, so a worker and a subagent group the same way.
+    Um worker é uma sessão de CLI isolada cujo runtime reporta seus próprios totais de token; `workers.py`
+    os escreve no registro de status. Um worker que não reportou nenhum mantém sua linha e deixa os
+    campos de token desconhecidos, que o relatório então exclui das suas somas em vez de ler como
+    zero. O nome do papel é o tipo de agente, então um worker e um subagente se agrupam da mesma forma.
 
-    Only a completed run is recorded: a run that timed out, failed or is still running has no
-    total worth comparing against another role's. The window is applied by file modification
-    time before the file is opened, so a sweep reads the recent runs and not the archive, and
-    a record whose own timestamps are unusable is dated by that same mtime rather than by a
-    stamp the report could never place in a window.
+    Só uma execução completa é registrada: uma execução que estourou o tempo, falhou ou ainda está rodando não tem
+    total que valha a pena comparar com o de outro papel. A janela é aplicada pela hora de modificação
+    do arquivo antes de ele ser aberto, para que uma varredura leia as execuções recentes e não o arquivo morto, e
+    um registro cujos próprios timestamps são inutilizáveis é datado por essa mesma mtime em vez de por um
+    carimbo que o relatório jamais poderia colocar numa janela.
     """
     rows = []
     try:
@@ -1727,18 +1727,18 @@ def worker_rows(cutoff=0.0):
         ended = stamp(record.get("finished_at") or record.get("started_at")) or stamp(mtime)
         usage = record.get("usage") if isinstance(record.get("usage"), dict) else {}
         row = {"kind": "worker", "runtime": record.get("runtime") or "claude-code",
-               # Stamped by `workers.py` when the run started, so a sweep months later still
-               # names the version that ran it rather than the version reading the file.
+               # Carimbado por `workers.py` quando a execução começou, para que uma varredura meses depois ainda
+               # nomeie a versão que a rodou em vez da versão que lê o arquivo.
                "harness_version": record.get("harness_version"),
-               # The same for the profile; a run from before the field is unattributed.
+               # O mesmo para o perfil; uma execução de antes do campo não é atribuída.
                FINGERPRINT_KEY: record.get(FINGERPRINT_KEY),
                "session_id": record["id"], "agent_id": record["id"],
                "agent_type": record["role"], "repo": os.path.basename(str(record.get("workspace") or "").rstrip("/")),
                "model": record.get("model") or "", "effort": record.get("effort") or "",
                "tool_calls": usage.get("tool_calls"), "spawn_depth": 1, "rerouted": False,
-               # A worker is launched by name from the CLI, so there is no requested type and no
-               # parent tool call to join on; null is that absence, not an empty answer. Present
-               # so every non-session row carries the same keys.
+               # Um worker é lançado por nome a partir da CLI, então não há tipo pedido nem
+               # chamada de ferramenta pai para unir; null é essa ausência, não uma resposta vazia. Presente
+               # para que toda linha que não é de sessão carregue as mesmas chaves.
                "requested_type": None, "tool_use_id": None,
                "status": record.get("status"), "stances": record.get("stances") or {},
                "started": stamp(record.get("started_at")) or ended, "ended": ended}
@@ -1749,7 +1749,7 @@ def worker_rows(cutoff=0.0):
 
 
 def backup(path):
-    """A copy of the ledger beside it, taken before a rescan rewrites or deletes any row."""
+    """Uma cópia do razão ao lado dele, tirada antes de uma revarredura reescrever ou apagar qualquer linha."""
     try:
         data = path.read_bytes()
     except OSError:
@@ -1763,15 +1763,15 @@ def backup(path):
 
 
 def rescan(days=30):
-    """Re-read every transcript in the window and rewrite the file once.
+    """Relê toda transcrição na janela e reescreve o arquivo uma vez.
 
-    A backfill of a month reads hundreds of transcripts. Upserting each one separately would
-    take the lock and rewrite the whole file that many times, so the rows are collected and
-    written in a single locked pass; `SessionEnd` keeps the one-session path.
+    Um preenchimento retroativo de um mês lê centenas de transcrições. Fazer upsert de cada uma separadamente
+    tomaria a trava e reescreveria o arquivo inteiro tantas vezes, então as linhas são coletadas e
+    escritas numa única passagem travada; `SessionEnd` mantém o caminho de uma-sessão.
 
-    Codex is read from both `sessions/` and `archived_sessions/`, because Codex moves a rollout
-    to the second directory without changing a byte of it: 96 of the 131 top-level rollouts on
-    one machine lived only there, which is most of the capture gap this walk closes.
+    O Codex é lido tanto de `sessions/` quanto de `archived_sessions/`, porque o Codex move um rollout
+    para o segundo diretório sem mudar um byte dele: 96 dos 131 rollouts de topo numa
+    máquina viviam só ali, o que é a maior parte da lacuna de captura que esta busca fecha.
     """
     cutoff = time.time() - max(days, 0) * 86400
     prior = recorded()
@@ -1781,10 +1781,10 @@ def rescan(days=30):
     for folder in ("sessions", "archived_sessions"):
         paths += list((codex / folder).rglob("*.jsonl"))
     for path in sorted(paths):
-        # A Claude Code subagent transcript is read from its session, never as one: it carries
-        # no session id of its own, so recording it here would invent a session that never ran.
-        # A Codex subagent is the opposite — its own rollout, named like any other — so it is
-        # walked here and told apart by `codex_spawn` once its first line has been read.
+        # Uma transcrição de subagente do Claude Code é lida a partir da sua sessão, nunca como uma: ela não carrega
+        # id de sessão próprio, então registrá-la aqui inventaria uma sessão que nunca rodou.
+        # Um subagente do Codex é o oposto — seu próprio rollout, nomeado como qualquer outro — então é
+        # percorrido aqui e distinguido por `codex_spawn` assim que sua primeira linha for lida.
         if path.name.startswith("agent-") or path.parent.name == "subagents":
             continue
         try:
@@ -1792,8 +1792,8 @@ def rescan(days=30):
                 continue
         except OSError:
             continue
-        # A transcript is named for its session, which is how a backfill finds the record it
-        # is refreshing before it has read a line of the file.
+        # Uma transcrição é nomeada pela sua sessão, que é como um preenchimento retroativo encontra o registro que
+        # está atualizando antes de ter lido uma linha do arquivo.
         ident = path.stem
         try:
             with path.open() as stream:
@@ -1803,9 +1803,9 @@ def rescan(days=30):
         except (OSError, ValueError):
             pass
         records = scan_all(path, prior=prior.get(ident), rescan=True)
-        # A transcript does not say which profile ran it. A session the ledger already holds
-        # keeps the fingerprint its live row was written with, and its subagents ran under the
-        # same profile; a session it does not is unattributed.
+        # Uma transcrição não diz qual perfil a rodou. Uma sessão que o razão já guarda
+        # mantém a impressão digital com que sua linha ao vivo foi escrita, e seus subagentes rodaram sob o
+        # mesmo perfil; uma sessão que ele não guarda não é atribuída.
         known = (prior.get(ident) or {}).get(FINGERPRINT_KEY)
         for record in records:
             record[FINGERPRINT_KEY] = known
@@ -1817,9 +1817,9 @@ def rescan(days=30):
     for row in batch:
         if row.get("kind") == "subagent" and row.get("runtime") == "codex":
             children[row["session_id"]] = children.get(row["session_id"], 0) + 1
-    # Codex counts a session's subagents from its own `spawn_agent` calls, which misses a spawn
-    # whose rollout this walk found but whose parent call was compacted away; the larger of the
-    # two is the one supported by a file on disk.
+    # O Codex conta os subagentes de uma sessão a partir das suas próprias chamadas `spawn_agent`, o que perde um spawn
+    # cujo rollout esta busca encontrou mas cuja chamada pai foi compactada para fora; o maior dos
+    # dois é o que é sustentado por um arquivo em disco.
     for row in batch:
         if row.get("kind") == "session" and row.get("runtime") == "codex":
             row["subagents"] = max(row.get("subagents") or 0, children.get(row["session_id"], 0))
@@ -1835,10 +1835,10 @@ def rescan(days=30):
 def main(argv):
     if argv and argv[0] == "--worker":
         transcript, session_id, cwd = (list(argv[1:]) + ["", "", ""])[:3]
-        # Role-run workers have no session of their own to end, so the detached worker that
-        # records this session also sweeps the recent ones into rows.
+        # Workers de execução de papel não têm sessão própria para terminar, então o worker desacoplado que
+        # registra esta sessão também varre os recentes para linhas.
         records = scan_all(transcript, session_id, cwd) + worker_rows(time.time() - 30 * 86400)
-        # Stamped here as well as in `upsert`, so what is offered live is what a replay reads.
+        # Carimbado aqui assim como em `upsert`, para que o que é oferecido ao vivo seja o que uma reprodução lê.
         records = [stamped(r) for r in records]
         if records:
             upsert(records)
@@ -1855,10 +1855,10 @@ def main(argv):
         payload = json.load(sys.stdin)
     except Exception:
         return 0
-    # Claude Code names the file `transcript_path`. Codex's SessionEnd payload has not been
-    # observed here — no Codex CLI is installed on the machine this was measured on — so the
-    # two names it could plausibly use are accepted and the rescan remains the path Codex
-    # capture is actually known to travel. See `docs/usage.md`.
+    # O Claude Code nomeia o arquivo `transcript_path`. O payload de SessionEnd do Codex não foi
+    # observado aqui — nenhuma CLI do Codex está instalada na máquina onde isto foi medido — então os
+    # dois nomes que ele plausivelmente poderia usar são aceitos e a revarredura permanece o caminho que
+    # a captura do Codex de fato sabe percorrer. Veja `docs/usage.md`.
     payload = payload or {}
     transcript = (payload.get("transcript_path") or payload.get("rollout_path")
                   or payload.get("session_path") or "")

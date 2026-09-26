@@ -1,60 +1,65 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""PreToolUse hook: grade every Bash command 0-3 and gate the grades the autonomy stance forbids.
+"""Hook de PreToolUse: avalia todo comando Bash de 0 a 3 e restringe as notas que a stance de autonomia proíbe.
 
-Why a hook and not a rule: "never force-push without asking" is a sentence the model can read
-and still skip, and the native permission prompt cannot tell `git push` from `git push --force`
-or `terraform plan` from `terraform apply`. A hook sees the command before it runs, in every
-permission mode, and can put the consequence in front of the user in one line.
+Por que um hook e não uma regra: "nunca faça force-push sem perguntar" é uma frase que o modelo
+consegue ler e ainda assim pular, e o prompt de permissão nativo não consegue distinguir
+`git push` de `git push --force` ou `terraform plan` de `terraform apply`. Um hook vê o comando
+antes de rodar, em todo modo de permissão, e consegue colocar a consequência diante do usuário em
+uma linha.
 
-Behaviour:
-  - Grades the maximum over the simple commands the read-only grammar decomposes the command
-    into: 0 read-only (`allow-readonly-bash.command_ok` proves it), 1 local write, 2
-    remote-mutating, 3 irreversible. An unknown command grades 1, never 3: a false low grade is
-    the missed prompt native gives today, and the corpus grows from each miss.
-  - The text is normalised before anything else — backslash continuations joined, quoted heredoc
-    bodies and comments dropped — so a `#` comment or a here-document cannot hide the verb or
-    break the parse with an unbalanced quote or backtick. When the text still does not parse, the
-    raw text is scanned for grade-3 verb families rather than graded 1: an unparseable command
-    that says `--force` or `rm -rf` is irreversible whatever the rest of it is.
-  - `bash -c`, `sh -c`, `eval`, `xargs`, `find -exec` and command-substitution bodies grade 3 when
-    their inner text carries a grade-3 verb, else 1; the read-only hook refuses them all anyway.
-  - The autonomy stance sets the threshold: `execute` gates grade 3, `confirm-writes` grade 2 and
-    up, `ask` grade 1 and up. Below the threshold the hook prints nothing. The stance comes from
-    `posture.py`; when that cannot answer the hook grades under the strictest variant it knows
-    and says the selection is unresolved, because guessing the permissive one would drop a
-    prompt the user asked for.
-  - At or above it, prompting modes get `ask` and the non-prompting modes get `deny` with the
-    confirmation channel in the reason, because per the Claude Code hooks reference, in
-    `bypassPermissions` and in `auto` mode 'The "ask" decision is ignored', while 'A hook that
-    returns `permissionDecision: "deny"` blocks the tool even in `bypassPermissions` mode or
-    with `--dangerously-skip-permissions`'.
-  - In `bypassPermissions`, a command prefixed `HARNESS_CONFIRMED=1` is the confirmation
-    channel: the marker is stripped and the command passes silently at any grade. The marker is
-    leading and confirms the whole command line, compounds included, because that is the text
-    the user was shown and said yes to; a marker in the middle confirms nothing.
-  - In `auto` mode the classifier refuses that marker as a bypass of this hook, so the deny
-    names an approval code instead (`approvals.py`): the user replies `approve <code>` as the whole
-    message, and the same command, with no marker, then passes once in that session within
-    thirty minutes. The approval is consumed here, at the point the hook would deny. A Bash command that writes to
-    the approvals store grades 3, so the agent cannot record an approval of its own.
-  - When `governance.provider` names a decision provider other than `none`, a command the stance
-    lets through is put to it as well (`govern`): each simple command is classified as
-    `coding.git_push`, `coding.git_commit`, `coding.pr_merge`, `coding.deploy` or
-    `coding.shell_exec`, its counterparty is the repository and branch of the directory it runs in
-    (a `git -C <dir>` and an earlier `cd <dir>` move it), and the strictest answer across the
-    segments stands. The provider only tightens: its `ask` is emitted through the same mode split
-    and approval channel as the grader's, and it is never asked about a command the grader
-    already gates. A configured provider that raises asks, naming the error, rather than allows,
-    and a write to a governance policy file or to the user `config.json`, or a `harness config
-    set governance...`, is always asked about, as a level-1 action. Each
-    decision is one `governance` row in the decision log. Under `none` nothing is imported and
-    the output is exactly the stance's.
-  - Never raises: a missing sibling grammar and any unexpected error are a silent exit 0, so a
-    fault here can only cost a prompt that native would not have shown either. The one thing it
-    will not guess at is the stance, above.
+Comportamento:
+  - Avalia o máximo entre os comandos simples em que a gramática somente leitura decompõe o
+    comando: 0 somente leitura (`allow-readonly-bash.command_ok` prova isso), 1 escrita local, 2
+    mutação remota, 3 irreversível. Um comando desconhecido recebe nota 1, nunca 3: uma nota
+    baixa falsa é o prompt perdido que o nativo já dá hoje, e o corpus cresce a cada falha.
+  - O texto é normalizado antes de qualquer outra coisa — continuações de barra invertida
+    unidas, corpos de heredoc entre aspas e comentários removidos — para que um comentário `#`
+    ou um here-document não consigam esconder o verbo ou quebrar o parse com uma aspa ou crase
+    desbalanceada. Quando o texto ainda não parseia, o texto bruto é escaneado em busca de
+    famílias de verbo de nota 3 em vez de receber nota 1: um comando que não parseia mas diz
+    `--force` ou `rm -rf` é irreversível seja lá o que mais tenha.
+  - `bash -c`, `sh -c`, `eval`, `xargs`, `find -exec` e corpos de substituição de comando recebem
+    nota 3 quando seu texto interno carrega um verbo de nota 3, senão 1; o hook somente leitura
+    os recusa todos de qualquer forma.
+  - A stance de autonomia define o limiar: `execute` restringe a nota 3, `confirm-writes` a nota
+    2 e acima, `ask` a nota 1 e acima. Abaixo do limiar o hook não imprime nada. A stance vem de
+    `posture.py`; quando isso não consegue responder o hook avalia sob a variante mais estrita
+    que conhece e diz que a seleção está sem resolução, porque adivinhar a permissiva
+    descartaria um prompt que o usuário pediu.
+  - No limiar ou acima, os modos com prompt recebem `ask` e os modos sem prompt recebem `deny`
+    com o canal de confirmação na razão, porque segundo a referência de hooks do Claude Code, em
+    `bypassPermissions` e no modo `auto` "a decisão 'ask' é ignorada", enquanto "um hook que
+    retorna `permissionDecision: 'deny'` bloqueia a ferramenta mesmo no modo `bypassPermissions`
+    ou com `--dangerously-skip-permissions`".
+  - Em `bypassPermissions`, um comando prefixado com `HARNESS_CONFIRMED=1` é o canal de
+    confirmação: o marcador é removido e o comando passa silenciosamente em qualquer nota. O
+    marcador vai no início e confirma a linha de comando inteira, compostos incluídos, porque é
+    esse o texto que foi mostrado ao usuário e ao qual ele disse sim; um marcador no meio não
+    confirma nada.
+  - No modo `auto` o classificador recusa esse marcador como uma tentativa de contornar este
+    hook, então a negação nomeia um código de aprovação em vez disso (`approvals.py`): o usuário
+    responde `approve <code>` como a mensagem inteira, e o mesmo comando, sem marcador, então
+    passa uma vez naquela sessão dentro de trinta minutos. A aprovação é consumida aqui, no ponto
+    em que o hook negaria. Um comando Bash que escreve no armazenamento de aprovações recebe nota
+    3, para que o agente não consiga registrar uma aprovação própria.
+  - Quando `governance.provider` nomeia um provedor de decisão diferente de `none`, um comando
+    que a stance deixa passar também é submetido a ele (`govern`): cada comando simples é
+    classificado como `coding.git_push`, `coding.git_commit`, `coding.pr_merge`,
+    `coding.deploy` ou `coding.shell_exec`, sua contraparte é o repositório e branch do diretório
+    em que roda (um `git -C <dir>` e um `cd <dir>` anterior o movem), e a resposta mais estrita
+    entre os segmentos vale. O provedor só aperta: seu `ask` é emitido através da mesma divisão
+    de modo e canal de aprovação do avaliador, e nunca é consultado sobre um comando que o
+    avaliador já restringe. Um provedor configurado que levanta exceção pergunta, nomeando o
+    erro, em vez de permitir, e uma escrita num arquivo de política de governança ou no
+    `config.json` do usuário, ou um `harness config set governance...`, é sempre consultado,
+    como uma ação de nível 1. Cada decisão é uma linha `governance` no log de decisão. Sob
+    `none` nada é importado e a saída é exatamente a da stance.
+  - Nunca levanta exceção: uma gramática irmã ausente e qualquer erro inesperado são uma saída
+    silenciosa com 0, então uma falha aqui só pode custar um prompt que o nativo também não teria
+    mostrado. A única coisa que não vai chutar é a stance, acima.
 
-Test: echo '{"tool_name":"Bash","tool_input":{"command":"git push --force origin main"}}' | python3 grade-bash.py
+Teste: echo '{"tool_name":"Bash","tool_input":{"command":"git push --force origin main"}}' | python3 grade-bash.py
 """
 import importlib.util
 import json
@@ -74,7 +79,7 @@ DENY_TAIL = (" Nothing can prompt in this permission mode, so the command was re
              " asked about. Say in chat what it would change and why that is hard to undo; if the"
              " user says yes, run the same command again with " + MARKER + " in front of it.")
 LABELS = {1: "local write", 2: "remote-mutating", 3: "irreversible"}
-# The label above is for a log; this is the same fact for whoever is reading the prompt.
+# O rótulo acima é para um log; este é o mesmo fato para quem estiver lendo o prompt.
 PLAIN = {1: "this changes files on this machine",
          2: "this changes something other people can see",
          3: "this cannot be undone"}
@@ -83,7 +88,7 @@ MAX_DEPTH = 4
 
 
 def _sibling(name, alias):
-    """A module beside this hook, or None: a broken sibling leaves the hook silent, never crashing."""
+    """Um módulo ao lado deste hook, ou None: um irmão quebrado deixa o hook silencioso, nunca travando."""
     try:
         spec = importlib.util.spec_from_file_location(alias, Path(__file__).resolve().with_name(name))
         module = importlib.util.module_from_spec(spec)
@@ -102,8 +107,8 @@ APPROVAL_TAIL = (" Nothing can prompt in this permission mode, so the command wa
                  " the same command again with no marker: the approval covers this command once, in"
                  " this session, for thirty minutes.")
 
-# One consequence clause per verb family, plus a generic fallback per grade. The clause is the
-# whole preview: the reason line is verb, target, clause.
+# Uma cláusula de consequência por família de verbo, mais um fallback genérico por nota. A
+# cláusula é o preview inteiro: a linha de razão é verbo, alvo, cláusula.
 CLAUSES = {
     "git-history": "rewrites remote history",
     "git-discard": "discards local work with no undo",
@@ -130,8 +135,8 @@ MARKER_RE = re.compile(r"^\s*(env\s+)?" + MARKER + r"\s*;?\s*")
 ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 HEREDOC_RE = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 DASH_C_RE = re.compile(r"^-[A-Za-z]*c$")
-# Wrappers that run the command in their remaining arguments, with the option letters that take
-# a value of their own, so `nice -n 10 git push --force` is graded as the push.
+# Wrappers que rodam o comando em seus argumentos restantes, com as letras de opção que levam
+# um valor próprio, para que `nice -n 10 git push --force` seja avaliado como o push.
 WRAPPERS = {
     "timeout": ("-k", "--kill-after", "-s", "--signal"),
     "time": (),
@@ -145,7 +150,7 @@ WRAPPERS = {
     "npx": ("--package", "-p"),
     "uvx": ("--from", "-p"),
 }
-# Runners that execute the rest of the line in a managed environment, like `npx`.
+# Runners que executam o resto da linha num ambiente gerenciado, como `npx`.
 RUNNERS = {("bundle", "exec"), ("poetry", "run"), ("uv", "run"), ("pipx", "run"),
            ("pnpm", "dlx"), ("pnpm", "exec"), ("yarn", "dlx"), ("yarn", "exec"),
            ("npm", "exec"), ("rye", "run"), ("hatch", "run")}
@@ -182,9 +187,10 @@ GH_G2_VERBS = {"create", "edit", "comment", "close", "reopen", "ready", "review"
 PUBLISH = {"npm": "publish", "pnpm": "publish", "yarn": "publish", "cargo": "publish",
            "twine": "upload", "gem": "push", "poetry": "publish"}
 
-# Last resort when the text does not parse: a grade-3 verb family anywhere in it is a grade 3.
-# Substring needles, not regexes: the text can be large, and every check here must stay linear.
-# A chunk is one separator-free run, so the needles of an entry must co-occur in one command.
+# Último recurso quando o texto não parseia: uma família de verbo de nota 3 em qualquer lugar
+# nele é uma nota 3. Agulhas de substring, não regexes: o texto pode ser grande, e toda checagem
+# aqui precisa continuar linear. Um chunk é uma sequência sem separador, então as agulhas de uma
+# entrada precisam coocorrer num único comando.
 SCAN = [
     (("force-with-lease",), "git push --force-with-lease", "git-history"),
     (("push", "--force"), "git push --force", "git-history"),
@@ -222,12 +228,13 @@ SCAN_SPLIT = re.compile(r"[\n;&|]+")
 
 
 def stance():
-    """The autonomy variant to grade under, and the label the notice carries.
+    """A variante de autonomia sob a qual avaliar, e o rótulo que o aviso carrega.
 
-    Resolved by `posture.py`, so one file answers for every hook. This one gates commands, so
-    it fails closed: a resolver that cannot be loaded or cannot answer means the strictest
-    variant the hook knows, not the permissive default, and the notice says the selection is
-    unresolved so the user can see why a familiar command suddenly asks."""
+    Resolvida por `posture.py`, então um único arquivo responde por todo hook. Este restringe
+    comandos, então falha fechado: um resolvedor que não pode ser carregado ou não consegue
+    responder significa a variante mais estrita que o hook conhece, não o padrão permissivo, e
+    o aviso diz que a seleção está sem resolução para que o usuário veja por que um comando
+    familiar de repente pergunta."""
     module = _sibling("posture.py", "harness_posture")
     try:
         if module is None:
@@ -247,16 +254,16 @@ def emit(decision, reason):
 
 
 def strip_marker(cmd):
-    """(command without a leading confirm marker, marker seen)."""
+    """(comando sem um marcador de confirmação inicial, marcador visto)."""
     stripped = MARKER_RE.sub("", cmd, count=1)
     return stripped, stripped != cmd
 
 
 def _split_heredocs(text):
-    """Text without the body of every here-document. A body is data: the shell expands a
-    variable in an unquoted one but never runs its lines, and a quoted body is not even
-    expanded. Bodies go before continuations are joined, so a body line ending in a backslash
-    cannot swallow the delimiter."""
+    """Texto sem o corpo de todo here-document. Um corpo é dado: o shell expande uma variável
+    num sem aspas mas nunca roda suas linhas, e um corpo entre aspas nem sequer é expandido. Os
+    corpos saem antes de as continuações serem unidas, para que uma linha de corpo terminando em
+    barra invertida não consiga engolir o delimitador."""
     lines = text.split("\n")
     out, bodies = [], []
     i = 0
@@ -279,8 +286,9 @@ def _split_heredocs(text):
 
 
 def _strip_comments(text):
-    """Text without its `#` comments, with quote state carried across newlines, so a `#` inside
-    a multi-line quoted string stays and a comment outside one takes the rest of its line."""
+    """Texto sem seus comentários `#`, com o estado de aspas carregado através de quebras de
+    linha, para que um `#` dentro de uma string entre aspas de várias linhas permaneça e um
+    comentário fora de uma tome o resto da sua linha."""
     out = []
     sq = dq = False
     i, n = 0, len(text)
@@ -312,10 +320,10 @@ def _strip_comments(text):
 
 
 def normalize(cmd):
-    """(shell text, here-document bodies). Bodies come out first, then continuations are
-    joined, then comments are dropped, so nothing can hide a verb behind a `#`, inside a body,
-    or behind a line continuation. A body is data to the shell; only a client that interprets
-    it — a SQL client — is graded on its contents."""
+    """(texto shell, corpos de here-document). Os corpos saem primeiro, depois as continuações
+    são unidas, depois os comentários são removidos, para que nada consiga esconder um verbo
+    atrás de um `#`, dentro de um corpo, ou atrás de uma continuação de linha. Um corpo é dado
+    para o shell; só um cliente que o interpreta — um cliente SQL — é avaliado pelo seu conteúdo."""
     text = cmd.replace("\r\n", "\n").replace("\r", "\n")
     text, bodies = _split_heredocs(text)
     text = re.sub(r"\\\n", " ", text)
@@ -323,9 +331,9 @@ def normalize(cmd):
 
 
 def _scan(text):
-    """The fallback for text this hook cannot decompose: a grade-3 verb family in any one of
-    its separator-free chunks, or grade 1. Linear in the length of the text, and the text it
-    reads is capped, because a hook that runs past its timeout fails open."""
+    """O fallback para texto que este hook não consegue decompor: uma família de verbo de nota 3
+    em qualquer um dos seus chunks sem separador, ou nota 1. Linear no comprimento do texto, e o
+    texto que lê é limitado, porque um hook que ultrapassa seu timeout falha aberto."""
     if len(text) > SCAN_CAP:
         return 3, "command too long to grade", "", "opaque"
     for chunk in SCAN_SPLIT.split(text.lower()):
@@ -336,8 +344,8 @@ def _scan(text):
 
 
 def _extract_subs(cmd):
-    """(text with every substitution replaced by a placeholder, the inner texts). The text is
-    None when a substitution never closes."""
+    """(texto com toda substituição substituída por um placeholder, os textos internos). O texto
+    é None quando uma substituição nunca fecha."""
     out, inners = [], []
     i, n = 0, len(cmd)
     sq = dq = False
@@ -378,7 +386,7 @@ def _extract_subs(cmd):
             if end is None:
                 return None, inners
             inner = cmd[i + 2:end]
-            if not inner.startswith("("):  # `$(( ))` is arithmetic, not a command
+            if not inner.startswith("("):  # `$(( ))` é aritmética, não um comando
                 inners.append(inner)
             out.append(PLACEHOLDER)
             i = end + 1
@@ -397,9 +405,9 @@ def _extract_subs(cmd):
 
 
 def segments(text):
-    """The simple commands in `text`, by the read-only grammar's own decomposition: newlines as
-    separators, reserved words structural only in command position. None when it does not
-    tokenize."""
+    """Os comandos simples em `text`, pela própria decomposição da gramática somente leitura:
+    quebras de linha como separadores, palavras reservadas estruturais só em posição de comando.
+    None quando não tokeniza."""
     text = " ; ".join(text.split("\n"))
     try:
         tokens = ro.tokenize(text)
@@ -417,7 +425,7 @@ def segments(text):
         if not cur:
             if token in ro.WORD_DROP or token in ro.WORD_COND or token == "!":
                 continue
-            if token in ro.WORD_HEADER:  # `for x in *` names data, not commands
+            if token in ro.WORD_HEADER:  # `for x in *` nomeia dados, não comandos
                 skipping = True
                 continue
         cur.append(token)
@@ -427,7 +435,7 @@ def segments(text):
 
 
 def _redirects(tokens):
-    """(tokens without redirections, the targets they write)."""
+    """(tokens sem redirecionamentos, os alvos em que escrevem)."""
     clean, targets = [], []
     i = 0
     while i < len(tokens):
@@ -458,7 +466,7 @@ def has(args, *names):
 
 
 def short(args, letters):
-    """True when a short-option cluster carries any of `letters`, so `-fu` reads like `-f`."""
+    """True quando um agrupamento de opções curtas carrega qualquer uma de `letters`, então `-fu` lê como `-f`."""
     for a in args:
         if a.startswith("-") and not a.startswith("--") and any(c in letters for c in a[1:]):
             return True
@@ -466,7 +474,7 @@ def short(args, letters):
 
 
 def strip_options(args, value_flags):
-    """Arguments past a wrapper's own options, with the value of each option that takes one."""
+    """Argumentos além das próprias opções de um wrapper, com o valor de cada opção que leva um."""
     i = 0
     while i < len(args):
         a = args[i]
@@ -484,13 +492,13 @@ def _joined(args, limit=2):
 
 
 def _rm_flagged(tokens):
-    """True when `tokens` is an `rm` carrying a recursive or force flag."""
+    """True quando `tokens` é um `rm` carregando uma flag recursiva ou de força."""
     return bool(tokens) and tokens[0].rpartition("/")[2] == "rm" and (
         short(tokens[1:], "rRf") or has(tokens[1:], "--recursive", "--force"))
 
 
 def _inner(text, cwd, depth):
-    """A body this hook cannot model as a command: grade 3 when it carries a grade-3 verb."""
+    """Um corpo que este hook não consegue modelar como um comando: nota 3 quando carrega um verbo de nota 3."""
     grade, verb, target, family = grade_text(text, cwd, depth + 1)
     if grade == 3:
         return 3, verb, target, family
@@ -728,7 +736,7 @@ RAILS_G3 = re.compile(r"^db:(migrate|drop|reset|schema:load|rollback)$")
 
 
 def grade_tokens(tokens, cwd, depth):
-    """(grade, verb, target, family) for one simple command."""
+    """(nota, verbo, alvo, família) para um comando simples."""
     tokens, written = _redirects(tokens)
     wrote = ""
     for target in written:
@@ -749,7 +757,7 @@ def grade_tokens(tokens, cwd, depth):
     text = " ".join(tokens)
 
     if PLACEHOLDER in head or head.startswith("$"):
-        return _scan(text)  # the program comes from a substitution or a variable
+        return _scan(text)  # o programa vem de uma substituição ou uma variável
     if (prog, ops[0] if ops else "") in RUNNERS:
         rest = args[args.index(ops[0]) + 1:]
         while rest and (rest[0].startswith("-") or ASSIGN_RE.match(rest[0])):
@@ -762,13 +770,13 @@ def grade_tokens(tokens, cwd, depth):
             return grade_tokens(rest, cwd, depth)
     if prog == "ssh":
         rest = strip_options(args, SSH_VALUE_FLAGS)
-        if len(rest) > 1:  # the first operand is the host; the rest runs on it
+        if len(rest) > 1:  # o primeiro operando é o host; o resto roda nele
             return _inner(" ".join(rest[1:]), cwd, depth)
     if prog == "kubectl" and ops[:1] == ["exec"] and "--" in args:
         return _inner_tokens(args[args.index("--") + 1:], cwd, depth)
     if prog in ("docker", "docker-compose") and "exec" in args:
         rest = strip_options(args[args.index("exec") + 1:], DOCKER_EXEC_VALUE_FLAGS)
-        if len(rest) > 1:  # the first operand is the container or the service
+        if len(rest) > 1:  # o primeiro operando é o container ou o serviço
             return _inner_tokens(rest[1:], cwd, depth)
     if prog in ("fly", "flyctl") and ops[:2] == ["ssh", "console"]:
         for i, a in enumerate(args):
@@ -785,7 +793,7 @@ def grade_tokens(tokens, cwd, depth):
         return _inner(" ".join(args), cwd, depth)
     if prog in ("xargs", "parallel"):
         rest = strip_options(args, XARGS_VALUE_FLAGS)
-        if _rm_flagged(rest):  # the operands arrive on stdin, so any rm -rf here is grade 3
+        if _rm_flagged(rest):  # os operandos chegam pelo stdin, então qualquer rm -rf aqui é nota 3
             return 3, "xargs rm -rf", "", "delete"
         return _inner_tokens(rest, cwd, depth)
     if prog in WRAPPERS:
@@ -793,7 +801,7 @@ def grade_tokens(tokens, cwd, depth):
         while rest and ASSIGN_RE.match(rest[0]):
             rest = rest[1:]
         if prog == "timeout" and rest:
-            rest = rest[1:]  # the duration
+            rest = rest[1:]  # a duração
         if rest:
             return grade_tokens(rest, cwd, depth)
         return 1, prog, "", None
@@ -826,7 +834,7 @@ def grade_tokens(tokens, cwd, depth):
         for op in ops:
             if op.upper() in ("FLUSHALL", "FLUSHDB"):
                 return 3, "redis-cli " + op.upper(), "", "database"
-    if SQL_RE.match(text) or ALTER_DROP_RE.match(text):  # a heredoc body, on its own segment
+    if SQL_RE.match(text) or ALTER_DROP_RE.match(text):  # um corpo de heredoc, no seu próprio segmento
         return _sql(text)
     if prog == "prisma" or (prog in ("npm", "pnpm", "yarn") and ops[:1] == ["prisma"]):
         rest = ops[1:] if prog != "prisma" else ops
@@ -896,10 +904,11 @@ def grade_tokens(tokens, cwd, depth):
 
 
 def grade_text(cmd, cwd="", depth=0):
-    """(grade, verb, target, family) for a whole command line: the maximum over its parts.
+    """(nota, verbo, alvo, família) para uma linha de comando inteira: o máximo entre suas partes.
 
-    A command that is not read-only and names the approvals store grades 3, whatever else it
-    does: an approval must come from the user's prompt, never from a write the agent makes."""
+    Um comando que não é somente leitura e nomeia o armazenamento de aprovações recebe nota 3,
+    seja lá o que mais faça: uma aprovação precisa vir do prompt do usuário, nunca de uma escrita
+    que o agente faz."""
     best = _grade_text(cmd, cwd, depth)
     if depth == 0 and 0 < best[0] < 3 and approvals is not None and approvals.mentions_store(cmd):
         return 3, "write to", "the approvals store", "approvals"
@@ -922,7 +931,7 @@ def _grade_text(cmd, cwd, depth):
     if parts is None:
         return max(best, _scan(text), key=lambda h: h[0])
     if bodies and any(seg and seg[0].rpartition("/")[2] in SQL_CLIENTS for seg in parts):
-        for body in bodies:  # the shell does not run a body, but a SQL client interprets it
+        for body in bodies:  # o shell não roda um corpo, mas um cliente SQL o interpreta
             hit = _sql(body)
             if hit and hit[0] > best[0]:
                 best = hit
@@ -943,17 +952,18 @@ def reason(grade, verb, target, family, variant):
 
 
 def approval_code(mode, session_id, command):
-    """The code the user replies with to approve `command`, or None where that channel is closed.
+    """O código com o qual o usuário responde para aprovar `command`, ou None onde esse canal está fechado.
 
-    Only `auto` mode has it: a prompting mode asks natively, and `bypassPermissions` keeps the
-    marker. `command` is the raw text the agent sent, so the code names exactly that command."""
+    Só o modo `auto` o tem: um modo com prompt pergunta nativamente, e `bypassPermissions` mantém
+    o marcador. `command` é o texto bruto que o agente enviou, então o código nomeia exatamente
+    esse comando."""
     if mode != "auto" or approvals is None or approvals.store_path(session_id) is None:
         return None
     return approvals.code_for(session_id, command)
 
 
 def approved(mode, session_id, command):
-    """Consume a live approval of `command` in this session; True when one was used."""
+    """Consome uma aprovação viva de `command` nesta sessão; True quando uma foi usada."""
     code = approval_code(mode, session_id, command)
     return code is not None and approvals.consume(session_id, code)
 
@@ -969,22 +979,25 @@ GOVERNANCE_POINT = "governance"
 NO_PROVIDER = "none"
 PUSH, COMMIT, MERGE = "coding.git_push", "coding.git_commit", "coding.pr_merge"
 DEPLOY, SHELL, FILE_WRITE = "coding.deploy", "coding.shell_exec", "coding.file_write"
-# A deploy is the grader's `deploy` family plus the preview deploys and stack deploys it grades
-# under another family, so a policy on `coding.deploy` covers every verb the grader knows ships.
+# Um deploy é a família `deploy` do avaliador mais os deploys de preview e deploys de stack que
+# avalia sob outra família, então uma política em `coding.deploy` cobre todo verbo que o
+# avaliador conhece que faz deploy.
 DEPLOY_VERBS = ("vercel deploy", "netlify deploy", "cdk deploy")
 RANK = {"allow": 0, "ask": 1, "deny": 2}
 POLICY_NAME = "governance.json"
 POLICY_DIR = ".agent-harness"
-# Either policy file named in a command that is not read-only is a write to it: the repository's
-# `.agent-harness/governance.json` and the user's `.config/agent-harness/governance.json`.
+# Qualquer arquivo de política nomeado num comando que não é somente leitura é uma escrita nele:
+# o `.agent-harness/governance.json` do repositório e o `.config/agent-harness/governance.json`
+# do usuário.
 POLICY_RE = re.compile(r"agent-harness[/\\]+governance\.json")
-# The user configuration selects the provider, so a write to it can switch governance off; it is
-# guarded like a policy file, and so is the command that sets a `governance` key in it.
+# A configuração do usuário seleciona o provedor, então uma escrita nela pode desligar a
+# governança; ela é protegida como um arquivo de política, assim como o comando que define uma
+# chave `governance` nela.
 CONFIG_NAME = "config.json"
 CONFIG_RE = re.compile(r"\.config[/\\]+agent-harness[/\\]+config\.json")
-# `citizen` is the CLI's other name, so both spellings are the same command.
+# `citizen` é o outro nome da CLI, então ambas as grafias são o mesmo comando.
 CONFIG_SET_RE = re.compile(r"(?:harness|citizen)\b[^;&|\n]*\bconfig\s+set\s+[\"']?governance\b")
-# Programs every operand of which may be a path they write, move or remove.
+# Programas cujo cada operando pode ser um caminho em que escrevem, movem ou removem.
 PATH_WRITERS = {"tee", "cp", "mv", "install", "ln", "rm", "unlink", "truncate", "touch", "rsync",
                 "shred", "dd"}
 IN_PLACE = {"sed", "gsed", "perl", "ruby"}
@@ -999,7 +1012,7 @@ FILE_DENY_TAIL = (" Nothing can prompt in this permission mode, so the edit was 
 
 
 def _config():
-    """The user configuration, found as `posture.py` finds it; `{}` when it cannot be read."""
+    """A configuração do usuário, encontrada como `posture.py` a encontra; `{}` quando não pode ser lida."""
     home = os.environ.get("HARNESS_HOME") or os.environ.get("HOME") or str(Path.home())
     try:
         data = json.loads((Path(home) / ".config" / "agent-harness" / "config.json")
@@ -1010,14 +1023,14 @@ def _config():
 
 
 def provider_name(config):
-    """The provider `governance.provider` names, read as `decision.select_provider` reads it."""
+    """O provedor que `governance.provider` nomeia, lido como `decision.select_provider` o lê."""
     block = config.get("governance")
     name = block.get("provider") if isinstance(block, dict) else None
     return name if isinstance(name, str) and name.strip() else NO_PROVIDER
 
 
 def _decision_module():
-    """`harness_core.decision`, imported only once a provider is configured."""
+    """`harness_core.decision`, importado só quando um provedor está configurado."""
     lib = str(Path(__file__).resolve().parents[2] / "lib")
     if lib not in sys.path:
         sys.path.insert(0, lib)
@@ -1025,8 +1038,8 @@ def _decision_module():
 
 
 def _resolve(target, cwd):
-    """`target` as an absolute path, relative to `cwd`, with `~` and `$HOME` expanded; None when
-    `cwd` is unknown (None) and `target` is relative."""
+    """`target` como um caminho absoluto, relativo a `cwd`, com `~` e `$HOME` expandidos; None
+    quando `cwd` é desconhecido (None) e `target` é relativo."""
     path = _expand(target)
     if not path:
         return cwd
@@ -1035,14 +1048,15 @@ def _resolve(target, cwd):
     return None if cwd is None else os.path.normpath(os.path.join(cwd, path))
 
 
-# A directory change is statically known only when its target is a literal path: nothing the
-# shell expands at run time. `~` and `~/…` are the one expansion allowed, being the user's home.
+# Uma mudança de diretório só é conhecida estaticamente quando seu alvo é um caminho literal:
+# nada que o shell expande em tempo de execução. `~` e `~/…` são a única expansão permitida, por
+# ser a home do usuário.
 DYNAMIC_CHARS = set("$`*?[{") | {"\\"}
 
 
 def _static_dir(target, cwd):
-    """The directory a `cd`, `pushd` or `-C` to `target` reaches, or None when it cannot be known
-    without running the line: `-`, a variable, a substitution, `~user`, a glob."""
+    """O diretório que um `cd`, `pushd` ou `-C` para `target` alcança, ou None quando não pode
+    ser conhecido sem rodar a linha: `-`, uma variável, uma substituição, `~user`, um glob."""
     if (not target or target.startswith("-") or PLACEHOLDER in target
             or any(c in DYNAMIC_CHARS for c in target)
             or (target.startswith("~") and target != "~" and not target.startswith("~/"))):
@@ -1051,13 +1065,14 @@ def _static_dir(target, cwd):
 
 
 def _isolating(text):
-    """Whether the line has a subshell, a pipeline or a background job, where a `cd` does not
-    carry to the commands after it."""
+    """Se a linha tem um subshell, um pipeline ou um job em segundo plano, onde um `cd` não
+    carrega para os comandos depois dele."""
     try:
         for token in ro.tokenize(" ; ".join(text.split("\n"))):
             if token and set(token) <= set("();|&<>"):
-                # An operator such as `)` or `|&`, or a quoted run of operator characters: drop
-                # the two list operators and the descriptor redirections, and look for what is left.
+                # Um operador como `)` ou `|&`, ou uma sequência entre aspas de caracteres de
+                # operador: remove os dois operadores de lista e os redirecionamentos de
+                # descritor, e procura o que sobrou.
                 rest = token.replace("&&", "").replace("||", "")
                 for redirect in (">&", "<&", "&>"):
                     rest = rest.replace(redirect, "")
@@ -1074,9 +1089,10 @@ LIST_ENDS = {"&&", "||", ";", ";;", "&"}
 
 
 def _unquoted_structure(text):
-    """`text` with every quoted or escaped operator character replaced by `_`, so the tokenizer,
-    which turns a quoted `|` into a word spelled like the operator, returns only real operators.
-    Word boundaries do not move: those characters were inside a word already."""
+    """`text` com todo caractere de operador entre aspas ou escapado substituído por `_`, para
+    que o tokenizador, que transforma um `|` entre aspas numa palavra soletrada como o operador,
+    retorne só operadores reais. Os limites de palavra não se movem: aqueles caracteres já
+    estavam dentro de uma palavra."""
     out, quote, i = [], "", 0
     while i < len(text):
         c = text[i]
@@ -1097,20 +1113,22 @@ def _unquoted_structure(text):
 
 
 def _confined(text):
-    """Per simple command of `segments(text)`, whether a `cd` there is confined to it, or None
-    when the walk cannot place the line's structure and each `cd` falls back to `_isolating`.
+    """Por comando simples de `segments(text)`, se um `cd` ali é confinado a ele, ou None quando
+    a varredura não consegue posicionar a estrutura da linha e cada `cd` recai para `_isolating`.
 
-    A pipeline binds tighter than `&&`, `||` and `;`, so every element of a pipeline starts in the
-    directory in effect when it begins: only a `cd` inside a pipeline element, a subshell or a
-    background job is confined. A `cd` inside a brace group, conditional or loop keeps the
-    line-wide rule, because such a construct may itself be a pipeline element."""
+    Um pipeline se liga mais forte que `&&`, `||` e `;`, então todo elemento de um pipeline
+    começa no diretório em vigor quando ele inicia: só um `cd` dentro de um elemento de
+    pipeline, um subshell ou um job em segundo plano é confinado. Um `cd` dentro de um grupo de
+    chaves, condicional ou loop mantém a regra da linha inteira, porque tal construção pode em
+    si ser um elemento de pipeline."""
     try:
         tokens = ro.tokenize(" ; ".join(_unquoted_structure(text).split("\n")))
     except ValueError:
         return None
-    # [(pipeline index, paren depth, compound depth)] per segment; per pipeline, whether it is
-    # piped and its AND-OR list; per list, whether `&` backgrounds it. `&` ends and backgrounds
-    # the whole list, `cd d && true & git push` included; `;` ends one without confining it.
+    # [(índice de pipeline, profundidade de parênteses, profundidade de composto)] por segmento;
+    # por pipeline, se está encanado e sua lista AND-OR; por lista, se `&` a coloca em segundo
+    # plano. `&` termina e coloca em segundo plano a lista inteira, `cd d && true & git push`
+    # incluído; `;` termina uma sem confiná-la.
     places, piped, list_of, backgrounded = [], [False], [0], [False]
     cur, skipping, parens, compounds = [], False, 0, 0
     for token in tokens:
@@ -1122,7 +1140,7 @@ def _confined(text):
                 parens += 1
             elif token == ")":
                 parens -= 1
-                if parens < 0:  # a `case` pattern, which this walk does not place
+                if parens < 0:  # um padrão `case`, que esta varredura não posiciona
                     return None
             elif parens == 0 and compounds == 0:
                 if token in ("|", "|&"):
@@ -1167,7 +1185,7 @@ def _user_policy(name=POLICY_NAME):
 
 
 def is_user_config(path):
-    """Whether `path` is the harness user configuration, `config.json`, which selects the provider."""
+    """Se `path` é a configuração de usuário do harness, `config.json`, que seleciona o provedor."""
     try:
         return (os.path.realpath(os.path.expanduser(str(path)))
                 == os.path.realpath(_user_policy(CONFIG_NAME)))
@@ -1176,7 +1194,7 @@ def is_user_config(path):
 
 
 def guarded(path):
-    """What `path` is, when a write to it is a level-1 action, or None."""
+    """O que `path` é, quando uma escrita nele é uma ação de nível 1, ou None."""
     if is_policy_file(path):
         return "the governance policy file " + str(path)
     if is_user_config(path):
@@ -1185,7 +1203,7 @@ def guarded(path):
 
 
 def is_policy_file(path):
-    """Whether `path` is a governance policy file: any repository's or the user's."""
+    """Se `path` é um arquivo de política de governança: de qualquer repositório ou do usuário."""
     try:
         real = os.path.realpath(os.path.expanduser(str(path)))
         user = os.path.realpath(_user_policy())
@@ -1197,9 +1215,9 @@ def is_policy_file(path):
 
 
 def _git_dir(args, cwd):
-    """(the directory a git command runs in, after each `-C <dir>`, and its subcommand). The
-    directory is None when a `-C` is not a literal path, or `--git-dir` or `--work-tree` points
-    the command at a repository its directory does not name."""
+    """(o diretório em que um comando git roda, depois de cada `-C <dir>`, e seu subcomando). O
+    diretório é None quando um `-C` não é um caminho literal, ou `--git-dir` ou `--work-tree`
+    aponta o comando para um repositório que seu diretório não nomeia."""
     i = 0
     while i < len(args):
         a = args[i]
@@ -1220,8 +1238,9 @@ def _git_dir(args, cwd):
 
 
 def _written(prog, args, targets, cwd):
-    """The paths one simple command may write, move or remove: absolute where the directory is
-    known, and otherwise the operand as written, so `_policy_hits` can still judge it by name."""
+    """Os caminhos que um comando simples pode escrever, mover ou remover: absolutos onde o
+    diretório é conhecido, e senão o operando como escrito, para que `_policy_hits` ainda consiga
+    julgá-lo pelo nome."""
     paths = [t for t in targets if t and not t.isdigit() and t != "/dev/null"]
     if prog in PATH_WRITERS:
         paths.extend(operands(args))
@@ -1237,10 +1256,10 @@ def _written(prog, args, targets, cwd):
 
 
 def _governed(tokens, cwd, depth):
-    """[(action class, grade, directory, paths written)] for one simple command.
+    """[(classe de ação, nota, diretório, caminhos escritos)] para um comando simples.
 
-    Wrappers, runners, `sudo` and a shell's `-c` text are looked through, as the grader looks
-    through them, and the inner command is governed at the higher of the two grades."""
+    Wrappers, runners, `sudo` e o texto `-c` de um shell são atravessados, como o avaliador os
+    atravessa, e o comando interno é governado na mais alta das duas notas."""
     grade, verb, _target, family = grade_tokens(list(tokens), cwd or "", depth)
     body, targets = _redirects(list(tokens))
     while body and ASSIGN_RE.match(body[0]):
@@ -1255,7 +1274,7 @@ def _governed(tokens, cwd, depth):
         if prog in WRAPPERS:
             if prog == "env" and any(a in ("-C", "--chdir") or a.startswith("--chdir=")
                                      for a in args):
-                cwd = None  # `env -C` moves the inner command; no literal is trusted here
+                cwd = None  # `env -C` move o comando interno; nenhum literal é confiado aqui
             rest = strip_options(args, WRAPPERS[prog])
             while rest and ASSIGN_RE.match(rest[0]):
                 rest = rest[1:]
@@ -1292,16 +1311,17 @@ def _governed(tokens, cwd, depth):
 
 
 def governed_text(cmd, cwd, depth=0, isolated=False):
-    """[(action class, grade, directory, paths written)] for every simple command in `cmd`, in
-    execution order, or None when the text does not decompose.
+    """[(classe de ação, nota, diretório, caminhos escritos)] para cada comando simples em `cmd`,
+    na ordem de execução, ou None quando o texto não decompõe.
 
-    The directory is the one in effect when the command runs, walking the line as the shell
-    would: a substitution is governed with the directory of the segment it sits in, so
-    `cd ../other && echo "$(git push)"` pushes from `../other`. A directory is None, which
-    `govern` names `repo:unknown/local`, from the first change that cannot be known without
-    running the line: a `cd` or `pushd` to anything but a literal path, `popd`, and any `cd` in a
-    subshell, a substitution, a pipeline or a background job, where it does not carry over. A
-    pipeline after a `cd` starts in that `cd`'s directory, as `_confined` places it."""
+    O diretório é o que está em vigor quando o comando roda, percorrendo a linha como o shell
+    faria: uma substituição é governada com o diretório do segmento em que está, então
+    `cd ../other && echo "$(git push)"` faz push a partir de `../other`. Um diretório é None, que
+    `govern` nomeia `repo:unknown/local`, a partir da primeira mudança que não pode ser conhecida
+    sem rodar a linha: um `cd` ou `pushd` para qualquer coisa além de um caminho literal, `popd`,
+    e qualquer `cd` num subshell, uma substituição, um pipeline ou um job em segundo plano, onde
+    não se carrega adiante. Um pipeline depois de um `cd` começa no diretório daquele `cd`, como
+    `_confined` o posiciona."""
     if depth >= MAX_DEPTH:
         return None
     text, _bodies = normalize(cmd)
@@ -1330,24 +1350,24 @@ def governed_text(cmd, cwd, depth=0, isolated=False):
             body = body[1:]
         head = body[0].rpartition("/")[2] if body else ""
         if head in ("cd", "pushd", "popd"):
-            # A directory change that also writes, through a redirect, is governed where it runs.
+            # Uma mudança de diretório que também escreve, através de um redirecionamento, é governada onde roda.
             moved_grade = grade_tokens(list(tokens), here or "", depth)[0]
             if moved_grade > 0:
                 found.append((SHELL, moved_grade, here, _written(head, [], _targets, here)))
             args = body[1:]
             if alone is None:
                 alone = line_wide
-            # A confined `cd` leaves the directory unknown, not unchanged: zsh runs a
-            # pipeline's last element in the current shell, so `x | cd d` moves it there.
+            # Um `cd` confinado deixa o diretório desconhecido, não inalterado: o zsh roda o
+            # último elemento de um pipeline no shell atual, então `x | cd d` o move para lá.
             if alone or head == "popd" or any(a.startswith("-") for a in args) or len(args) > 1:
                 here = None
             elif head == "pushd" and not args:
-                here = None  # swaps with the directory stack, which this walk does not hold
+                here = None  # troca com a pilha de diretórios, que esta varredura não mantém
             else:
                 here = _static_dir(args[0] if args else "~", here)
             continue
         found.extend(_governed(tokens, here, depth))
-    substitutions(len(queue), None)  # any the segments did not account for: fail closed
+    substitutions(len(queue), None)  # qualquer um que os segmentos não contabilizaram: falha fechado
     return found
 
 
@@ -1356,7 +1376,7 @@ _LEDGER = []
 
 def _log(action_class, slug, level, grade, outcome, provider, event, runtime,
          error=None):
-    """One `governance` row: the class, counterparty, level, grade and outcome, never the text."""
+    """Uma linha `governance`: a classe, contraparte, nível, nota e resultado, nunca o texto."""
     if not _LEDGER:
         _LEDGER.append(_sibling("decisions.py", "grade_bash_decisions"))
     module = _LEDGER[0]
@@ -1371,11 +1391,12 @@ def _log(action_class, slug, level, grade, outcome, provider, event, runtime,
 
 
 def unresolved(operand):
-    """What a write operand whose directory is unknown may be, judged by its name alone.
+    """O que um operando de escrita cujo diretório é desconhecido pode ser, julgado só pelo nome.
 
-    An operand under a `cd` the walk cannot follow, or with a variable or substitution in its
-    directory, has no path to check, so a name ending in `governance.json` or `config.json` is
-    taken to be the file it names. An operand that is itself a variable is not judged here."""
+    Um operando sob um `cd` que a varredura não consegue seguir, ou com uma variável ou
+    substituição em seu diretório, não tem caminho para checar, então um nome terminando em
+    `governance.json` ou `config.json` é tomado como o arquivo que nomeia. Um operando que é em
+    si uma variável não é julgado aqui."""
     name = operand.strip("\"'")
     for suffix, what in ((POLICY_NAME, "a governance policy file"),
                          (CONFIG_NAME, "the harness configuration")):
@@ -1385,8 +1406,8 @@ def unresolved(operand):
 
 
 def _policy_hits(command, found):
-    """What a command changes that is a level-1 action: a policy file, the user configuration or
-    a `governance` key set through `harness config set`."""
+    """O que um comando muda que é uma ação de nível 1: um arquivo de política, a configuração do
+    usuário ou uma chave `governance` definida através de `harness config set`."""
     hits = sorted(set(filter(None, (guarded(p) if os.path.isabs(p) else unresolved(p)
                                     for entry in found for p in entry[3]))))
     if not hits:
@@ -1404,13 +1425,13 @@ def _policy_hits(command, found):
 
 
 def govern(command, cwd, grade, variant, event=None, runtime=""):
-    """What the decision provider adds to a command the grader lets through.
+    """O que o provedor de decisão acrescenta a um comando que o avaliador deixa passar.
 
-    None when nothing is added: provider `none`, a grade-0 command, or a provider that allows.
-    Otherwise `(outcome, sentence)`, `ask` or `deny`, the sentence naming the class, counterparty,
-    level and its source. Tighten-only by construction: the caller asks this only when its own
-    answer is to let the command through. A configured provider that cannot answer is an ask
-    naming the error, never an allow."""
+    None quando nada é acrescentado: provedor `none`, um comando de nota 0, ou um provedor que
+    permite. Senão `(outcome, sentence)`, `ask` ou `deny`, a frase nomeando a classe, contraparte,
+    nível e sua fonte. Só aperta por construção: o chamador só pergunta isso quando sua própria
+    resposta é deixar o comando passar. Um provedor configurado que não consegue responder é um
+    ask nomeando o erro, nunca um allow."""
     config = _config()
     name = provider_name(config)
     if name == NO_PROVIDER or not grade:
@@ -1421,8 +1442,9 @@ def govern(command, cwd, grade, variant, event=None, runtime=""):
     except Exception:
         found = None
     if not found or max(entry[1] for entry in found) <= 0:
-        # The grader graded the line above 0 yet no segment carries that grade: govern the whole
-        # line at its grade rather than let the walk find nothing to ask about.
+        # O avaliador deu à linha uma nota acima de 0, mas nenhum segmento carrega essa nota:
+        # governa a linha inteira na sua nota em vez de deixar a varredura não encontrar nada
+        # sobre o que perguntar.
         found = (found or []) + [(SHELL, grade, cwd, [])]
     hits = _policy_hits(command, found)
     if hits:
@@ -1433,10 +1455,11 @@ def govern(command, cwd, grade, variant, event=None, runtime=""):
     try:
         decision = _decision_module()
         places, providers = {}, {}
-        # The provider is selected, loaded and its policy read for the command's own directory
-        # before any segment is looked at. A provider that cannot be used then asks for the whole
-        # command, whatever its segments grade: a line whose only graded part is hidden from the
-        # segment walk, such as `cd $(cat x)`, must not pass for want of a segment to ask about.
+        # O provedor é selecionado, carregado e sua política lida para o próprio diretório do
+        # comando antes de qualquer segmento ser examinado. Um provedor que não pode ser usado
+        # então pergunta pelo comando inteiro, seja qual for a nota dos seus segmentos: uma linha
+        # cuja única parte avaliada fica escondida da varredura de segmentos, como
+        # `cd $(cat x)`, não pode passar por falta de um segmento sobre o qual perguntar.
         places[cwd] = decision.locate(cwd)
         home_root = places[cwd][1] or cwd
         providers[home_root] = decision.select_provider(config, root=home_root, variant=variant)
@@ -1447,8 +1470,9 @@ def govern(command, cwd, grade, variant, event=None, runtime=""):
             if level_grade <= 0:
                 continue
             if where is None:
-                # A directory the walk could not know: no pair names this counterparty, so the
-                # class default governs, read from the policies the hook's own directory sees.
+                # Um diretório que a varredura não conseguiu conhecer: nenhum par nomeia esta
+                # contraparte, então o padrão da classe governa, lido das políticas que o próprio
+                # diretório do hook enxerga.
                 slug, root = decision.UNKNOWN_COUNTERPARTY, home_root
             else:
                 if where not in places:
@@ -1476,10 +1500,10 @@ def govern(command, cwd, grade, variant, event=None, runtime=""):
 
 
 def govern_file(tool, tool_input, paths, event=None, runtime=""):
-    """`(subject, sentence)` for a file-tool write to a policy file or the user config, or None.
+    """`(subject, sentence)` para uma escrita de ferramenta de arquivo num arquivo de política ou na config do usuário, ou None.
 
-    Only when a provider other than `none` is configured. `subject` is what an approval code
-    names: the tool and its exact input, so an approval covers that one edit."""
+    Só quando um provedor diferente de `none` está configurado. `subject` é o que um código de
+    aprovação nomeia: a ferramenta e sua entrada exata, para que uma aprovação cubra aquela edição."""
     name = provider_name(_config())
     if name == NO_PROVIDER:
         return None
@@ -1494,7 +1518,7 @@ def govern_file(tool, tool_input, paths, event=None, runtime=""):
 
 def main():
     if ro is None:
-        return  # no grammar, no grading: fall through to the normal permission flow
+        return  # sem gramática, sem avaliação: cai no fluxo de permissão normal
     try:
         payload = json.load(sys.stdin)
     except Exception:
@@ -1539,4 +1563,4 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        pass  # fail open: a bug here costs a prompt, never a block
+        pass  # falha aberta: um bug aqui custa um prompt, nunca um bloqueio

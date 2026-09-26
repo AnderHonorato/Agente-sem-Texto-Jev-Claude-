@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""PostToolUse scanner: flag instruction-shaped text arriving in tool output.
+"""Escâner de PostToolUse: sinaliza texto em forma de instrução chegando na saída de uma ferramenta.
 
-Advisory only — never blocks a tool call, never rewrites its result. Subagent returns
-already arrive wrapped in a notice of this shape; Bash, fetch and read results do not.
-Patterns match a once-lowercased copy, which is several times faster than scanning the
-original case-insensitively; only the uppercase directives need the original.
+Só consultivo — nunca bloqueia uma chamada de ferramenta, nunca reescreve seu resultado. Retornos
+de subagente já chegam embrulhados num aviso dessa forma; resultados de Bash, fetch e read não.
+Os padrões combinam contra uma cópia já em minúsculas, o que é várias vezes mais rápido do que
+escanear o original sem diferenciar maiúsculas; só as diretivas em maiúsculas precisam do original.
 """
 import json
 import re
@@ -38,7 +38,7 @@ TRAILER_CUE = re.compile(r"from here on|from now on|use this trailer")
 
 
 def attribution(low):
-    """A trailer counts only near wording that tells the reader to use it."""
+    """Um trailer só conta perto de uma redação que instrui o leitor a usá-lo."""
     if ATTRIBUTION.search(low):
         return True
     if not TRAILER.search(low):

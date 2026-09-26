@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""PostToolUse validator: enforce the Review Card contract on plan files.
+"""Validador de PostToolUse: impõe o contrato do Review Card em arquivos de plano.
 
-Contract lives in the plan-authoring skill (~/.claude/skills/plan-authoring/SKILL.md).
-Advisory only — this never fails a write; it feeds a correction back to the agent.
+O contrato vive na skill plan-authoring (~/.claude/skills/plan-authoring/SKILL.md).
+Só consultivo — isto nunca falha uma escrita; devolve uma correção ao agente.
 """
 import json
 import os
@@ -59,7 +59,7 @@ def main():
         return
 
     start = 0
-    if lines[0].strip() == "---":  # tolerate YAML frontmatter
+    if lines[0].strip() == "---":  # tolera front matter YAML
         for i in range(1, len(lines)):
             if lines[i].strip() == "---":
                 start = i + 1

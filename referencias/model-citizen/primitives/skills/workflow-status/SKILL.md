@@ -1,6 +1,6 @@
 ---
 name: workflow-status
-description: Show progress of background Workflow runs: who has returned, who is still working, how much output. Use when the user asks about workflow progress, says "/workflows doesn't work", asks "is the workflow done", "how's the workflow going", "check the workflow", or wants to inspect a multi-agent orchestration run.
+description: Show progress of background Workflow runs: who has returned, who is still working, how much output. Use when the user asks about workflow progress, says "/workflows doesn't work", asks "is the workflow done", "how's the workflow going", "check the workflow", or wants to inspect a multi-agent orchestration run. (Mostre o progresso de execuções de Workflow em segundo plano: quem retornou, quem ainda está trabalhando, quanto de saída. Use quando o usuário pergunta sobre o progresso do workflow, diz "/workflows não funciona", pergunta "o workflow terminou", "como está o workflow", "verifique o workflow", ou quer inspecionar uma execução de orquestração multi-agente.)
 ---
 
 # Status do workflow

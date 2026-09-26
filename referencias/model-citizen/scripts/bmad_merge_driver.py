@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Git merge drivers for the BMad issue map and the sprint status derived from it.
+"""Drivers de merge do git para o mapa de issues do BMad e o status de sprint derivado dele.
 
-Two branches that each reserve a BMad ID both append to `items` and bump `next_ids`, so the
-second to merge used to conflict textually. `map` merges the three versions item by item: the
-main side's map, plus the entries the other side added, with the larger `next_ids` per kind.
-When both sides mapped the same GitHub issue under different IDs, the main side's entry wins.
-The main side is the incoming one in a merge, since agents merge main into their branch, and
-the upstream one in a rebase.
+Dois branches que cada um reserva um ID do BMad ambos anexam a `items` e incrementam `next_ids`,
+então o segundo a mesclar costumava entrar em conflito textual. `map` mescla as três versões item
+por item: o mapa do lado principal, mais as entradas que o outro lado adicionou, com o maior
+`next_ids` por tipo. Quando os dois lados mapearam a mesma issue do GitHub sob IDs diferentes, a
+entrada do lado principal vence. O lado principal é o que está entrando (incoming) num merge, já
+que agentes mesclam main dentro do próprio branch, e é o upstream num rebase.
 
-`sprint-status` cannot merge the derived file from its own three versions, and anything it
-writes to the working tree never reaches the merge commit. It rebuilds the merged map and the
-merged story files from the two commits being merged, renders them, and returns that render as
-the merge result, so the merge commit carries a fresh regeneration. It supports `git merge` and
-`git pull`, which name the incoming commit; anywhere else it reports a conflict and leaves your
-side's file, and you regenerate it with `python3 scripts/bmad_issue_sync.py sprint-status`.
+`sprint-status` não consegue mesclar o arquivo derivado a partir de suas próprias três versões, e
+qualquer coisa que escreve na árvore de trabalho nunca alcança o commit de merge. Ele reconstrói o
+mapa mesclado e os arquivos de história mesclados a partir dos dois commits sendo mesclados,
+renderiza-os, e retorna essa renderização como o resultado do merge, então o commit de merge
+carrega uma regeneração fresca. Ele suporta `git merge` e `git pull`, que nomeiam o commit
+entrando; em qualquer outro lugar ele relata um conflito e deixa o arquivo do seu lado, e você o
+regenera com `python3 scripts/bmad_issue_sync.py sprint-status`.
 
-Both exit 1 on anything they cannot merge exactly, which git reports as a conflict. A genuine
-duplicate, one ID claimed by two different issues, keeps both entries so the audit still fails
-on it. Register them with `citizen worktree create`, or with the commands in
-docs/bmad-governance.md.
+Os dois saem com 1 em qualquer coisa que não conseguem mesclar exatamente, o que o git relata
+como um conflito. Uma duplicata genuína, um ID reivindicado por duas issues diferentes, mantém as
+duas entradas para que a auditoria ainda falhe nela. Registre-as com `citizen worktree create`,
+ou com os comandos em docs/bmad-governance.md.
 """
 
 import json
@@ -39,11 +40,11 @@ EMPTY_MAP = {"items": [], "next_ids": {}}
 
 
 class Unmergeable(Exception):
-    """A merge the driver cannot settle exactly; git reports it as a conflict."""
+    """Um merge que o driver não consegue resolver exatamente; o git o relata como um conflito."""
 
 
 def serialize(manifest):
-    """The byte format `bmad_issue_sync.write_manifest` writes."""
+    """O formato de bytes que `bmad_issue_sync.write_manifest` escreve."""
     return json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
 
 
@@ -58,7 +59,7 @@ def parse_map(text, side):
     if not isinstance(counters, dict):
         raise Unmergeable("the {} issue map's next_ids is not an object".format(side))
     for kind, value in counters.items():
-        # `type` rather than isinstance, since JSON true is a Python bool and bool is an int.
+        # `type` em vez de isinstance, já que JSON true é um bool do Python e bool é um int.
         if type(value) is not int:
             raise Unmergeable("the {} issue map's next {} ID is not an integer".format(side, kind))
     return manifest
@@ -90,7 +91,7 @@ def items_by_id(manifest):
 
 
 def merge_maps(base, ours, theirs, main_is_ours=False):
-    """Three-way merge of parsed maps; returns (merged, conflicts, notices)."""
+    """Merge de três vias de mapas já analisados; retorna (mesclado, conflitos, avisos)."""
     main, branch = (ours, theirs) if main_is_ours else (theirs, ours)
     conflicts, notices = [], []
     base_items, main_items, branch_items = (items_by_id(manifest) for manifest in (base, main, branch))
@@ -106,7 +107,7 @@ def merge_maps(base, ours, theirs, main_is_ours=False):
                 items.append(item)
             continue
         if before is None and other != item:
-            # Both sides took one ID for different work: a genuine duplicate the audit must see.
+            # Os dois lados usaram um ID para trabalhos diferentes: uma duplicata genuína que a auditoria precisa ver.
             conflicts.append("{} was reserved on both sides".format(bmad_id))
             items.extend([item, other])
             continue
@@ -163,7 +164,7 @@ def rebasing():
 
 
 def incoming_commit():
-    """The commit `git merge` is merging in, which it names in a GITHEAD_<oid> variable."""
+    """O commit que `git merge` está mesclando, que ele nomeia numa variável GITHEAD_<oid>."""
     oids = [name[len("GITHEAD_"):] for name in os.environ if name.startswith("GITHEAD_")]
     oids = [oid for oid in oids if HEX_OID.match(oid)]
     if len(oids) != 1:
@@ -172,7 +173,7 @@ def incoming_commit():
 
 
 def tree_blobs(commit, directory):
-    """{path: blob} for the files under `directory` at `commit`."""
+    """{path: blob} para os arquivos sob `directory` em `commit`."""
     out = git("ls-tree", "-r", "-z", commit, "--", directory).decode("utf-8")
     blobs = {}
     for entry in filter(None, out.split("\0")):
@@ -182,7 +183,7 @@ def tree_blobs(commit, directory):
 
 
 def read_blobs(oids):
-    """{oid: bytes} through one `git cat-file --batch`."""
+    """{oid: bytes} através de um único `git cat-file --batch`."""
     oids = sorted(set(oids))
     if not oids:
         return {}
@@ -200,7 +201,7 @@ def read_blobs(oids):
 
 
 def merge_story(path, base, ours, theirs, contents, scratch):
-    """The content git's clean merge gives one story file, or None when the file is absent."""
+    """O conteúdo que o merge limpo do git dá a um arquivo de história, ou None quando o arquivo está ausente."""
     if ours == theirs or theirs == base:
         oid = ours
     elif ours == base:
@@ -220,7 +221,7 @@ def merge_story(path, base, ours, theirs, contents, scratch):
 
 
 def merged_sprint_status():
-    """Render sprint status from the tree the running merge will commit."""
+    """Renderiza o status de sprint a partir da árvore que o merge em andamento vai commitar."""
     if rebasing():
         raise Unmergeable("a rebase replays commits without naming them to the driver")
     theirs = incoming_commit()

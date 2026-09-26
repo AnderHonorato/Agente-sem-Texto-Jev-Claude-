@@ -1,6 +1,6 @@
 ---
 name: worktree-per-agent
-description: Isolate an agent's work in its own git worktree branched off the default branch, so two agents never land conflicting changes on the shared checkout. Use at the start of any implementation task in a repo where others may also be working, and whenever a repo's instructions say "work in a worktree".
+description: Isolate an agent's work in its own git worktree branched off the default branch, so two agents never land conflicting changes on the shared checkout. Use at the start of any implementation task in a repo where others may also be working, and whenever a repo's instructions say "work in a worktree". (Isole o trabalho de um agente em sua própria worktree git ramificada do branch padrão, para que dois agentes nunca finalizem mudanças conflitantes no checkout compartilhado. Use no início de qualquer tarefa de implementação num repositório onde outros também podem estar trabalhando, e sempre que as instruções de um repositório dizem "trabalhe numa worktree".)
 ---
 
 # Uma worktree por agente

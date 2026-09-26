@@ -1,6 +1,6 @@
 ---
 name: migration-safety
-description: Write, review or apply a database schema migration without destroying data. Use for any task that creates or modifies a migration file (Alembic, Prisma, Django, Rails, Flyway, raw SQL), and before applying one to a shared environment.
+description: Write, review or apply a database schema migration without destroying data. Use for any task that creates or modifies a migration file (Alembic, Prisma, Django, Rails, Flyway, raw SQL), and before applying one to a shared environment. (Escreva, revise ou aplique uma migração de schema de banco de dados sem destruir dados. Use para qualquer tarefa que crie ou modifique um arquivo de migração (Alembic, Prisma, Django, Rails, Flyway, SQL cru), e antes de aplicar uma a um ambiente compartilhado.)
 ---
 
 # Segurança de migração

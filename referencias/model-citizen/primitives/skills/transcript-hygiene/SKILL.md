@@ -1,6 +1,6 @@
 ---
 name: transcript-hygiene
-description: Bound what subagents return and what tool output enters the transcript; load when briefing a subagent or reading large output.
+description: Bound what subagents return and what tool output enters the transcript; load when briefing a subagent or reading large output. (Delimite o que subagentes retornam e o que a saída de ferramenta entra na transcrição; carregue ao instruir um subagente ou ler uma saída grande.)
 ---
 
 # Higiene de transcrição

@@ -1,6 +1,6 @@
 ---
 name: plan-authoring
-description: Write or revise a plan file, proposal, design doc or handoff the user reviews before approving work; carries the Review Card contract and the addendum rules. Use before writing anything into .agent-harness/plans/, and for any markdown deliverable whose job is to get a go/no-go.
+description: Write or revise a plan file, proposal, design doc or handoff the user reviews before approving work; carries the Review Card contract and the addendum rules. Use before writing anything into .agent-harness/plans/, and for any markdown deliverable whose job is to get a go/no-go. (Escreva ou revise um arquivo de plano, proposta, doc de design ou handoff que o usuário revisa antes de aprovar o trabalho; carrega o contrato do Review Card e as regras do adendo. Use antes de escrever qualquer coisa em .agent-harness/plans/, e para qualquer entregável markdown cujo trabalho é obter um sinal verde ou vermelho.)
 ---
 
 O gatilho vive na postura (stance) `plan-ceremony`. Este é o contrato.

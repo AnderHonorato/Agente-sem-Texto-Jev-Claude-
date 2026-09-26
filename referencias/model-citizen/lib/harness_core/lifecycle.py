@@ -271,17 +271,19 @@ def marker_role(prompt):
     return None
 
 
-# A workflow script's `agent()` calls never reach the `Agent` hooks, so the launch is the one call
-# the harness sees (docs/spikes/2026-09-22-workflow-tool-band-routing-and-ledger.md). The script
-# is JavaScript: a role is named as a quoted `agentType` value, and a brief's `harness-role:` line
-# usually sits inside a string literal, bounded by a quote or a `\n` escape rather than a newline.
+# As chamadas `agent()` de um script de workflow nunca alcançam os hooks de `Agent`, então o
+# lançamento é a única chamada que o harness enxerga
+# (docs/spikes/2026-09-22-workflow-tool-band-routing-and-ledger.md). O script é JavaScript: um
+# papel é nomeado como um valor `agentType` entre aspas, e a linha `harness-role:` de um brief
+# geralmente fica dentro de um literal de string, delimitada por uma aspa ou um escape `\n` em
+# vez de uma quebra de linha real.
 WORKFLOW_POINT = "workflow-launch"
 WORKFLOW_AGENT_TYPE = re.compile(r"\bagentType\b")
-# A literal counts only when it is the whole value: `'worker-a' && 'reviewer'` is computed.
+# Um literal só conta quando é o valor inteiro: `'worker-a' && 'reviewer'` é computado.
 WORKFLOW_AGENT_VALUE = re.compile(r"""['"]?\s*[:=]\s*(['"`])([^'"`\\\n]*)\1(?=\s*(?:[,;)\]}]|$))""")
 WORKFLOW_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 WORKFLOW_LITERAL = re.compile(r"""(['"`])([a-z][a-z0-9-]*)\1""")
-# A literal with an escape in it, such as `'re\u0076iewer'`, which evaluates to a role name.
+# Um literal com um escape nele, como `'re\u0076iewer'`, que se avalia como um nome de papel.
 WORKFLOW_ESCAPED = re.compile(r"""(['"`])((?:(?!\1)[^\\\n])*\\.(?:(?!\1)[^\\\n]|\\.)*)\1""")
 WORKFLOW_ESCAPE = re.compile(r"""\\(?:u\{([0-9A-Fa-f]{1,6})\}|u([0-9A-Fa-f]{4})|x([0-9A-Fa-f]{2})|([nrtvfb0])|(.))""",
                              re.S)
@@ -289,18 +291,19 @@ WORKFLOW_CONTROL = {"n": "\n", "r": "\r", "t": "\t", "v": "\v", "f": "\f", "b": 
 WORKFLOW_MARKER = re.compile(r"""(?:^|\\n|['"`])[ \t]*harness-role:[ \t]*([a-z][a-z0-9-]*)[ \t]*"""
                              r"""(?=$|\\n|\\r|['"`])""", re.M)
 WORKFLOW_SCRIPT_MAX = 1024 * 1024
-# A file longer than the read limit runs in full but cannot be judged in full, so it is refused.
+# Um arquivo mais longo que o limite de leitura roda por inteiro mas não pode ser julgado por
+# inteiro, então é recusado.
 WORKFLOW_TOO_LARGE = object()
 
 
 def workflow_script(event):
-    """The text a `Workflow` launch will run, None when this hook cannot read it, or
-    `WORKFLOW_TOO_LARGE` for a file past `WORKFLOW_SCRIPT_MAX` characters.
+    """O texto que um lançamento `Workflow` vai rodar, None quando este hook não consegue lê-lo, ou
+    `WORKFLOW_TOO_LARGE` para um arquivo além de `WORKFLOW_SCRIPT_MAX` caracteres.
 
-    The runtime takes `scriptPath` over `script` over `name`; a name resolves to a file under a
-    `.claude/workflows/` directory, project first. A built-in workflow and a resume by run id
-    carry no text here: the first is the runtime's own script, and the second re-runs one whose
-    launch this hook already judged.
+    O runtime prioriza `scriptPath` sobre `script` sobre `name`; um nome resolve para um arquivo
+    sob um diretório `.claude/workflows/`, o do projeto primeiro. Um workflow embutido e uma
+    retomada por id de execução não carregam texto aqui: o primeiro é o próprio script do
+    runtime, e o segundo re-executa um cujo lançamento este hook já julgou.
     """
     inputs = event.get("tool_input") or {}
     cwd = Path(event.get("cwd") or os.getcwd())
@@ -325,8 +328,9 @@ def workflow_script(event):
 
 
 def workflow_literal(text, keep_quoting=False):
-    """`text` with its JavaScript escapes decoded: a literal's body, or with `keep_quoting` a
-    whole script, where a quote or backslash escape stays escaped so literals keep their bounds."""
+    """`text` com seus escapes de JavaScript decodificados: o corpo de um literal, ou, com
+    `keep_quoting`, um script inteiro, onde uma aspa ou escape de barra invertida permanece
+    escapado para que os literais mantenham seus limites."""
     def decode(match):
         code = match.group(1) or match.group(2) or match.group(3)
         if code is not None:
@@ -338,11 +342,12 @@ def workflow_literal(text, keep_quoting=False):
 
 
 def workflow_role(script):
-    """`(name, fields, how)` for the first constrained role a workflow script names, else None.
+    """`(name, fields, how)` para o primeiro papel restrito que um script de workflow nomeia, senão None.
 
-    The script is read twice, as written and with its escapes decoded, because an escaped key
-    (`agent\\u0054ype`) or an escaped newline around a `harness-role:` line reads as the plain
-    form once JavaScript evaluates it. See `workflow_role_in` for one reading.
+    O script é lido duas vezes, como está escrito e com seus escapes decodificados, porque uma
+    chave escapada (`agent\\u0054ype`) ou uma quebra de linha escapada ao redor de uma linha
+    `harness-role:` lê como a forma simples assim que o JavaScript a avalia. Veja
+    `workflow_role_in` para uma leitura.
     """
     if not isinstance(script, str):
         return None

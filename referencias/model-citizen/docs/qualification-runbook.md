@@ -1,101 +1,102 @@
-# Native qualification runbook
+# Runbook de qualificação nativa
 
-How an operator runs `scripts/native_acceptance.py` against a real client. What must be proved,
-and what the evidence record must contain, is in [what is supported](compatibility.md); this page
-is only the mechanics of a run.
+Como um operador roda `scripts/native_acceptance.py` contra um cliente real. O que precisa ser
+provado, e o que o registro de evidência precisa conter, está em [o que é suportado](compatibility.md);
+esta página é apenas a mecânica de uma execução.
 
-## Before a run
+## Antes de uma execução
 
-- The checkout must be clean. Native evidence names a source commit, and the runner refuses a
-  dirty tree rather than record a commit that does not describe what ran.
-- The client must be installed and logged in for the account you intend to qualify, and
-  `<client> --version` must report a version the runner can parse. [Target hosts](#target-hosts)
-  says where each target's client comes from and how it logs in.
-- Run `python3 scripts/smoke_tier.py --targets <ids>` first, naming the targets the round will
-  run; with no `--targets` it checks every CLI target this host can run and reports the others
-  as skipped. It spends no model turn, and the deterministic faults it catches — a client off
-  `PATH`, a missing Codex login or Docker daemon, an unreachable credential, a drifted
-  projection, a runner that misreads a transcript — are the ones that otherwise surface part-way
-  through a paid round. It is advisory
-  and never qualification; see [releasing](releasing.md#freeze-the-qualification-branch).
-- Every probe is one short headless turn and costs money. Use the cheapest model the client
-  offers; `--model` defaults to it.
+- O checkout precisa estar limpo. Evidência nativa nomeia um commit de origem, e o executor recusa
+  uma árvore suja em vez de registrar um commit que não descreve o que rodou.
+- O cliente precisa estar instalado e logado para a conta que você pretende qualificar, e
+  `<client> --version` precisa relatar uma versão que o executor consegue interpretar.
+  [Hosts alvo](#target-hosts) diz de onde vem o cliente de cada alvo e como ele faz login.
+- Rode `python3 scripts/smoke_tier.py --targets <ids>` primeiro, nomeando os alvos que a rodada vai
+  rodar; sem `--targets` ele verifica todo alvo de CLI que este host consegue rodar e relata os
+  outros como pulados. Ele não gasta nenhum turno de modelo, e os defeitos determinísticos que
+  captura — um cliente fora do `PATH`, um login do Codex ou daemon do Docker ausente, uma
+  credencial inalcançável, uma projeção desviada, um executor que interpreta mal uma transcrição —
+  são os que de outra forma apareceriam no meio de uma rodada paga. É consultivo e nunca
+  qualificação; veja [releasing](releasing.md#freeze-the-qualification-branch).
+- Toda sondagem é um turno headless curto e custa dinheiro. Use o modelo mais barato que o cliente
+  oferece; `--model` tem esse como padrão.
 
-## Target hosts
+## Hosts alvo
 
-Which binary, login and host each required target uses is the contract in
-[what is supported](compatibility.md#where-each-target-runs-and-what-it-needs). These are the
-commands that establish it on the Mac every round has run on, in order, before anything is paid
-for.
+Qual binário, login e host cada alvo obrigatório usa é o contrato em
+[o que é suportado](compatibility.md#where-each-target-runs-and-what-it-needs). Estes são os
+comandos que o estabelecem no Mac em que toda rodada rodou, em ordem, antes de qualquer coisa ser
+paga.
 
-1. **Codex on `PATH`.** Link the ChatGPT desktop app's bundled binary and read its version, which
-   the app moves forward on its own:
+1. **Codex no `PATH`.** Ligue o binário empacotado do aplicativo desktop do ChatGPT e leia sua
+   versão, que o aplicativo avança sozinho:
 
    ```sh
    ln -sf /Applications/ChatGPT.app/Contents/Resources/codex ~/.local/bin/codex
    codex --version
    ```
 
-2. **Codex login.** `codex login` with the ChatGPT account the round runs under writes
-   `~/.codex/auth.json`. A Codex round spends that ChatGPT plan's usage rather than API credit,
-   so confirm the plan has headroom for the round, or budget a usage purchase, before starting
-   rather than finding the limit mid-case.
-3. **Claude Code credential.** Export an Anthropic API key, a cloud profile, or a subscription
-   token from `claude setup-token`; the runner passes each by name — see [credentials](#credentials).
-4. **Docker daemon**, for either Linux target. Start Docker Desktop and confirm `docker info`
-   answers, then build the target image once per pinned client version:
+2. **Login do Codex.** `codex login` com a conta ChatGPT sob a qual a rodada roda escreve
+   `~/.codex/auth.json`. Uma rodada do Codex gasta o uso desse plano ChatGPT em vez de crédito de
+   API, então confirme que o plano tem margem para a rodada, ou orce uma compra de uso, antes de
+   começar em vez de encontrar o limite no meio de um caso.
+3. **Credencial do Claude Code.** Exporte uma chave de API Anthropic, um perfil de nuvem, ou um
+   token de assinatura de `claude setup-token`; o executor passa cada um pelo nome — veja
+   [credenciais](#credentials).
+4. **Daemon do Docker**, para qualquer um dos dois alvos Linux. Inicie o Docker Desktop e confirme
+   que `docker info` responde, depois construa a imagem alvo uma vez por versão fixada de cliente:
 
    ```sh
    docker build -f scripts/linux-target.Dockerfile -t agent-harness-linux-target .
    ```
 
-   It builds natively as linux/arm64 on Apple silicon, which is what the 0.11.x Linux records
-   describe. Change `CODEX_VERSION` and `CLAUDE_CODE_VERSION` with `--build-arg` when a round
-   pins newer clients.
-5. **Check before paying.** The smoke tier's `credentials` check reads the targets you name and
-   fails at once, naming the target, when a client is off `PATH`, the Codex login is missing or
-   the Docker daemon does not answer:
+   Ela constrói nativamente como linux/arm64 em silício Apple, que é o que os registros Linux da
+   0.11.x descrevem. Mude `CODEX_VERSION` e `CLAUDE_CODE_VERSION` com `--build-arg` quando uma
+   rodada fixa clientes mais novos.
+5. **Verifique antes de pagar.** A verificação `credentials` da camada de smoke lê os alvos que
+   você nomeia e falha na hora, nomeando o alvo, quando um cliente está fora do `PATH`, o login do
+   Codex está ausente ou o daemon do Docker não responde:
 
    ```sh
    python3 scripts/smoke_tier.py --only credentials \
        --targets claude-code-cli-macos,codex-cli-macos,claude-code-cli-linux,codex-cli-linux
    ```
 
-   A Linux target checks only the daemon from the Mac; its client and login are checked by the
-   same command inside the container.
+   Um alvo Linux verifica só o daemon a partir do Mac; seu cliente e login são verificados pelo
+   mesmo comando dentro do container.
 
-A Linux target is never run from the Mac. The runner refuses a target whose platform is not
-the host's, because the record would carry one platform's name on another's outcome, and
-`scripts/qualification_round.py` reports such a target as not run here and leaves it out of the
-round rather than failing it (#708). It runs inside the container instead, against the round's
-frozen clone mounted read-only and its records directory mounted writable, both from
-[provisioning](#provisioning-the-round). On a Claude subscription, pass the token from
-`claude setup-token` as `CLAUDE_CODE_OAUTH_TOKEN` (#672); this is the sequence that produced the
-0.13.0 `claude-code-cli-linux` records:
+Um alvo Linux nunca é rodado a partir do Mac. O executor recusa um alvo cuja plataforma não é a do
+host, porque o registro carregaria o nome de uma plataforma sobre o resultado de outra, e
+`scripts/qualification_round.py` relata tal alvo como não rodado aqui e o deixa fora da rodada em
+vez de falhá-lo (#708). Em vez disso ele roda dentro do container, contra o clone congelado da
+rodada montado somente-leitura e seu diretório de registros montado com escrita, ambos vindos do
+[provisionamento](#provisioning-the-round). Em uma assinatura Claude, passe o token de
+`claude setup-token` como `CLAUDE_CODE_OAUTH_TOKEN` (#672); esta é a sequência que produziu os
+registros `claude-code-cli-linux` da 0.13.0:
 
 ```sh
 docker run --rm -it -e CLAUDE_CODE_OAUTH_TOKEN \
     -v "$PWD/../round-v<version>/clone:/frozen:ro" \
     -v "$PWD/../round-v<version>/records:/records" \
     agent-harness-linux-target
-# inside the container
+# dentro do container
 git -c safe.directory='*' clone -q /frozen harness && cd harness
 python3 scripts/smoke_tier.py --only credentials --targets claude-code-cli-linux
 python3 scripts/native_acceptance.py --client claude-code-cli-linux --model sonnet \
     --out /records/claude-code-cli-linux.json
 ```
 
-`sonnet` is the `standard` class's routed model in `adapters/claude-code/bindings.json`; the
-runner started by hand has no round to route it, so it is named, and the record reads
-`model_source: routing` because it matches. The API-key and cloud-profile forms, and a Codex
-target:
+`sonnet` é o modelo roteado da classe `standard` em `adapters/claude-code/bindings.json`; o
+executor iniciado manualmente não tem nenhuma rodada para roteá-lo, então ele é nomeado, e o
+registro lê `model_source: routing` porque combina. As formas de chave de API e perfil de nuvem, e
+um alvo Codex:
 
 ```sh
 docker run --rm -it -e ANTHROPIC_API_KEY \
     -v "$PWD/../round-v<version>/clone:/frozen:ro" \
     -v "$PWD/../round-v<version>/records:/records" \
     agent-harness-linux-target
-# or, for Claude Code on a cloud profile instead of an API key
+# ou, para o Claude Code em um perfil de nuvem em vez de uma chave de API
 docker run --rm -it \
     -e CLAUDE_CODE_USE_BEDROCK -e AWS_PROFILE -e AWS_REGION \
     -e AWS_CONFIG_FILE=/aws/config -e AWS_SHARED_CREDENTIALS_FILE=/aws/credentials \
@@ -103,7 +104,7 @@ docker run --rm -it \
     -v "$PWD/../round-v<version>/clone:/frozen:ro" \
     -v "$PWD/../round-v<version>/records:/records" \
     agent-harness-linux-target
-# inside the container
+# dentro do container
 git -c safe.directory='*' clone -q /frozen harness && cd harness
 codex login --device-auth
 python3 scripts/smoke_tier.py --only credentials --targets codex-cli-linux,claude-code-cli-linux
@@ -111,38 +112,40 @@ python3 scripts/native_acceptance.py --client codex-cli-linux --model <cheapest>
     --out /records/codex-cli-linux.json
 ```
 
-The writable clone exists because the runner refuses a tree it cannot prove clean, and the
-`safe.directory` override is needed because the mount is owned by another user. `-e` names each
-credential variable without its value. The profile form mounts the AWS directory read-only at a
-path that is not the container user's home and points the file variables at it, because the
-runner hands its disposable home only those pointers. `codex login --device-auth` gives the container its own
-ChatGPT session, so no host login file is copied into it; whether the 0.11.x Linux rounds logged
-in this way or used a copy of the host's login is not recorded.
+O clone com escrita existe porque o executor recusa uma árvore que não consegue provar limpa, e a
+sobrescrita `safe.directory` é necessária porque o mount pertence a outro usuário. `-e` nomeia cada
+variável de credencial sem seu valor. A forma de perfil monta o diretório AWS somente-leitura em
+um caminho que não é o home do usuário do container e aponta as variáveis de arquivo para lá,
+porque o executor entrega ao seu diretório home descartável só esses ponteiros.
+`codex login --device-auth` dá ao container sua própria sessão ChatGPT, então nenhum arquivo de
+login do host é copiado para dentro dele; se as rodadas Linux da 0.11.x fizeram login dessa forma
+ou usaram uma cópia do login do host não está registrado.
 
-**The runner's disposable `CODEX_HOME` does not carry the session login.** `adapters/codex/worker.py`
-links `auth.json` into an isolated worker home; the acceptance runner copies no credential and
-passes only the variables in [credentials](#credentials), so a runner-driven Codex case has no
-login, and every Codex record to date was produced by hand rather than by this runner. Until the runner links the login the way
-the worker does, the precondition check above proves the login exists, not that the runner can
-use it.
+**O `CODEX_HOME` descartável do executor não carrega o login de sessão.** `adapters/codex/worker.py`
+linka `auth.json` em um diretório home de worker isolado; o executor de aceitação não copia
+nenhuma credencial e passa apenas as variáveis em [credenciais](#credentials), então um caso Codex
+conduzido pelo executor não tem login, e todo registro Codex até hoje foi produzido manualmente em
+vez de por este executor. Até que o executor linke o login da mesma forma que o worker faz, a
+verificação de pré-condição acima prova que o login existe, não que o executor consegue usá-lo.
 
-## Provisioning the round
+## Provisionando a rodada
 
-A round needs a frozen clone of the commit it qualifies and somewhere to keep each target's
-record. Provision both once, outside the checkout:
+Uma rodada precisa de um clone congelado do commit que qualifica e de algum lugar para guardar o
+registro de cada alvo. Provisione os dois uma vez, fora do checkout:
 
 ```sh
 python3 scripts/qualification_provision.py --out ../round-v<version>
 ```
 
-The clone is taken from this repository's own object store and is refused unless the tree is
-clean and the clone lands on the commit named. No required case runs a framework workflow, so no
-case needs anything else. On a minor release, `--bmad` also installs a BMad framework checkout
-with the pinned installer from [bmad](bmad.md) for the optional integration suite in
-[releasing](releasing.md#source-and-qualification), which is run by hand; it is the only step that
-reaches the network, and `--print-env` prints the export that suite's operator needs.
+O clone é tirado do próprio armazenamento de objetos deste repositório e é recusado a menos que a
+árvore esteja limpa e o clone aterrisse no commit nomeado. Nenhum caso obrigatório roda um workflow
+de framework, então nenhum caso precisa de mais nada. Em um lançamento minor, `--bmad` também
+instala um checkout do framework BMad com o instalador fixado de [bmad](bmad.md) para a suíte de
+integração opcional em [releasing](releasing.md#source-and-qualification), que é rodada
+manualmente; é o único passo que alcança a rede, e `--print-env` imprime a exportação que o
+operador dessa suíte precisa.
 
-## Running
+## Executando
 
 ```sh
 python3 scripts/native_acceptance.py --client claude-code-cli-macos --dry-plan
@@ -153,125 +156,135 @@ python3 scripts/qualification_round.py --round ../round-v<version> \
     --targets claude-code-cli-macos,claude-code-cli-linux
 ```
 
-A round given no `--model` passes each target the model its execution class routes to, and each
-evidence record and per-case row carries it as `model_run`, with the record's routing reading
-`model_source: routing`; an operator's `--model` still wins, recorded as `model_source: operator`
-beside the routed model (#721). On a Mac the Linux target in that example is reported as not run
-here, and runs in the container from [target hosts](#target-hosts).
+Uma rodada sem nenhum `--model` passa para cada alvo o modelo para o qual sua classe de execução
+roteia, e cada registro de evidência e linha por caso o carrega como `model_run`, com o roteamento
+do registro lendo `model_source: routing`; um `--model` de operador ainda vence, registrado como
+`model_source: operator` ao lado do modelo roteado (#721). Em um Mac, o alvo Linux nesse exemplo é
+relatado como não rodado aqui, e roda no container a partir de [hosts alvo](#target-hosts).
 
-`--dry-plan` launches no client and names, per case, what a run would do. `--keep-home` leaves
-each disposable home in place for debugging; without it every home is removed at the end of its
-case. Write `--out` outside the checkout: the runner refuses to run against a dirty tree, and an
-evidence file is added to the tree deliberately, after review.
+`--dry-plan` não lança nenhum cliente e nomeia, por caso, o que uma execução faria.
+`--keep-home` deixa cada diretório home descartável no lugar para depuração; sem isso, todo
+diretório home é removido ao final do seu caso. Escreva `--out` fora do checkout: o executor recusa
+rodar contra uma árvore suja, e um arquivo de evidência é adicionado à árvore deliberadamente,
+depois de revisão.
 
-`scripts/qualification_round.py` drives a provisioned round: the smoke tier once, then the
-runner per target from the frozen clone, one record each. A smoke tier that fails or times out
-stops the round before any target runs, and `round.json` records the tier's result, why the round
-stopped and the targets it did not run; `--skip-smoke` records the tier as `skipped` and runs every
-target. Past the tier it decides nothing and stops for nothing — a round collects every target's
-defects before any of them is fixed, which is the rule in
-[releasing](releasing.md#freeze-the-qualification-branch) — and it exits non-zero unless the tier
-passed or was skipped and every case of every target passed. A target's earlier record is moved
-aside before its runner is launched, so a runner that exits before writing one reports every case
-`unverified` rather than the previous round's passes, and a target that runs past the round
-deadline is recorded and carried rather than raised — the targets after it still run.
+`scripts/qualification_round.py` conduz uma rodada provisionada: a camada de smoke uma vez, depois
+o executor por alvo a partir do clone congelado, um registro cada. Uma camada de smoke que falha
+ou expira para a rodada antes de qualquer alvo rodar, e `round.json` registra o resultado da
+camada, por que a rodada parou e os alvos que não rodou; `--skip-smoke` registra a camada como
+`skipped` e roda todo alvo. Passada a camada, ela não decide nada e não para por nada — uma rodada
+coleta os defeitos de todo alvo antes de qualquer um deles ser corrigido, que é a regra em
+[releasing](releasing.md#freeze-the-qualification-branch) — e ela sai com código não-zero a menos
+que a camada tenha passado ou sido pulada e todo caso de todo alvo tenha passado. O registro
+anterior de um alvo é movido para o lado antes de seu executor ser lançado, então um executor que
+sai antes de escrever um relata todo caso como `unverified` em vez das aprovações da rodada
+anterior, e um alvo que roda além do prazo da rodada é registrado e carregado adiante em vez de
+levantado — os alvos depois dele ainda rodam.
 
-## Which class executes, and which class reads
+## Qual classe executa, e qual classe lê
 
-A round carries two capability classes per target, not one. The **execution class**, `standard`
-by default, is the worker that runs the scripted cases, reads their JSON and writes the findings
-file. The **assessment class**, `strong` by default and a floor rather than a preference, is the
-reader that assesses the round's observations, which [what is supported](compatibility.md)
-requires of a reviewer. Both are written into the evidence record as `tier_routing` and into the
-round's `round.json`, so the record says which class produced an observation and which class read
-it.
+Uma rodada carrega duas classes de capacidade por alvo, não uma. A **classe de execução**,
+`standard` por padrão, é o worker que roda os casos com script, lê seu JSON e escreve o arquivo de
+achados. A **classe de avaliação**, `strong` por padrão e um piso em vez de uma preferência, é o
+leitor que avalia as observações da rodada, o que [o que é suportado](compatibility.md) exige de um
+revisor. As duas são escritas no registro de evidência como `tier_routing` e no `round.json` da
+rodada, então o registro diz qual classe produziu uma observação e qual classe a leu.
 
 ```sh
 python3 scripts/qualification_round.py --round ../round-v<version> \
     --execution-class light --execution-class codex-cli-macos=standard
 ```
 
-A bare class moves every target; `TARGET=CLASS` moves the one it names, so a Codex target can be
-executed at a different class from a Claude Code one in the same round. Later arguments win.
+Uma classe simples move todo alvo; `TARGET=CLASS` move o que nomeia, então um alvo Codex pode ser
+executado em uma classe diferente de um Claude Code na mesma rodada. Argumentos posteriores
+vencem.
 
-The classes are resolved through the target runtime's `adapters/<runtime>/bindings.json`, the
-same table `citizen tiers` checks; a personal `tiers.<runtime>` override in a user configuration
-is not applied, because a round runs from a frozen clone. Two refusals, both before any client is
-launched:
+As classes são resolvidas através do `adapters/<runtime>/bindings.json` do runtime alvo, a mesma
+tabela que `citizen tiers` verifica; uma sobrescrita pessoal de `tiers.<runtime>` em uma
+configuração de usuário não é aplicada, porque uma rodada roda a partir de um clone congelado.
+Duas recusas, ambas antes de qualquer cliente ser lançado:
 
-- An assessment class weaker than `strong`. A cheaper tier may execute the cases; it does not
-  assess them.
-- A cheap execution class that resolves to the assessment class's own model — because the
-  adapter maps both classes to one identifier, because it spells one model two ways, or because
-  it does not map the cheap class at all and an unmapped class resolves upward. The executor
-  would then be the only reader of the evidence it produced. The two identifiers are compared
-  the way the usage ledger compares them, so a date-stamped id and a bare alias of the same
-  model are one model; the comparison errs towards refusing, and two models an operator means
-  to be different are written as two ids neither of which is a prefix of the other.
-- An assessment class the adapter does not map while the execution class is mapped: the reader
-  would inherit whatever model the session happens to be running, which is no named reader.
+- Uma classe de avaliação mais fraca que `strong`. Uma classe mais barata pode executar os casos;
+  ela não os avalia.
+- Uma classe de execução barata que resolve para o próprio modelo da classe de avaliação — porque
+  o adaptador mapeia as duas classes para um identificador, porque soletra um modelo de duas
+  formas, ou porque não mapeia a classe barata de forma alguma e uma classe não mapeada resolve
+  para cima. O executor então seria o único leitor da evidência que produziu. Os dois
+  identificadores são comparados da mesma forma que o ledger de uso os compara, então um id com
+  data e um alias simples do mesmo modelo são um modelo; a comparação erra pelo lado de recusar, e
+  dois modelos que um operador quis dizer serem diferentes são escritos como dois ids nenhum dos
+  quais é prefixo do outro.
+- Uma classe de avaliação que o adaptador não mapeia enquanto a classe de execução está mapeada: o
+  leitor herdaria seja qual for o modelo que a sessão por acaso está rodando, que não é nenhum
+  leitor nomeado.
 
-An unmapped *execution* class beside a mapped assessor — what asking for a class stronger than
-the assessor's does — is disclosed rather than guessed at: that worker inherits the session
-model and the record carries the note saying so.
+Uma classe de *execução* não mapeada ao lado de um avaliador mapeado — o que pedir uma classe mais
+forte que a do avaliador faz — é divulgada em vez de suposta: esse worker herda o modelo da sessão
+e o registro carrega a nota dizendo isso.
 
-The routing is written to the durable per-case log before the first case runs and to
-`round.json` before the smoke tier, so a killed round still records which classes were running.
-`--from-progress` refuses a log whose cases were executed under a different routing rather than
-merging them: a record built from two routings cannot say which class produced an observation.
+O roteamento é escrito no log durável por caso antes de o primeiro caso rodar e no `round.json`
+antes da camada de smoke, então uma rodada morta ainda registra quais classes estavam rodando.
+`--from-progress` recusa um log cujos casos foram executados sob um roteamento diferente em vez de
+mesclá-los: um registro construído a partir de dois roteamentos não consegue dizer qual classe
+produziu uma observação.
 
-A round started again with the same arguments at the same commit resumes from that log: a case
-whose latest line is `passed` or `failed` is not run again, and the runner says so on stderr for
-each one. A failure is kept so its evidence stays intact; an `unverified` case, which observed
-nothing, and a case the kill interrupted both run again. The log's header carries the source
-commit, client version and routing, so a verdict never skips a case for a different candidate. A
-resume without `--home-confirmed` on a surface that needs it keeps no verdict, since it could only
-read `unverified` itself, so every case runs again. To
-retry a failed case at the same commit, give the round a fresh `--progress` log.
+Uma rodada iniciada de novo com os mesmos argumentos no mesmo commit retoma a partir desse log: um
+caso cuja última linha é `passed` ou `failed` não roda de novo, e o executor diz isso no stderr
+para cada um. Uma falha é mantida para que sua evidência continue intacta; um caso `unverified`,
+que não observou nada, e um caso que a interrupção cortou, ambos rodam de novo. O cabeçalho do log
+carrega o commit de origem, versão do cliente e roteamento, então um veredito nunca pula um caso
+para um candidato diferente. Uma retomada sem `--home-confirmed` em uma superfície que precisa
+disso não mantém nenhum veredito, já que só conseguiria ler `unverified` de qualquer forma, então
+todo caso roda de novo. Para tentar de novo um caso falho no mesmo commit, dê à rodada um log
+`--progress` novo.
 
-The saving this buys is the issue's estimate, not a measurement: workers ran 0.7×–1.8× their 82K
-output budget, so four targets cost 230K–590K output tokens per round, most of it authoring
-rather than judgement (#338). It is worth nothing without the scripted cases (#336): dropping the
-class on a worker that is still hand-driving the cases buys worse observations and more retries.
+A economia que isso compra é a estimativa da issue, não uma medição: workers rodaram 0,7×–1,8× de
+seu orçamento de 82K de saída, então quatro alvos custam 230K–590K tokens de saída por rodada, a
+maior parte deles de autoria em vez de julgamento (#338). Não vale nada sem os casos com script
+(#336): descartar a classe em um worker que ainda está conduzindo os casos manualmente compra
+observações piores e mais tentativas.
 
-## Client surfaces
+## Superfícies de cliente
 
-Each surface names the environment variable that moves its whole configuration home, which is
-what makes a disposable home possible: `CLAUDE_CONFIG_DIR` for Claude Code, `CODEX_HOME` for
-Codex. The Codex surface is driven headlessly with `codex exec --json` and read from the rollout
-files under its home, following `adapters/codex/worker.py` and
-[usage](usage.md#codex-rollouts).
+Cada superfície nomeia a variável de ambiente que move todo seu diretório de configuração, que é o
+que torna possível um diretório home descartável: `CLAUDE_CONFIG_DIR` para o Claude Code,
+`CODEX_HOME` para o Codex. A superfície do Codex é conduzida em modo headless com
+`codex exec --json` e lida a partir dos arquivos de rollout sob seu diretório home, seguindo
+`adapters/codex/worker.py` e [usage](usage.md#codex-rollouts).
 
-**No Codex round has been driven through this runner.** Until one has been, its reading is
-derived from those files rather than observed, so every Codex verdict is reported `unverified`
-with the observation kept, exactly as an unobserved case is. On the first round that runs a Codex
-target, qualify it by hand as well, compare the two, and pass `--home-confirmed` only once they
-agree. Record that comparison with the round's observations.
+**Nenhuma rodada Codex foi conduzida através deste executor.** Até que uma seja, sua leitura é
+derivada desses arquivos em vez de observada, então todo veredito Codex é relatado `unverified`
+com a observação mantida, exatamente como um caso não observado é. Na primeira rodada que roda um
+alvo Codex, qualifique-o também manualmente, compare os dois, e passe `--home-confirmed` só quando
+concordarem. Registre essa comparação com as observações da rodada.
 
-## Credentials
+## Credenciais
 
-The runner copies no credential and prints none. Each case runs in a disposable `HOME` that
-inherits, **by name only**, the authentication variables this machine already uses — the
-`ANTHROPIC_*` variables, `CLAUDE_CODE_OAUTH_TOKEN`, the Bedrock and Vertex switches, `AWS_PROFILE` and the AWS region,
-credentials-file and session variables (`AWS_ACCESS_KEY_ID`, `AWS_SESSION_TOKEN` and the
-secret-key variable beside them), `GOOGLE_APPLICATION_CREDENTIALS` and `OPENAI_API_KEY`. `AUTH_PASSTHROUGH`
-in the runner is the full list. A container that holds its credentials as environment variables
-and has no profile to fall back on is qualified by exporting them to the wrapper that invokes the
-runner; nothing else reaches the client.
+O executor não copia nenhuma credencial e não imprime nenhuma. Cada caso roda em um `HOME`
+descartável que herda, **só pelo nome**, as variáveis de autenticação que esta máquina já usa — as
+variáveis `ANTHROPIC_*`, `CLAUDE_CODE_OAUTH_TOKEN`, os switches de Bedrock e Vertex, `AWS_PROFILE`
+e a região AWS, variáveis de arquivo de credenciais e sessão (`AWS_ACCESS_KEY_ID`,
+`AWS_SESSION_TOKEN` e a variável de chave secreta ao lado delas), `GOOGLE_APPLICATION_CREDENTIALS`
+e `OPENAI_API_KEY`. `AUTH_PASSTHROUGH` no executor é a lista completa. Um container que guarda suas
+credenciais como variáveis de ambiente e não tem nenhum perfil para recorrer é qualificado
+exportando-as para o wrapper que invoca o executor; nada mais alcança o cliente.
 
-An interactive `claude login` never reaches the disposable home. On a Claude subscription with no
-API key, run `claude setup-token` once — it mints a long-lived token for that subscription — and
-export it as `CLAUDE_CODE_OAUTH_TOKEN` in the shell that invokes the runner, so the round spends
-the subscription rather than on-demand credit. Export it for the round only; never write it to a file.
+Um `claude login` interativo nunca alcança o diretório home descartável. Em uma assinatura Claude
+sem chave de API, rode `claude setup-token` uma vez — ele emite um token de longa duração para
+essa assinatura — e o exporte como `CLAUDE_CODE_OAUTH_TOKEN` no shell que invoca o executor, para
+que a rodada gaste da assinatura em vez de crédito sob demanda. Exporte-o só para a rodada; nunca o
+escreva em um arquivo.
 
-The AWS file pointers are re-anchored at the operator's real home, because the probe's `HOME` is
-disposable and an unset pointer hangs the provider lookup. On macOS each disposable home gets its
-own default keychain first, so a client that stores an item raises no system dialog.
+Os ponteiros de arquivo AWS são reancorados no home real do operador, porque o `HOME` da sondagem é
+descartável e um ponteiro não definido trava a busca do provedor. No macOS, cada diretório home
+descartável ganha seu próprio chaveiro padrão primeiro, então um cliente que armazena um item não
+levanta nenhuma caixa de diálogo do sistema.
 
-## Reading the result
+## Lendo o resultado
 
-A case is `passed` only when the runner observed the behaviour itself. An assertion that did not
-hold is `failed`; anything the runner could not observe — no transcript, a turn that did not
-finish, a model that declined the turn on its own judgement — is `unverified` with its reason,
-never a pass. Every observation is redacted for home paths, host names and credential shapes
-before it is written. The exit status is 0 only when every selected case passed.
+Um caso é `passed` somente quando o executor observou o comportamento ele mesmo. Uma afirmação que
+não se sustentou é `failed`; qualquer coisa que o executor não conseguiu observar — nenhuma
+transcrição, um turno que não terminou, um modelo que recusou o turno por julgamento próprio — é
+`unverified` com seu motivo, nunca uma aprovação. Toda observação é redigida quanto a caminhos de
+home, nomes de host e formatos de credencial antes de ser escrita. O status de saída é 0 somente
+quando todo caso selecionado passou.

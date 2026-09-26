@@ -1,183 +1,203 @@
-# Cost benchmarks
+# Benchmarks de custo
 
-What the harness costs you, measured against Claude Code with no harness at all. The static figure
-below exists today. The live replay that compares whole tasks has a runner and no published
-result yet, so nothing here claims a saving.
+O que o harness custa a você, medido contra o Claude Code sem harness nenhum. O número estático
+abaixo existe hoje. A reprodução ao vivo que compara tarefas inteiras tem um executor e ainda
+nenhum resultado publicado, então nada aqui alega uma economia.
 
-A result published from these runs must meet the [evidence standard](evidence-standard.md), and
-its plan is a filled [pre-registration template](pre-registration-template.md) committed before
-the first trial.
+Um resultado publicado a partir dessas execuções precisa atender ao [padrão de evidência](evidence-standard.md),
+e seu plano é um [modelo de pré-registro](pre-registration-template.md) preenchido e commitado
+antes do primeiro trial.
 
-## Static context figure
+## Número estático de contexto
 
-Every session the harness manages starts with its global instructions, rules, selected stances and
-output style already in context, plus one listed description for each agent, skill and command. A
-bare Claude Code session loads none of that, so the whole count is the harness's standing overhead.
+Toda sessão que o harness gerencia começa com suas instruções globais, regras, posturas
+selecionadas e estilo de saída já no contexto, mais uma descrição listada para cada agente, skill
+e comando. Uma sessão nua do Claude Code não carrega nada disso, então a contagem inteira é o
+overhead permanente do harness.
 
 ```sh
-python3 scripts/cost_bench.py static            # print the figure for this checkout
-python3 scripts/cost_bench.py static --check    # what CI runs
-python3 scripts/cost_bench.py static --write    # refresh benchmarks/static.json at a release
+python3 scripts/cost_bench.py static            # imprime o número para este checkout
+python3 scripts/cost_bench.py static --check    # o que a CI roda
+python3 scripts/cost_bench.py static --write    # atualiza benchmarks/static.json em um lançamento
 ```
 
-`benchmarks/static.json` is the committed figure for the last release. It records files, lines,
-characters, an estimated token count for the default stance selection and for the longest variant
-of every dimension, the five largest files, and what that many tokens cost per model. Its
-`scopes` block names the set each count is over, because the caps `citizen lint` prints are
-over a narrower one.
+`benchmarks/static.json` é o número commitado para o último lançamento. Ele registra arquivos,
+linhas, caracteres, uma contagem estimada de tokens para a seleção de postura padrão e para a
+variante mais longa de cada dimensão, os cinco maiores arquivos, e quanto essa quantidade de
+tokens custa por modelo. Seu bloco `scopes` nomeia o conjunto sobre o qual cada contagem é feita,
+porque os limites que `citizen lint` imprime são sobre um conjunto mais estreito.
 
-- **Tokens are an estimate:** characters divided by four. It is there to show the trend between
-  versions with no tokenizer, network call or API key. It is not a billing figure.
-- **Dollars come from `policy/prices.json`.** `session_start` prices the layer as one cache write,
-  `later_turn` as one cache read. A session that outlives the cache pays the write again.
-- **CI fails when the estimate grows more than 5% over the committed figure.** Trim the growth, or
-  add an entry to `benchmarks/allow.json` naming `harness_version`, the new `est_tokens` and a
-  `reason`. The entry stops matching as soon as the figure moves again.
-- **Every counted file is priced on its own.** The `files` map gives each file's characters,
-  estimated tokens and dollars, and sums to the totals within rounding. `--check` prints one line
-  per file whose estimate moved since the committed figure, priced on the model with the highest
-  cache-read rate, so a change to one rule reads as that file's delta rather than a moved total.
-  The 5% gate stays on the total.
-- **The caps in `citizen lint` are separate.** They bound the worst case — the longest variant of
-  every stance — in tokens and in lines, over instructions, rules and stances only; this tracks the
-  default selection, output styles and listings included, in tokens and dollars, version by
-  version. Both use the same characters-over-four estimate. Which cap binds, and why:
-  [how-it-works](how-it-works.md#context-discipline).
+- **Tokens são uma estimativa:** caracteres divididos por quatro. Ela existe para mostrar a
+  tendência entre versões sem tokenizador, chamada de rede ou chave de API. Não é um número de
+  cobrança.
+- **Os valores em dólar vêm de `policy/prices.json`.** `session_start` precifica a camada como uma
+  escrita de cache, `later_turn` como uma leitura de cache. Uma sessão que ultrapassa a duração do
+  cache paga a escrita de novo.
+- **A CI falha quando a estimativa cresce mais de 5% acima do número commitado.** Reduza o
+  crescimento, ou adicione uma entrada a `benchmarks/allow.json` nomeando `harness_version`, o novo
+  `est_tokens` e um `reason`. A entrada para de valer assim que o número se move de novo.
+- **Todo arquivo contado é precificado por conta própria.** O mapa `files` dá os caracteres,
+  tokens estimados e dólares de cada arquivo, e soma para os totais dentro do arredondamento.
+  `--check` imprime uma linha por arquivo cuja estimativa se moveu desde o número commitado,
+  precificada no modelo com a maior taxa de leitura de cache, para que uma mudança em uma regra
+  leia como o delta daquele arquivo em vez de um total deslocado. O gate de 5% permanece sobre o
+  total.
+- **Os limites em `citizen lint` são separados.** Eles limitam o pior caso — a variante mais longa
+  de cada postura — em tokens e em linhas, apenas sobre instruções, regras e posturas; isso
+  rastreia a seleção padrão, incluindo estilos de saída e listagens, em tokens e dólares, versão
+  por versão. Ambos usam a mesma estimativa de caracteres dividido por quatro. Qual limite vale, e
+  por quê: [how-it-works](how-it-works.md#context-discipline).
 
-### Recorded trims
+### Reduções registradas
 
-One row per change that set out to shrink the static figure, before and after, from
-`scripts/cost_bench.py static` run on that change's branch. `benchmarks/history.jsonl` cannot hold
-these: its rows are replay ratios against a bare arm on one model and one day, and a static trim
-has no arm. Read the rows in order; none of them is a live measurement.
+Uma linha por mudança que se propôs a encolher o número estático, antes e depois, a partir de
+`scripts/cost_bench.py static` rodado na branch dessa mudança. `benchmarks/history.jsonl` não
+consegue guardar essas linhas: as dela são razões de reprodução contra um braço nu em um modelo e
+um dia, e uma redução estática não tem braço. Leia as linhas em ordem; nenhuma delas é uma medição
+ao vivo.
 
-| Change | Always-loaded | Listings | Total |
+| Mudança | Sempre carregado | Listagens | Total |
 | --- | --- | --- | --- |
-| Baseline at 0.12.0 | 5,198 | 2,326 | 7,524 |
-| After shortening skill and agent descriptions (#430) | 5,198 | 1,980 | 7,185 |
-| After trimming the output style (#430) | 4,539 | 1,980 | 6,519 |
+| Base na 0.12.0 | 5.198 | 2.326 | 7.524 |
+| Depois de encurtar descrições de skill e agente (#430) | 5.198 | 1.980 | 7.185 |
+| Depois de aparar o estilo de saída (#430) | 4.539 | 1.980 | 6.519 |
 
-## Live replay
+## Reprodução ao vivo
 
-`scripts/cost_bench.py replay` runs the pinned tasks in `benchmarks/tasks.json` headlessly, once
-against a signed-in, otherwise empty Claude Code profile and once against the installed harness, and
-scores each run with a check the agent never sees. It calls a model and spends real usage, so it is
-run by hand on a release candidate and never in CI.
+`scripts/cost_bench.py replay` roda as tarefas fixadas em `benchmarks/tasks.json` em modo headless,
+uma vez contra um perfil do Claude Code logado mas por lo resto vazio e uma vez contra o harness
+instalado, e pontua cada execução com uma verificação que o agente nunca vê. Ela chama um modelo e
+gasta uso real, então é rodada manualmente em um candidato a lançamento e nunca na CI.
 
 ```sh
-python3 scripts/cost_bench.py replay --verify-tasks              # prove every check; calls no model
-python3 scripts/cost_bench.py replay --model <id> --dry-run      # print the schedule
-python3 scripts/cost_bench.py replay --model <id>                # 7 tasks x 2 arms x 2 reps
+python3 scripts/cost_bench.py replay --verify-tasks              # prova toda verificação; não chama modelo
+python3 scripts/cost_bench.py replay --model <id> --dry-run      # imprime o cronograma
+python3 scripts/cost_bench.py replay --model <id>                # 7 tarefas x 2 braços x 2 repetições
 python3 scripts/cost_bench.py replay --model <id> \
-    --tag v0.12.0 --tag v0.13.0 --harness-config ~/.claude-bench-harness   # two versions, one run
+    --tag v0.12.0 --tag v0.13.0 --harness-config ~/.claude-bench-harness   # duas versões, uma execução
 ```
 
-- **`--tag` is what the harness arm runs, and it is repeatable.** `candidate`, the default, is the
-  harness installed at `~/.claude` as it stands. Any other value is a git ref of this repository:
-  it is checked out with its history intact, projected by its own `bin/harness sync` into a config
-  directory of its own, run as a whole schedule, and torn down before the next tag. Each tag
-  writes its own results file and its own history row, stamped with the version and commit of the
-  ref that ran. Every ref is resolved before the first launch, so a typo costs nothing, and
-  `--spend-cap` applies to each tag's schedule on its own.
-- **A tagged sync touches nothing of yours.** It runs with a temporary HOME as well as an explicit
-  `CLAUDE_CONFIG_DIR`, so it neither reads nor writes the profile you run under, and it renders no
-  identity or stance selection out of your `~/.config/agent-harness/config.json`: a tagged arm
-  loads that tag's defaults, which is the same question asked of every tag. A sync target that
-  resolves to your live profile, sits inside it, holds it (HOME or any ancestor) or is the bare
-  profile is refused. Because a profile's credential is keyed on its absolute path, a directory
-  made for the run is not signed in; name a signed-in `--harness-config` as the directory each
-  tag is synced into when the run is meant to spend. That profile must hold no harness files
-  already (a link counts only when it leads into a harness checkout or sits at a name the harness
-  manages; the CLI's own `debug/latest` does not), and it cannot serve `candidate` in the same
-  run, and none of the names the sync writes (`rules`, `skills`, `commands`, `agents`, `hooks`,
-  `output-styles`, `plans`, `CLAUDE.md`, `settings.json` and the rest) may be a link leading out
-  of it. After each tag's schedule, exception or interrupt included, the sync is taken back out
-  of it rather than the profile rolled back: exactly the links and files the sync's own manifest
-  and ownership records name are removed, a directory it made goes only once empty, and the one
-  file it rewrites in place, `settings.json`, is put back from a copy taken beforehand through an
-  atomic write. Nothing else is touched: a transcript another session wrote during the run stays,
-  and credential files are never copied, rewritten or deleted, whether they existed before or
-  the CLI created them mid-run, so a refreshed token stays refreshed and a fresh sign-in stays
-  signed in. Nothing in the profile is read but `settings.json`; a FIFO or an unreadable file
-  is listed by its stat and never opened. The records are read from where the harness at HEAD
-  writes them, so the profile itself is checked afterwards: if anything the sync could have
-  written is still there, or the records were empty, the run stops at that tag with the leftover
-  paths named, before another tag launches into a profile that would refuse it. If taking the
-  sync back fails, the copy is kept and its path printed. The refusals above are all decided
-  before the first launch of any tag; the copy-aside, checkout and sync run as each tag's turn
-  comes. The pinned checkout is admitted to the harness arm's fence for reading only, and a
-  pinned tag's results go in a folder named for it.
+- **`--tag` é o que o braço do harness roda, e é repetível.** `candidate`, o padrão, é o harness
+  instalado em `~/.claude` como está. Qualquer outro valor é uma referência git deste repositório:
+  ela é feita checkout com seu histórico intacto, projetada pelo próprio `bin/harness sync` em um
+  diretório de configuração próprio, rodada como um cronograma inteiro, e desmontada antes da
+  próxima tag. Cada tag escreve seu próprio arquivo de resultados e sua própria linha de
+  histórico, carimbada com a versão e o commit da referência que rodou. Toda referência é
+  resolvida antes do primeiro lançamento, então um erro de digitação não custa nada, e
+  `--spend-cap` se aplica ao cronograma de cada tag por conta própria.
+- **Uma sincronização com tag não toca em nada seu.** Ela roda com um HOME temporário além de um
+  `CLAUDE_CONFIG_DIR` explícito, então não lê nem escreve no perfil sob o qual você roda, e não
+  renderiza nenhuma identidade ou seleção de postura a partir do seu
+  `~/.config/agent-harness/config.json`: um braço com tag carrega os padrões dessa tag, que é a
+  mesma pergunta feita a toda tag. Um alvo de sincronização que resolve para o seu perfil ao vivo,
+  fica dentro dele, o contém (HOME ou qualquer ancestral) ou é o perfil nu é recusado. Como a
+  credencial de um perfil é indexada pelo seu caminho absoluto, um diretório feito para a execução
+  não está logado; nomeie um `--harness-config` logado como o diretório em que cada tag é
+  sincronizada quando a execução deve gastar de fato. Esse perfil não pode conter nenhum arquivo do
+  harness já (um link só conta quando leva a um checkout do harness ou fica em um nome que o
+  harness gerencia; o próprio `debug/latest` da CLI não conta), e não pode servir a `candidate` na
+  mesma execução, e nenhum dos nomes que a sincronização escreve (`rules`, `skills`, `commands`,
+  `agents`, `hooks`, `output-styles`, `plans`, `CLAUDE.md`, `settings.json` e o resto) pode ser um
+  link que leve para fora dele. Depois do cronograma de cada tag, exceção ou interrupção incluída,
+  a sincronização é retirada de lá em vez de o perfil ser revertido: exatamente os links e arquivos
+  que o próprio manifesto e registros de posse da sincronização nomeiam são removidos, um diretório
+  que ela criou só some quando vazio, e o único arquivo que ela reescreve no lugar,
+  `settings.json`, é devolvido a partir de uma cópia feita antes, por meio de uma escrita atômica.
+  Nada mais é tocado: uma transcrição que outra sessão escreveu durante a execução permanece, e
+  arquivos de credencial nunca são copiados, reescritos ou apagados, seja lá se já existiam antes
+  ou a CLI os criou no meio da execução, então um token renovado continua renovado e um login
+  recente continua logado. Nada no perfil é lido além de `settings.json`; um FIFO ou um arquivo
+  ilegível é listado pelo seu stat e nunca aberto. Os registros são lidos de onde o harness no HEAD
+  os escreve, então o próprio perfil é verificado depois: se qualquer coisa que a sincronização
+  poderia ter escrito ainda está lá, ou os registros estavam vazios, a execução para naquela tag
+  com os caminhos remanescentes nomeados, antes que outra tag seja lançada em um perfil que a
+  recusaria. Se retirar a sincronização falhar, a cópia é mantida e seu caminho impresso. As
+  recusas acima são todas decididas antes do primeiro lançamento de qualquer tag; a cópia à parte,
+  o checkout e a sincronização rodam conforme chega a vez de cada tag. O checkout fixado é admitido
+  na cerca do braço do harness só para leitura, e os resultados de uma tag fixada vão em uma pasta
+  nomeada por ela.
 
-- **The arms differ by environment only.** Both get one command line: the same `--model`,
-  `--strict-mcp-config`, `--max-budget-usd 2`, the task's own `max_turns` as `--max-turns`, and the
-  same sandbox settings, with command network access off. The bare arm adds `CLAUDE_CONFIG_DIR`,
-  pointing at the empty profile. The fence admits each arm's own config directory and `/tmp` for
-  reading and writing, because the repository's suite writes to both and a fence that admitted only
-  the CLI's default would fail the gate for whichever arm was moved to a bench profile.
-- **Neither arm has the web.** `WebFetch` and `WebSearch` run in the CLI's own process, outside the
-  command sandbox, so the fence's empty network list does not reach them; a profile's permission
-  rules do, and the harness profile allows both on documentation domains. The settings every arm
-  launches with therefore deny both tools, and a deny outranks any profile's allow.
-- **The stop gate can fire.** The stop-gate hook runs a gate only in a folder the user trusted, and
-  no one trusts a fresh snapshot. For the length of each scored run, its snapshot is listed in
-  `~/.config/agent-harness/trusted.txt`, where `citizen trust` lists roots, and exactly that line
-  is removed afterwards. Every arm's snapshot is listed; the bare arm has no hook to read it.
-- **Every run is captured as `stream-json` with hook events**, the one format that carries the
-  Stop hook's decisions, so each row records `stop_hooks`, how often the hook ran, and
-  `hook_blocks`, how often it refused the stop. A raw file kept in the older single-document form
-  still reads, with both fields `null`.
-- **Each arm's fence is proved before anything is scored.** One capped `-p` run per arm runs
-  `bin/harness lint` under that arm's own fence and profile; an arm whose lint is not clean, or
-  whose run has a read refused, refuses the whole replay with exit 2 before any scored run
-  launches, and its cost counts against `--spend-cap`. The bar is lint rather than the full suite
-  because the suite is profile-dependent at older snapshot commits. Every scored row records
-  `preflight`. `--skip-preflight` bypasses the check and stamps the rows `skipped`.
-- **Every run starts in a throwaway snapshot outside the home directory**, launched with a scrubbed
-  environment. A folder under the home directory inherits the user's instruction files through the
-  parent-folder walk, which would put the harness into the bare arm. The snapshot holds one commit,
-  so the change that solved a task is not reachable from it, and it is removed after scoring.
-- **Cost is the CLI's own `total_cost_usd`**, a list-price equivalent and not money charged under a
-  plan sign-in. Run order changes it, because a later run finds its prefix already cached, so each
-  row also carries a cache-normalised cost that reprices every thread's first-turn cache reads as
-  cache writes. It is empty when the CLI output does not carry per-turn usage.
-- **Beside it, `cache_miss_ratio`: how much of its prefix the run re-bought.**
-  `cache_write / (cache_read + cache_write)` summed over every turn the run opened, subagent
-  threads included, because a fan-out's fresh prefix is part of what the run cost. The
-  arithmetic is `citizen usage --by prefix`'s, imported from that module rather than restated,
-  but the two are not the same number: the session figure subtracts a subagent's tokens, so a
-  run that fanned out reads higher here, by design. A candidate that buys fewer tokens by
-  re-writing its prefix more often is otherwise invisible in the history, so `history.jsonl` and
-  `history.md` carry each arm's mean of it beside the cache-normalised ratio. A run whose output
-  carries no per-turn cache figures, any one of whose turns reports usage without them, or whose
-  turns report neither reads nor writes, is `null` and is left out of the arm's mean; so is an
-  errored run, whose turns are not the spend it would have had. Never zero: zero is a run that
-  served its whole prefix.
-- **An errored run is an error, never a failure.** It sits outside both cost per passed task and
-  the pass count, and is counted beside them. The per-run cap is soft, so the runner also stops
-  before any launch that could take reported spend past `--spend-cap`.
-- **`benchmarks/history.jsonl` holds one row per harness version per run day**, stored as a ratio to
-  bare on the same day and model; `benchmarks/history.md` is rendered from it. Compare ratios across
-  days, never dollars. The publishable threshold is fixed in the script: the harness costs at most
-  85% of bare per passed task while passing no fewer than bare minus one, mean of reps.
-- **What is faked:** single-shot prompts stand in for interactive sessions, 2 of the 7 tasks are
-  synthetic, and a tagged run measures the tag's default configuration rather than a configured
-  one.
-- **A task that cannot be passed honestly leaves the set** and moves to the manifest's `retired`
-  list with its reason and date. `usage-prices` left on 2026-09-25: its held-back tests pin live
-  prices and helper names its prompt never gives, and no arm can reach the web to confirm a price.
+- **Os braços diferem só pelo ambiente.** Ambos recebem uma linha de comando: o mesmo `--model`,
+  `--strict-mcp-config`, `--max-budget-usd 2`, o próprio `max_turns` da tarefa como `--max-turns`, e
+  as mesmas configurações de sandbox, com acesso de rede de comando desligado. O braço nu adiciona
+  `CLAUDE_CONFIG_DIR`, apontando para o perfil vazio. A cerca admite o próprio diretório de
+  configuração de cada braço e `/tmp` para leitura e escrita, porque a suíte do repositório
+  escreve nos dois e uma cerca que admitisse só o padrão da CLI falharia o gate para qualquer braço
+  que fosse movido para um perfil de bancada.
+- **Nenhum braço tem a web.** `WebFetch` e `WebSearch` rodam no próprio processo da CLI, fora do
+  sandbox de comando, então a lista de rede vazia da cerca não os alcança; as regras de permissão
+  de um perfil alcançam, e o perfil do harness permite ambos em domínios de documentação. As
+  configurações com que todo braço é lançado, portanto, negam as duas ferramentas, e uma negação
+  vence qualquer permissão de perfil.
+- **O gate de parada pode disparar.** O hook stop-gate roda um gate somente em uma pasta que o
+  usuário confiou, e ninguém confia em um snapshot novo. Pela duração de cada execução pontuada,
+  seu snapshot é listado em `~/.config/agent-harness/trusted.txt`, onde `citizen trust` lista
+  raízes, e exatamente essa linha é removida depois. O snapshot de todo braço é listado; o braço nu
+  não tem hook para lê-lo.
+- **Toda execução é capturada como `stream-json` com eventos de hook**, o único formato que carrega
+  as decisões do hook Stop, então cada linha registra `stop_hooks`, quantas vezes o hook rodou, e
+  `hook_blocks`, quantas vezes ele recusou a parada. Um arquivo bruto mantido na forma antiga de
+  documento único ainda é lido, com os dois campos `null`.
+- **A cerca de cada braço é provada antes de qualquer pontuação.** Uma execução `-p` limitada por
+  braço roda `bin/harness lint` sob a cerca e o perfil próprios daquele braço; um braço cujo lint
+  não está limpo, ou cuja execução tem uma leitura recusada, recusa toda a reprodução com saída 2
+  antes de qualquer execução pontuada ser lançada, e seu custo conta contra `--spend-cap`. A barra
+  é o lint em vez da suíte completa porque a suíte depende do perfil em commits de snapshot mais
+  antigos. Toda linha pontuada registra `preflight`. `--skip-preflight` contorna a verificação e
+  marca as linhas como `skipped`.
+- **Toda execução começa em um snapshot descartável fora do diretório home**, lançada com um
+  ambiente limpo. Uma pasta sob o diretório home herda os arquivos de instrução do usuário através
+  da travessia de pasta-pai, o que colocaria o harness no braço nu. O snapshot guarda um commit,
+  então a mudança que resolveu uma tarefa não é alcançável a partir dele, e ele é removido depois da
+  pontuação.
+- **O custo é o próprio `total_cost_usd` da CLI**, um equivalente de preço de tabela e não dinheiro
+  cobrado sob um login de plano. A ordem de execução o muda, porque uma execução posterior encontra
+  seu prefixo já em cache, então cada linha também carrega um custo normalizado por cache que
+  reprecifica as leituras de cache do primeiro turno de todo fio como escritas de cache. Fica vazio
+  quando a saída da CLI não carrega uso por turno.
+- **Ao lado, `cache_miss_ratio`: quanto do seu prefixo a execução recomprou.**
+  `cache_write / (cache_read + cache_write)` somado sobre todo turno que a execução abriu, threads
+  de subagente incluídas, porque o prefixo novo de um fan-out é parte do que a execução custou. A
+  aritmética é a de `citizen usage --by prefix`, importada desse módulo em vez de reafirmada, mas
+  os dois não são o mesmo número: o número de sessão subtrai os tokens de um subagente, então uma
+  execução que fez fan-out lê mais alto aqui, por design. Uma execução cujo output não carrega
+  nenhuma cifra de cache por turno, qualquer um de cujos turnos relata uso sem elas, ou cujos
+  turnos não relatam nem leituras nem escritas, é `null` e é deixada de fora da média do braço;
+  assim também uma execução com erro, cujos turnos não são o gasto que teria tido. Nunca zero:
+  zero é uma execução que serviu o prefixo inteiro.
+- **Uma execução com erro é um erro, nunca uma falha.** Ela fica fora tanto do custo por tarefa
+  aprovada quanto da contagem de aprovações, e é contada ao lado delas. O teto por execução é
+  flexível, então o executor também para antes de qualquer lançamento que pudesse levar o gasto
+  relatado além de `--spend-cap`.
+- **`benchmarks/history.jsonl` guarda uma linha por versão do harness por dia de execução**,
+  armazenada como uma razão contra o nu no mesmo dia e modelo; `benchmarks/history.md` é
+  renderizado a partir dela. Compare razões entre dias, nunca dólares. O limiar publicável é fixo
+  no script: o harness custa no máximo 85% do nu por tarefa aprovada, aprovando não menos que o nu
+  menos um, média das repetições.
+- **O que é simulado:** prompts de disparo único substituem sessões interativas, 2 das 7 tarefas
+  são sintéticas, e uma execução com tag mede a configuração padrão da tag em vez de uma
+  configurada.
+- **Uma tarefa que não pode ser aprovada honestamente sai do conjunto** e vai para a lista
+  `retired` do manifesto com seu motivo e data. `usage-prices` saiu em 2026-09-25: seus testes
+  retidos fixam preços ao vivo e nomes de helper que seu prompt nunca dá, e nenhum braço consegue
+  alcançar a web para confirmar um preço.
 
-**Status.** The live tier has produced one uncontaminated result: 1.052 on a four-task set, above
-the 0.85 threshold, so no cost claim is published. Two earlier figures in either direction were
-artifacts of the runner's sandbox and of a test-suite defect, both since fixed. A review on
-2026-09-24 found six more ways the arms were unequal or a task unfair: the task count above, the
-turn cap, the stop gate, web access, `usage-prices` and hook capture. Each is fixed as described
-above, and no result has been taken since. Treat this tier as an instrument whose methodology is under review, not as a result; the static tier above is the
-figure to rely on today.
+**Status.** A camada ao vivo produziu um resultado não contaminado: 1,052 em um conjunto de quatro
+tarefas, acima do limiar de 0,85, então nenhuma alegação de custo é publicada. Duas cifras
+anteriores em qualquer direção eram artefatos do sandbox do executor e de um defeito de suíte de
+teste, ambos corrigidos desde então. Uma revisão em 2026-09-24 encontrou mais seis formas em que os
+braços eram desiguais ou uma tarefa injusta: a contagem de tarefas acima, o teto de turnos, o gate
+de parada, o acesso à web, `usage-prices` e a captura de hook. Cada uma é corrigida como descrito
+acima, e nenhum resultado foi coletado desde então. Trate esta camada como um instrumento cuja
+metodologia está sob revisão, não como um resultado; a camada estática acima é o número em que
+confiar hoje.
 
-## Limits
+## Limites
 
-- Claude Code only. Codex instructions are rendered at sync time and are not counted.
-- Your own `CLAUDE.personal.md`, memory files, MCP servers and hook output are not counted. They
-  are yours, not the harness's, and MCP tool definitions alone can outweigh everything measured
-  here.
-- Full agent and skill bodies load only when used, so only their descriptions are counted.
+- Só Claude Code. Instruções do Codex são renderizadas no momento da sincronização e não são
+  contadas.
+- Seu próprio `CLAUDE.personal.md`, arquivos de memória, servidores MCP e saída de hook não são
+  contados. São seus, não do harness, e definições de ferramenta MCP sozinhas podem superar tudo
+  que é medido aqui.
+- Corpos completos de agente e skill só carregam quando usados, então só suas descrições são
+  contadas.

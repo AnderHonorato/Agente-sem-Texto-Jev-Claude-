@@ -3,45 +3,46 @@ name: spike-contract
 description: Frame a spike so its result is a decision: the question, the cheapest experiment, a numeric exit criterion, the measured result, the machine it ran on. Use when asked to "spike", "prototype to find out", "de-risk", or "check whether X is feasible", and when writing the spikes section of a plan or README.
 ---
 
-# The spike contract
+# O contrato do spike
 
-A spike answers one question with the cheapest experiment that can answer it, and it is judged
-against a number written down before the experiment ran. Everything else is a prototype
-looking for a purpose.
+Um spike responde a uma pergunta com o experimento mais barato que pode respondê-la, e é julgado
+contra um número escrito antes do experimento rodar. Tudo mais é um protótipo procurando um
+propósito.
 
-## Before running anything, write the row
+## Antes de rodar qualquer coisa, escreva a linha
 
-Each spike gets one entry, in the project's spikes README or the plan's addendum:
+Cada spike recebe uma entrada, no README de spikes do projeto ou no adendo do plano:
 
-- **Question** — one sentence, answerable yes/no or with a number. "Can the core simulate
-  14 million cells at one tick per second on the target machine?"
-- **Cheapest experiment** — the smallest thing that produces the number. A throwaway script,
-  a synthetic dataset, a stub of the real path. Name what is faked.
-- **Exit criterion** — the number and the comparison. "Under 800 ms per tick, mean of 100
-  ticks." Written before the run, not adjusted after.
-- **Status** — `not started`, `running`, `passed`, `failed`, `inconclusive`, with the date.
-- **Machine** — the hardware and OS the budget was measured on. A budget measured on a
-  laptop does not transfer to CI or to the target machine without saying so.
+- **Pergunta** — uma frase, respondível sim/não ou com um número. "O núcleo consegue simular 14
+  milhões de células a um tick por segundo na máquina alvo?"
+- **Experimento mais barato** — a menor coisa que produz o número. Um script descartável, um
+  dataset sintético, um stub do caminho real. Nomeie o que é falsificado.
+- **Critério de saída** — o número e a comparação. "Abaixo de 800 ms por tick, média de 100
+  ticks." Escrito antes da execução, não ajustado depois.
+- **Status** — `not started`, `running`, `passed`, `failed`, `inconclusive`, com a data.
+- **Máquina** — o hardware e SO em que o orçamento foi medido. Um orçamento medido num laptop não
+  se transfere para o CI ou para a máquina alvo sem dizer isso.
 
-## Run it
+## Rode
 
-- Record the exact command and the raw output, in the row or in a linked file.
-- Run enough times to see the variance. Report the mean and the spread, not the best run.
-- If the experiment had to change mid-way, update the row's experiment line and say why. If
-  the criterion had to change, that is a new spike.
+- Registre o comando exato e a saída bruta, na linha ou num arquivo vinculado.
+- Rode vezes suficientes para ver a variância. Relate a média e a dispersão, não a melhor
+  execução.
+- Se o experimento teve que mudar no meio do caminho, atualize a linha do experimento e diga por
+  quê. Se o critério teve que mudar, isso é um spike novo.
 
-## Read the result against the number
+## Leia o resultado contra o número
 
-- **Passed** means the measured number met the criterion on the named machine. Nothing else
-  is "passed".
-- **Failed** is a result, not a setback. Write what was learned and what the next cheapest
-  experiment would be.
-- **Inconclusive** means the experiment could not produce the number. Say what blocked it.
+- **Passou** significa que o número medido atendeu ao critério na máquina nomeada. Nada mais é
+  "passou".
+- **Falhou** é um resultado, não um revés. Escreva o que foi aprendido e qual seria o próximo
+  experimento mais barato.
+- **Inconclusivo** significa que o experimento não conseguiu produzir o número. Diga o que o
+  bloqueou.
 
-Never read a spike against impressions. "It felt fast" and "it seemed to work" are not
-statuses.
+Nunca leia um spike contra impressões. "Pareceu rápido" e "parece que funcionou" não são status.
 
-## Order and dependency
+## Ordem e dependência
 
-Run the spike that could invalidate the most other work first. Name the fallback if it fails,
-so the plan already knows what happens on a `failed`.
+Rode primeiro o spike que poderia invalidar mais outros trabalhos. Nomeie o fallback se ele
+falhar, para que o plano já saiba o que acontece num `failed`.

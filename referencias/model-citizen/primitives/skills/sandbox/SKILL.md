@@ -3,27 +3,29 @@ name: sandbox
 description: Fence an autonomous or long-running agent loop: the built-in sandbox with network off, or a container with the worktree mounted. Use before any unattended loop, before `execute` autonomy on an unfamiliar repo, and whenever a task pulls untrusted input.
 ---
 
-# Fence the loop
+# Cerque o loop
 
-A permission mode decides whether a call runs. A sandbox decides what a command can reach once it
-is running, and the OS enforces that on every child process. An unattended loop needs the second
-kind: nobody is at the prompt to answer for the first.
+Um modo de permissão decide se uma chamada roda. Um sandbox decide o que um comando pode alcançar
+uma vez que está rodando, e o SO impõe isso em todo processo filho. Um loop não supervisionado
+precisa do segundo tipo: ninguém está no prompt para responder pelo primeiro.
 
-## Runtime scope
+## Escopo de runtime
 
-The configuration and container example below are Claude Code-specific. Do not copy those
-settings into Codex. For Codex, use its native sandbox and approval controls as documented in
-[the configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
-A read-only sandbox constrains filesystem writes; approval policy is a separate control.
-Native hooks are not a replacement for OS confinement. Custom Codex role defaults can be
-superseded by the parent turn's permissions; see `docs/runtime-controls.md` before delegating
-work that requires a hard boundary. Client qualification remains in the compatibility catalog.
+A configuração e o exemplo de container abaixo são específicos do Claude Code. Não copie essas
+configurações para o Codex. Para o Codex, use seu sandbox nativo e controles de aprovação como
+documentado em [a referência de configuração](https://learn.chatgpt.com/docs/config-file/config-reference).
+Um sandbox somente-leitura restringe escritas no sistema de arquivos; a política de aprovação é um
+controle separado. Hooks nativos não substituem o confinamento do SO. Padrões personalizados de
+papel do Codex podem ser substituídos pelas permissões do turno do pai; veja
+`docs/runtime-controls.md` antes de delegar trabalho que exige uma fronteira rígida. A
+qualificação de cliente permanece no catálogo de compatibilidade.
 
-## The Claude Code sandbox
+## O sandbox do Claude Code
 
-It "runs on macOS, Linux, and WSL2. Native Windows is not supported"; Linux and WSL2 need
-`bubblewrap` and `socat` installed first. Put this in `~/.claude/settings.json` to cover every
-project; the `/sandbox` panel writes `enabled` to `.claude/settings.local.json` for one project.
+Ele "roda no macOS, Linux e WSL2. Windows nativo não é suportado"; Linux e WSL2 precisam de
+`bubblewrap` e `socat` instalados primeiro. Coloque isto em `~/.claude/settings.json` para cobrir
+todo projeto; o painel `/sandbox` escreve `enabled` em `.claude/settings.local.json` para um
+projeto.
 
 ```json
 {
@@ -37,25 +39,27 @@ project; the `/sandbox` panel writes `enabled` to `.claude/settings.local.json` 
 }
 ```
 
-`strictAllowlist` over an empty `allowedDomains` is network off: Claude Code then "denies sandboxed
-commands access to any host outside the allowlist instead of prompting". Only user, managed and
-`--settings` settings set it; a repository's own file cannot. The deny entries are load-bearing —
-the default read policy covers the whole disk, and "this default still allows reading credential
-files such as `~/.aws/credentials` and `~/.ssh/`." Add `sandbox.credentials.envVars` entries with
-`"mode": "deny"` to unset tokens for sandboxed commands too. `failIfUnavailable` makes a missing
-dependency a hard stop rather than a silent unsandboxed fallback, and `allowUnsandboxedCommands:
-false` removes the retry-outside escape hatch. Subagents inherit the session's sandbox; commands
-you type at the `!` prompt do not.
+`strictAllowlist` sobre um `allowedDomains` vazio é rede desligada: o Claude Code então "nega a
+comandos em sandbox o acesso a qualquer host fora da lista de permissões em vez de perguntar".
+Apenas as configurações de usuário, gerenciadas e `--settings` a definem; o próprio arquivo de um
+repositório não pode. As entradas de negação são estruturais — a política de leitura padrão cobre
+o disco inteiro, e "este padrão ainda permite ler arquivos de credencial como
+`~/.aws/credentials` e `~/.ssh/`." Adicione entradas em `sandbox.credentials.envVars` com `"mode":
+"deny"` para desabilitar tokens para comandos em sandbox também. `failIfUnavailable` torna uma
+dependência faltando uma parada dura em vez de um fallback silencioso sem sandbox, e
+`allowUnsandboxedCommands: false` remove a via de escape de retentar-fora. Subagentes herdam o
+sandbox da sessão; comandos que você digita no prompt `!` não.
 
-For one session, writing no file: `claude --settings '{"sandbox":{"enabled":true}}'`. Confirm with
-`/sandbox`: the **Config** tab shows the resolved settings, and a **Dependencies** tab appearing
-means a package is missing. A prompt titled "Bash command (unsandboxed)" is the signal a command
-left the boundary. Keys and defaults: https://code.claude.com/docs/en/sandboxing
+Para uma sessão, sem escrever nenhum arquivo: `claude --settings '{"sandbox":{"enabled":true}}'`.
+Confirme com `/sandbox`: a aba **Config** mostra as configurações resolvidas, e uma aba
+**Dependencies** aparecendo significa que um pacote está faltando. Um prompt intitulado "Bash
+command (unsandboxed)" é o sinal de que um comando saiu da fronteira. Chaves e padrões:
+https://code.claude.com/docs/en/sandboxing
 
-## A container
+## Um container
 
-Harder boundary, coarser tooling. Mount the worktree and nothing else, stay non-root, and let the
-container be the isolation — do not nest the built-in sandbox inside it.
+Fronteira mais dura, ferramental mais grosseiro. Monte a worktree e nada mais, permaneça não-root,
+e deixe o container ser o isolamento — não aninhe o sandbox nativo dentro dele.
 
 ```bash
 docker run --rm -it --network none \
@@ -65,16 +69,18 @@ docker run --rm -it --network none \
   <image-with-the-cli> claude --dangerously-skip-permissions -p "<the loop prompt>"
 ```
 
-`podman` substitutes unchanged. What breaks, in order: `--network none` cuts the model API too, so
-as written this runs only against a local model — for a loop that must reach the API, allow that
-one host and nothing else and the shape holds. Then web search and fetch, every MCP server reached
-over the network, and every package install; a read-only config mount blocks session state and
-credential writes, so auth arrives by environment variable. Losing all of it is the point when the
-task parses input you did not write: a path the loop lacks cannot be talked into opening.
+`podman` substitui sem mudanças. O que quebra, em ordem: `--network none` corta também a API do
+modelo, então como está escrito isso roda apenas contra um modelo local — para um loop que precisa
+alcançar a API, permita aquele único host e nada mais e a forma se mantém. Depois busca e fetch
+web, todo servidor MCP alcançado pela rede, e toda instalação de pacote; um mount de config
+somente-leitura bloqueia estado de sessão e escritas de credencial, então a autenticação chega por
+variável de ambiente. Perder tudo isso é o objetivo quando a tarefa faz parsing de entrada que
+você não escreveu: um caminho que o loop não tem não pode ser convencido a abrir.
 
-## Which one
+## Qual escolher
 
-Built-in sandbox for daily work: a settings change, every tool still works, the OS still enforces
-the boundary. Container for a loop that runs while you sleep, a repo whose build scripts you have
-not read, or anything handling untrusted content. Neither isolates branches — run inside a
-worktree as well, per the `worktree-per-agent` skill.
+Sandbox nativo para trabalho diário: uma mudança de configuração, toda ferramenta continua
+funcionando, o SO ainda impõe a fronteira. Container para um loop que roda enquanto você dorme,
+um repositório cujos scripts de build você não leu, ou qualquer coisa lidando com conteúdo não
+confiável. Nenhum dos dois isola branches — rode dentro de uma worktree também, conforme a skill
+`worktree-per-agent`.

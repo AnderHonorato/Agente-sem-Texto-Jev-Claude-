@@ -500,9 +500,9 @@ def run(root, config, runtime, name, workspace, prompt, state_root, model=None, 
                 record["artifact"] = str(workspace / ".agent-harness/plans" / artifact)
             reconcile.atomic_text(run_dir / "result.md", content)
             record["result_path"] = str(run_dir / "result.md")
-            # What the run cost, as its own runtime reported it, so `usage --by role` counts a
-            # worker beside a subagent. An adapter that reports nothing leaves the key absent
-            # rather than a zero, which a report would read as a measured run that spent none.
+            # O que a execução custou, como o próprio runtime reportou, para que `usage --by role`
+            # conte um worker ao lado de um subagente. Um adaptador que não reporta nada deixa a
+            # chave ausente em vez de um zero, que um relatório leria como uma execução medida que não gastou nada.
             try:
                 counts = getattr(native, "usage", lambda *_: {})(work, run_dir)
             except Exception:
@@ -527,13 +527,13 @@ ORPHANED = "the worker process ended without reporting a result"
 
 
 def process_start(pid):
-    """A token naming this pid's incarnation, or None when the platform will not say.
+    """Um token nomeando a encarnação deste pid, ou None quando a plataforma não consegue dizer.
 
-    Recorded beside the pid so a recycled pid cannot be mistaken for the original process: a
-    reused number carries a different start time. Linux reads field 22 of `/proc/<pid>/stat`,
-    counted after the comm field's closing parenthesis, which may itself contain spaces; every
-    other POSIX platform asks `ps`, whose second-resolution timestamp is enough to separate two
-    processes that happened to receive the same number.
+    Registrado ao lado do pid para que um pid reciclado não seja confundido com o processo
+    original: um número reutilizado carrega um horário de início diferente. O Linux lê o campo 22
+    de `/proc/<pid>/stat`, contado após o parêntese de fechamento do campo comm, que pode em si
+    conter espaços; toda outra plataforma POSIX pergunta ao `ps`, cujo timestamp de resolução de
+    segundo é suficiente para separar dois processos que por acaso receberam o mesmo número.
     """
     if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
         return None
@@ -541,7 +541,7 @@ def process_start(pid):
         stat = Path("/proc/" + str(pid) + "/stat")
         if stat.exists():
             return stat.read_text().rsplit(")", 1)[1].split()[19]
-        # A fixed locale, so a reader under different LC_TIME settings prints the same token.
+        # Um locale fixo, para que um leitor sob configurações LC_TIME diferentes imprima o mesmo token.
         out = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], stdout=subprocess.PIPE,
                              stderr=subprocess.DEVNULL, text=True, timeout=10,
                              env=dict(os.environ, LC_ALL="C"))

@@ -1,21 +1,37 @@
-# CodeRabbit review for agent-harness, with bot threads cleared before merge
+# Revisão do CodeRabbit para o agent-harness, com threads do bot resolvidas antes do merge
 
-> **Verdict.** Adds a `.coderabbit.yaml` so CodeRabbit reviews every PR into `main` quietly and for free, and gives `/build` a step that answers the bot's threads before a PR goes up for approval. `/land` then stops on an open thread by name, because `main-review` already blocks that merge and today `land` only learns it when `gh` refuses.
-> **Effort** about half an agent-day · **Risk** low: one config file and two workflow texts · **Blast radius** `/build` and `/land` in every repo the harness serves
+> **Veredito.** Adiciona um `.coderabbit.yaml` para que o CodeRabbit revise todo PR para `main` de
+> forma silenciosa e gratuita, e dá ao `/build` um passo que responde as threads do bot antes de um
+> PR subir para aprovação. O `/land` então para numa thread aberta pelo nome, porque o
+> `main-review` já bloqueia essa mesclagem e hoje o `land` só descobre isso quando o `gh` recusa.
+> **Esforço** cerca de meio dia de agente · **Risco** baixo: um arquivo de configuração e dois
+> textos de workflow · **Raio de impacto** `/build` e `/land` em todo repositório que o harness
+> atende
 
-> **Changed this round.** Fixes happen in `/build`, in one PR (settled) · `CONTRIBUTING.md` tells outside contributors how to work with the bot · the re-review decision now answers for contributors.
+> **Mudou nesta rodada.** Correções acontecem no `/build`, em um PR (resolvido) · `CONTRIBUTING.md`
+> diz a contribuidores externos como trabalhar com o bot · a decisão de nova revisão agora
+> responde por contribuidores.
 
-## At a glance
+## Em resumo
 
-- **Outcome** — every PR into `main` gets one CodeRabbit review, its threads are fixed or answered before you approve, and `/land` never meets a thread block by surprise
-- **Approach** — a schema-validated `.coderabbit.yaml` (chill, one review per PR, prose linters off, path instructions), plus `/build` step 6 and a thread check in `/land` step 1
-- **Touches** — agent-harness only: the config, `primitives/workflows/{build,land}.md` and their generated copies, a `CONTRIBUTING.md` paragraph, a changelog fragment, the story and issue map; about 9 files
-- **New deps** — the CodeRabbit GitHub App, a hosted service free for public repos; nothing vendored
-- **Not in scope** — Greptile, any change to the `main-review` ruleset, CodeRabbit as a required check, landing copy
-- **Exit test** — gate green, the four required checks green on the PR, and CodeRabbit reviews it once you install the app
-- **Open question** — whether pushes get an automatic re-review; see decision 1
+- **Resultado** — todo PR para `main` recebe uma revisão do CodeRabbit, suas threads são corrigidas
+  ou respondidas antes de você aprovar, e o `/land` nunca encontra um bloqueio de thread de
+  surpresa
+- **Abordagem** — um `.coderabbit.yaml` validado por schema (tranquilo, uma revisão por PR,
+  linters de prosa desligados, instruções por caminho), mais o passo 6 do `/build` e uma
+  verificação de thread no passo 1 do `/land`
+- **Toca** — só o agent-harness: a configuração, `primitives/workflows/{build,land}.md` e suas
+  cópias geradas, um parágrafo de `CONTRIBUTING.md`, um fragmento de changelog, a história e o
+  mapa de issues; cerca de 9 arquivos
+- **Novas dependências** — o GitHub App do CodeRabbit, um serviço hospedado grátis para
+  repositórios públicos; nada vendorizado
+- **Fora de escopo** — Greptile, qualquer mudança no ruleset `main-review`, o CodeRabbit como check
+  obrigatório, texto de vitrine (landing copy)
+- **Teste de saída** — gate verde, os quatro checks obrigatórios verdes no PR, e o CodeRabbit o
+  revisa assim que você instalar o app
+- **Pergunta em aberto** — se pushes recebem uma nova revisão automática; veja a decisão 1
 
-## System design
+## Design do sistema
 
 ```text
 /build ── PR ──▶ GitHub ── PR opened ──▶ *CodeRabbit (.coderabbit.yaml)
@@ -28,130 +44,183 @@
 you approve ──▶ */land step 1: no open thread ──▶ squash merge
 ```
 
-`*` = new or changed. The `main-review` rule that threads must be resolved stays as it is.
+`*` = novo ou alterado. A regra do `main-review` de que threads precisam estar resolvidas
+continua como está.
 
-## Steps
+## Passos
 
-1. **Validate the config against CodeRabbit's live schema** — `/tmp/review-bots-research/coderabbit.yaml`, done while planning.
-   *Exit:* 0 schema errors and 0 unknown keys; both negative controls were caught.
-2. **[File the delivery issue](#step-2--file-the-delivery-issue)** — a managed worktree, then `bmad_issue_sync.py new`, milestone v0.14.0.
-   *Exit:* the issue carries `type::story`, and its ID and story skeleton exist in the worktree.
-3. **[Build](#step-3--build)** — the `builder` agent adds the config, `/build` step 6, the `/land` check and the contributor paragraph, regenerates, writes the fragment and story, and makes one commit.
-   *Exit:* `bin/harness generate --check` is clean in the worktree.
-4. **Run the gate myself** — lint, unit tests and `generate --check` in the worktree.
-   *Exit:* `lint: 0 finding(s)`, `OK` with no skips, generate clean.
-5. **Review with `bmad-code-review`** — findings and how each was resolved go into the story.
-   *Exit:* no unresolved high-severity finding.
-6. **[Push and open the PR](#step-6--push-and-open-the-pr)** — `feat/coderabbit-review` into `main`, `Closes #N`, a `Landing copy:` line.
-   *Exit:* lint, test, issue-ownership and landing-copy are green on the head.
-7. **You install the CodeRabbit app** on JakeSelby/agent-harness only; it is the one step I cannot do.
-   *Exit:* CodeRabbit reviews the PR; comment `@coderabbitai review` if the PR predates the install.
+1. **Validar a configuração contra o schema ao vivo do CodeRabbit** —
+   `/tmp/review-bots-research/coderabbit.yaml`, feito durante o planejamento.
+   *Saída:* 0 erros de schema e 0 chaves desconhecidas; os dois controles negativos foram
+   capturados.
+2. **[Registrar a issue de entrega](#passo-2--registrar-a-issue-de-entrega)** — um worktree
+   gerenciado, depois `bmad_issue_sync.py new`, marco v0.14.0.
+   *Saída:* a issue carrega `type::story`, e seu ID e o esqueleto de história existem no worktree.
+3. **[Construir](#passo-3--construir)** — o agente `builder` adiciona a configuração, o passo 6 do
+   `/build`, a verificação do `/land` e o parágrafo para contribuidores, regenera, escreve o
+   fragmento e a história, e faz um commit.
+   *Saída:* `bin/harness generate --check` está limpo no worktree.
+4. **Rodar o gate eu mesmo** — lint, testes unitários e `generate --check` no worktree.
+   *Saída:* `lint: 0 finding(s)`, `OK` sem pulos, generate limpo.
+5. **Revisar com `bmad-code-review`** — achados e como cada um foi resolvido entram na história.
+   *Saída:* nenhum achado de alta severidade não resolvido.
+6. **[Enviar (push) e abrir o PR](#passo-6--enviar-push-e-abrir-o-pr)** —
+   `feat/coderabbit-review` para `main`, `Closes #N`, uma linha `Landing copy:`.
+   *Saída:* lint, test, issue-ownership e landing-copy estão verdes na ponta (head).
+7. **Você instala o app do CodeRabbit** só no JakeSelby/agent-harness; é o único passo que eu não
+   posso fazer.
+   *Saída:* o CodeRabbit revisa o PR; comente `@coderabbitai review` se o PR for anterior à
+   instalação.
 
-## Decisions for the reviewer
+## Decisões para o revisor
 
-> **1. Should CodeRabbit re-review automatically after a fix is pushed?**
-> *Recommend* no, as BMad has it — a contributor still gets a full review when the PR opens, asks for another with `@coderabbitai review`, and uses their own rate budget.
-> *Alternative* yes — contributors see each fix confirmed unasked, and your ~35 PRs a day roughly double in review volume.
+> **1. O CodeRabbit deve revisar de novo automaticamente depois que uma correção é enviada?**
+> *Recomendação* não, como o BMad faz — um contribuidor ainda recebe uma revisão completa quando o
+> PR abre, pede outra com `@coderabbitai review`, e usa seu próprio orçamento de taxa.
+> *Alternativa* sim — contribuidores veem cada correção confirmada sem pedir, e seus ~35 PRs por
+> dia aproximadamente dobram em volume de revisão.
 
-## Risks
+## Riscos
 
-- **The open-source rate limit throttles reviews at this volume** — reviews are skipped, never blocking; if it happens often, narrow `auto_review` or weigh Essentials at $24 a month.
-- **A finding is wrong, or prose gets nitpicked** — `/build` replies with the reason and resolves it; two rounds at most; tune `path_instructions` from whatever recurs.
-- **The bot never posts (outage or throttle)** — step 6 waits ten minutes, then says so and moves on.
+- **O limite de taxa do open-source estrangula revisões nesse volume** — revisões são puladas,
+  nunca bloqueando; se acontecer com frequência, restrinja `auto_review` ou pese o plano
+  Essentials a $24 por mês.
+- **Um achado está errado, ou a prosa recebe nitpicks** — o `/build` responde com o motivo e
+  resolve; no máximo duas rodadas; ajuste `path_instructions` a partir do que se repetir.
+- **O bot nunca posta (queda ou limite de taxa)** — o passo 6 espera dez minutos, depois diz isso e
+  segue em frente.
 
 ---
 
-# Addendum
+# Anexo
 
-## Step 2 — File the delivery issue
+## Passo 2 — Registrar a issue de entrega
 
-`trust_check` rates `coding.shell_exec`, `coding.git_commit` and `coding.git_push` at L2 for this repository, so approving this plan approves exactly the commands below and in Step 6, and nothing else. Run the first line from the shared checkout, and the rest in the worktree it prints.
+`trust_check` classifica `coding.shell_exec`, `coding.git_commit` e `coding.git_push` em L2 para
+este repositório, então aprovar este plano aprova exatamente os comandos abaixo e no Passo 6, e
+mais nada. Rode a primeira linha a partir do checkout compartilhado, e o resto no worktree que ela
+imprime.
 
 ```sh
 bin/harness worktree create coderabbit-review --branch feat/coderabbit-review
 python3 scripts/bmad_issue_sync.py new --kind story --milestone 18 \
   --title "Adopt CodeRabbit review and clear review-bot threads before merge" \
   --body-file /tmp/review-bots-research/issue-body.md
-# The reservation usually lags behind the issue list; when it does:
+# A reserva costuma ficar atrás da listagem de issues; quando isso acontece:
 python3 scripts/bmad_issue_sync.py reserve --issue <N> --kind story
 ```
 
-The issue body is `/tmp/review-bots-research/issue-body.md`, as written. Milestone 18 is v0.14.0.
+O corpo da issue é `/tmp/review-bots-research/issue-body.md`, como escrito. O marco 18 é a v0.14.0.
 
-## Step 3 — Build
+## Passo 3 — Construir
 
-Spawn `builder` with this plan's absolute path, the worktree from Step 2 (it works there and creates no other), base `main`, and the Co-Authored-By trailer the tool supplies.
+Dispare o `builder` com o caminho absoluto deste plano, o worktree do Passo 2 (ele trabalha ali e
+não cria nenhum outro), base `main`, e o trailer Co-Authored-By que a ferramenta fornece.
 
-Allowed to touch:
+Permitido tocar:
 
-- **`.coderabbit.yaml`** — copy `/tmp/review-bots-research/coderabbit.yaml` verbatim.
-- **`primitives/workflows/build.md`** — add step 6, below, and add "the bot threads answered and any still open" to the report line.
-- **`primitives/workflows/land.md`** — extend step 1, below.
-- **`CONTRIBUTING.md`** — add the paragraph below to the end of `## Review`, as written.
-- **`claude/commands/build.md`, `claude/commands/land.md`** — only through `bin/harness generate`, never by hand.
-- **`changelog.d/<N>.changed.md`** — one line, following `changelog.d/README.md`.
-- **`_bmad-output/implementation-artifacts/<ID>.md`** — fill every section of the story from this plan: design and decisions from the card, dev notes from this addendum.
-- **`_bmad-output/issue-map.json`** — only as the sync tool writes it.
-- **`.agent-harness/plans/2026-09-24-coderabbit-review.md`** — copy this plan into the worktree.
+- **`.coderabbit.yaml`** — copie `/tmp/review-bots-research/coderabbit.yaml` literalmente.
+- **`primitives/workflows/build.md`** — adicione o passo 6, abaixo, e adicione "as threads do bot
+  respondidas e quaisquer ainda abertas" à linha de relatório.
+- **`primitives/workflows/land.md`** — estenda o passo 1, abaixo.
+- **`CONTRIBUTING.md`** — adicione o parágrafo abaixo ao final de `## Review`, como escrito.
+- **`claude/commands/build.md`, `claude/commands/land.md`** — só através de
+  `bin/harness generate`, nunca manualmente.
+- **`changelog.d/<N>.changed.md`** — uma linha, seguindo `changelog.d/README.md`.
+- **`_bmad-output/implementation-artifacts/<ID>.md`** — preencha toda seção da história a partir
+  deste plano: design e decisões do cartão, dev notes deste anexo.
+- **`_bmad-output/issue-map.json`** — só como a ferramenta de sincronização o escreve.
+- **`.agent-harness/plans/2026-09-24-coderabbit-review.md`** — copie este plano para dentro do
+  worktree.
 
-Must not touch: `product.json`, any other workflow, the rulesets, `templates/`.
+Não deve tocar: `product.json`, qualquer outro workflow, os rulesets, `templates/`.
 
-New `/build` step 6, after "Push the branch and open the pull request":
+Novo passo 6 do `/build`, depois de "Push the branch and open the pull request":
 
-> 6. **Answer the review bot**, where the repository runs one: a `.coderabbit.yaml`, a `greptile.json`, or a bot that reviewed earlier pull requests. Wait up to ten minutes for its first review of this pull request. Then take each unresolved bot thread as a finding: fix it in the worktree, rerun the gate and push, or reply with the reason it does not apply. Then resolve the thread (GraphQL `reviewThreads`, then `resolveReviewThread`). Two rounds at most; report whatever remains. A human's thread is never yours to resolve.
+> 6. **Answer the review bot**, where the repository runs one: a `.coderabbit.yaml`, a
+>    `greptile.json`, or a bot that reviewed earlier pull requests. Wait up to ten minutes for
+>    its first review of this pull request. Then take each unresolved bot thread as a finding:
+>    fix it in the worktree, rerun the gate and push, or reply with the reason it does not apply.
+>    Then resolve the thread (GraphQL `reviewThreads`, then `resolveReviewThread`). Two rounds at
+>    most; report whatever remains. A human's thread is never yours to resolve.
 
-Addition to `/land` step 1, after "A pending, failing or stale check stops the workflow, named.":
+Adição ao passo 1 do `/land`, depois de "A pending, failing or stale check stops the workflow,
+named.":
 
-> So does an unresolved review thread: name it and stop. A fix belongs to `/build`, before approval, and a human's thread is theirs to resolve.
+> So does an unresolved review thread: name it and stop. A fix belongs to `/build`, before
+> approval, and a human's thread is theirs to resolve.
 
-The paragraph for the end of `CONTRIBUTING.md`'s `## Review` section:
+O parágrafo para o final da seção `## Review` do `CONTRIBUTING.md`:
 
-> CodeRabbit also reviews every PR into `main`, forks included, once when it opens. Treat its comments as you would a reviewer's: push a fix, or reply with why one doesn't apply, then resolve the thread, because `main` won't merge while a review thread is open. Comment `@coderabbitai review` for another pass after you push. Its comments are advice, and where you disagree with it, the maintainer decides.
+> CodeRabbit also reviews every PR into `main`, forks included, once when it opens. Treat its
+> comments as you would a reviewer's: push a fix, or reply with why one doesn't apply, then
+> resolve the thread, because `main` won't merge while a review thread is open. Comment
+> `@coderabbitai review` for another pass after you push. Its comments are advice, and where you
+> disagree with it, the maintainer decides.
 
-The commit is `feat(workflows): adopt CodeRabbit review and clear bot threads before merge`. Its body has three bullets (the config, `/build` step 6, the `/land` check), then `Closes #<N>`, then the trailer. It uses no em dashes, because it is published under Jake's name.
+O commit é `feat(workflows): adopt CodeRabbit review and clear bot threads before merge`. Seu
+corpo tem três marcadores (a configuração, o passo 6 do `/build`, a verificação do `/land`),
+depois `Closes #<N>`, depois o trailer. Não usa travessões longos, porque é publicado em nome do
+Jake.
 
-## Step 6 — Push and open the PR
+## Passo 6 — Enviar (push) e abrir o PR
 
-Before pushing, run the `trust_check` for `coding.git_push`.
+Antes de enviar (push), rode o `trust_check` para `coding.git_push`.
 
 ```sh
 git push -u origin feat/coderabbit-review
 gh pr create --base main --head feat/coderabbit-review \
   --title "feat(workflows): adopt CodeRabbit review and clear bot threads before merge" \
-  --body-file <body file outside the worktree>
+  --body-file <arquivo de corpo fora do worktree>
 ```
 
-The body follows `.github/PULL_REQUEST_TEMPLATE.md`:
+O corpo segue `.github/PULL_REQUEST_TEMPLATE.md`:
 
-- **What and why** — the issue's three scope bullets.
-- **Where it lands** — the files.
-- **Checklist** — ticked honestly.
+- **O quê e por quê** — os três marcadores de escopo da issue.
+- **Onde aterrissa** — os arquivos.
+- **Checklist** — marcada honestamente.
 - `Closes #<N>`.
 - `Landing copy: none; /build and /land gain a step, not a new capability.`
-- The generated-with line.
+- A linha de geração.
 
-No em dashes.
+Sem travessões longos.
 
-## Evidence and verification
+## Evidência e verificação
 
-- **Config:** 0 errors against `https://coderabbit.ai/integrations/schema.v2.json` (jsonschema in a temp venv), and 0 keys missing from the schema. The schema allows extra properties, so the key walk is the check that bites. Its control flagged `reviews.not_a_key`, and the enum control flagged `profile: loud`. `mode: "off"` is quoted because YAML 1.1 reads a bare `off` as false.
-- **Generated projections:** `claude/agents/`, `claude/commands/` and `claude/CLAUDE.md` are generated (`lib/harness_core/catalog.py`, near line 420). `claude/rules`, `claude/skills` and `claude/stances` are symlinks into `primitives/`. That is why the path filters drop the first three and review `primitives/`.
-- **Ruleset:** `main-review` sets `required_review_thread_resolution: true` and requires 0 approvals, with bypass for admins only. `/land` merges with a plain `gh pr merge --squash --delete-branch`, which refuses a blocked merge unless given `--admin`.
-- **Pricing, eligibility and the BMAD-METHOD#2957 evidence:** `/tmp/review-bots-research/digest.md`.
+- **Configuração:** 0 erros contra `https://coderabbit.ai/integrations/schema.v2.json`
+  (jsonschema num venv temporário), e 0 chaves faltando no schema. O schema permite propriedades
+  extras, então a varredura de chaves é o teste que morde. Seu controle sinalizou
+  `reviews.not_a_key`, e o controle de enum sinalizou `profile: loud`. `mode: "off"` está entre
+  aspas porque YAML 1.1 lê um `off` sem aspas como falso.
+- **Projeções geradas:** `claude/agents/`, `claude/commands/` e `claude/CLAUDE.md` são gerados
+  (`lib/harness_core/catalog.py`, perto da linha 420). `claude/rules`, `claude/skills` e
+  `claude/stances` são links simbólicos para dentro de `primitives/`. É por isso que os filtros de
+  caminho descartam os três primeiros e revisam `primitives/`.
+- **Ruleset:** `main-review` define `required_review_thread_resolution: true` e exige 0
+  aprovações, com bypass só para administradores. `/land` mescla com um simples
+  `gh pr merge --squash --delete-branch`, que recusa uma mesclagem bloqueada a menos que receba
+  `--admin`.
+- **Preços, elegibilidade e a evidência do BMAD-METHOD#2957:**
+  `/tmp/review-bots-research/digest.md`.
 
-## Revision history
+## Histórico de revisão
 
-- **Round 1, 2026-09-24:**
-  - Settled: bot findings are fixed in `/build` before approval, and config and workflows ship as one PR.
-  - Jake asked how the bot works for outside contributors. The answer:
-    - CodeRabbit reviews fork PRs; it reviewed Jake's own fork PR, BMAD-METHOD#2957.
-    - A PR's author can resolve its conversations.
-    - Rate limits count per developer identity.
-    - BMad's own config also sets `auto_incremental_review: false`.
-  - Added the `CONTRIBUTING.md` paragraph so contributors know the loop.
+- **Rodada 1, 2026-09-24:**
+  - Resolvido: achados do bot são corrigidos no `/build` antes da aprovação, e a configuração e os
+    workflows são entregues em um único PR.
+  - Jake perguntou como o bot funciona para contribuidores externos. A resposta:
+    - O CodeRabbit revisa PRs de fork; ele revisou o próprio PR de fork do Jake, o
+      BMAD-METHOD#2957.
+    - O autor de um PR pode resolver suas conversas.
+    - Limites de taxa contam por identidade de desenvolvedor.
+    - A própria configuração do BMad também define `auto_incremental_review: false`.
+  - Adicionado o parágrafo do `CONTRIBUTING.md` para que os contribuidores conheçam o ciclo.
 
-## Deferred, and why
+## Adiado, e por quê
 
-- **Greptile:** free only through its open-source programme, which requires attesting the repo is not part of a commercial product. That is Jake's call, and one bot is enough to start.
-- **A `.coderabbit.yaml` in `templates/repo/`:** wait until this one has run for a couple of weeks.
-- **Codex automatic review as a second reviewer from a different model family:** reconsider after measuring CodeRabbit's hit rate.
+- **Greptile:** grátis só através de seu programa open-source, que exige atestar que o
+  repositório não faz parte de um produto comercial. Essa é uma decisão do Jake, e um bot já é o
+  suficiente para começar.
+- **Um `.coderabbit.yaml` em `templates/repo/`:** esperar até este ter rodado por algumas semanas.
+- **Revisão automática do Codex como um segundo revisor de uma família de modelo diferente:**
+  reconsiderar depois de medir a taxa de acerto do CodeRabbit.

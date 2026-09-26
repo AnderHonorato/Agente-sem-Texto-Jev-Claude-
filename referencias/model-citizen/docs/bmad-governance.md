@@ -1,118 +1,130 @@
-# BMad repository governance
+# Governança do repositório BMad
 
-This file is the single policy source loaded by agent-harness's BMad workflow customizations.
-The repository instructions remain authoritative when they are stricter.
+Este arquivo é a única fonte de política carregada pelas customizações de workflow BMad do
+agent-harness. As instruções do repositório continuam valendo quando forem mais rígidas.
 
-- **Authority is split between the issue and its story file.**
-  - The GitHub issue is the delivery authority. It holds state, discussion, a summary-depth writeup and
-    the acceptance evidence.
-  - The issue's story file, `_bmad-output/implementation-artifacts/<BMad ID>.md`, is the design
-    authority. It holds:
-    - context and acceptance criteria;
-    - the design, with decisions and alternatives;
-    - tasks;
-    - dev notes that cite their sources;
-    - the dev agent record;
-    - review findings.
-  - Keep the issue at summary depth and put the design depth in the story.
-  - Create the issue before changing tracked files. Use one delivery issue per PR, and keep one concern in
-    each PR.
-- Run implementation in a managed worktree. Run BMad's installed scripts from the shared checkout
-  and pass the implementation worktree as an explicit input.
-- Public BMad artifacts live under `_bmad-output`; never redirect this repository's artifacts to a
-  private or central planning repository.
-- Publish synthesized evidence and decisions, not raw conversations, tool logs, memory exports,
-  secrets, private paths or irrelevant personal information.
-- Label claims as implemented, validated, proposed, historical or unknown. Do not treat generated
-  configuration, green unit tests or a prior release as proof of current native-client behavior.
-- Every managed work item has one immutable typed BMad ID and a bidirectional GitHub mapping.
-  Reparenting never changes the ID; reconstructed history must say that it is reconstructed.
-- The exact `type::*` label is the repository's authoritative GitHub type projection. Native issue
-  types are organization-managed and unavailable for issues in this personal-account repository;
-  native sub-issue relationships remain the hierarchy projection.
-- File maintainer work with `python3 scripts/bmad_issue_sync.py new --title T --kind KIND --body-file F
-  [--parent N] [--milestone M]` from the implementation worktree: it labels the issue and reserves
-  its ID in one step. Refuse to start or continue implementation for an issue that is absent from
-  `_bmad-output/issue-map.json`; reserve it first. The required `issue-ownership` check fails a PR
-  whose delivery issue is unmapped, so the reservation ships in that PR or before it.
-- Community issues can enter without BMad metadata. During maintainer triage, reserve an ID with
-  `python3 scripts/bmad_issue_sync.py reserve --issue N --kind KIND [--parent N]`; merge its artifact,
-  then run `plan` and `apply` before implementation ownership begins.
-- Preserve issue and repository history. Add amendments rather than rewriting dated evidence, and
-  do not replace original issue prose when maintaining traceability metadata.
-- Before review, run `python3 bin/harness lint`, `python3 -m unittest discover -s tests`, and
-  `bin/harness generate --check`. Never bypass hooks.
-- Ordinary issues and PRs use the repository's native voice without generated framework footers.
-  README and planning documentation may credit BMad explicitly.
+- **A autoridade é dividida entre a issue e seu arquivo de história.**
+  - A issue do GitHub é a autoridade de entrega. Ela guarda o estado, a discussão, um texto em
+    profundidade de resumo e a evidência de aceitação.
+  - O arquivo de história da issue, `_bmad-output/implementation-artifacts/<BMad ID>.md`, é a
+    autoridade de design. Ele guarda:
+    - contexto e critérios de aceitação;
+    - o design, com decisões e alternativas;
+    - tarefas;
+    - notas de desenvolvimento que citam suas fontes;
+    - o registro do agente de desenvolvimento;
+    - achados de revisão.
+  - Mantenha a issue em profundidade de resumo e coloque a profundidade de design na história.
+  - Crie a issue antes de alterar arquivos rastreados. Use uma issue de entrega por PR, e mantenha
+    uma única questão em cada PR.
+- Rode a implementação em uma worktree gerenciada. Rode os scripts instalados do BMad a partir do
+  checkout compartilhado e passe a worktree de implementação como uma entrada explícita.
+- Os artefatos públicos do BMad ficam sob `_bmad-output`; nunca redirecione os artefatos deste
+  repositório para um repositório de planejamento privado ou central.
+- Publique evidências e decisões sintetizadas, não conversas brutas, logs de ferramenta,
+  exportações de memória, segredos, caminhos privados ou informação pessoal irrelevante.
+- Rotule alegações como implementadas, validadas, propostas, históricas ou desconhecidas. Não trate
+  configuração gerada, testes unitários verdes ou um lançamento anterior como prova de
+  comportamento nativo de cliente atual.
+- Todo item de trabalho gerenciado tem um único ID BMad tipado e imutável e um mapeamento
+  bidirecional com o GitHub. Reparentar nunca muda o ID; um histórico reconstruído deve dizer que
+  é reconstruído.
+- O rótulo `type::*` exato é a projeção de tipo autoritativa do GitHub neste repositório. Tipos
+  nativos de issue são gerenciados pela organização e indisponíveis para issues neste repositório
+  de conta pessoal; relações nativas de sub-issue continuam sendo a projeção de hierarquia.
+- Registre trabalho de mantenedor com
+  `python3 scripts/bmad_issue_sync.py new --title T --kind KIND --body-file F [--parent N] [--milestone M]`
+  a partir da worktree de implementação: isso rotula a issue e reserva seu ID em um único passo.
+  Recuse iniciar ou continuar a implementação de uma issue ausente em
+  `_bmad-output/issue-map.json`; reserve-a primeiro. O check obrigatório `issue-ownership` reprova
+  um PR cuja issue de entrega não esteja mapeada, então a reserva vai nesse PR ou antes dele.
+- Issues da comunidade podem entrar sem metadados do BMad. Durante a triagem do mantenedor, reserve
+  um ID com `python3 scripts/bmad_issue_sync.py reserve --issue N --kind KIND [--parent N]`; faça
+  merge do seu artefato, depois rode `plan` e `apply` antes de a posse da implementação começar.
+- Preserve o histórico da issue e do repositório. Adicione emendas em vez de reescrever evidência
+  datada, e não substitua a prosa original da issue ao manter os metadados de rastreabilidade.
+- Antes da revisão, rode `python3 bin/harness lint`, `python3 -m unittest discover -s tests`, e
+  `bin/harness generate --check`. Nunca contorne hooks.
+- Issues e PRs comuns usam a voz nativa do repositório, sem rodapés gerados por framework. O README
+  e a documentação de planejamento podem creditar o BMad explicitamente.
 
-## Route every operation through BMad
+## Roteie toda operação pelo BMad
 
-Before an SDLC step, read and follow the BMad skill for it. Never improvise a process a skill already
-defines.
+Antes de uma etapa do ciclo de vida do software, leia e siga a skill do BMad correspondente. Nunca
+improvise um processo que uma skill já define.
 
-| When you | Run |
+| Quando você | Rode |
 | --- | --- |
-| Research a question a decision depends on | `bmad-deep-recon` |
-| Change who the product serves or what it is for | `bmad-product-brief`, update intent |
-| Add, change or retire a requirement | `bmad-prd`, update intent |
-| Change a user-facing flow, output or copy pattern | `bmad-ux`, update intent |
-| Change an invariant, a boundary or a dependency direction | `bmad-architecture`, update intent |
-| Break new scope into work | `bmad-create-epics-and-stories`, then `scripts/bmad_issue_sync.py new` |
-| Implement a work item | `bmad-build`, with the delivery story as its spec |
-| Review a change | `bmad-code-review` |
-| Change direction mid-flight | `bmad-correct-course` |
-| Close an epic | `bmad-retrospective` |
-| Check readiness or status | `bmad-sprint-planning` |
+| Pesquisa uma pergunta da qual uma decisão depende | `bmad-deep-recon` |
+| Muda quem o produto serve ou para que ele existe | `bmad-product-brief`, atualize a intenção |
+| Adiciona, muda ou aposenta um requisito | `bmad-prd`, atualize a intenção |
+| Muda um fluxo, saída ou padrão de texto voltado ao usuário | `bmad-ux`, atualize a intenção |
+| Muda um invariante, um limite ou uma direção de dependência | `bmad-architecture`, atualize a intenção |
+| Divide um escopo novo em trabalho | `bmad-create-epics-and-stories`, depois `scripts/bmad_issue_sync.py new` |
+| Implementa um item de trabalho | `bmad-build`, com a história de entrega como sua especificação |
+| Revisa uma mudança | `bmad-code-review` |
+| Muda de direção no meio do caminho | `bmad-correct-course` |
+| Fecha um épico | `bmad-retrospective` |
+| Verifica prontidão ou status | `bmad-sprint-planning` |
 
-The harness's `/plan` Review Card stays the approval surface for a build. At build time, distill its
-addendum into the delivery story's Design and Dev notes. Whatever produced the plan, the story is the
-durable record.
+O Review Card do `/plan` do harness continua sendo a superfície de aprovação de um build. No
+momento do build, destile seu adendo nas notas de Design e de Dev da história de entrega. Seja lá
+o que produziu o plano, a história é o registro durável.
 
-## Keep the corpus current in every change
+## Mantenha o corpus atualizado em toda mudança
 
-Update the corpus in the same PR as the change that makes it stale:
+Atualize o corpus no mesmo PR da mudança que o deixa desatualizado:
 
-- **New work.** File it with `scripts/bmad_issue_sync.py new`, which files the issue, reserves the ID and
-  writes a typed story skeleton. Fill the story's required sections before the delivery PR merges. The
-  `issue-ownership` check fails a typed delivery story that still holds placeholders.
-- **Touching a legacy stub.** Run `scripts/bmad_issue_sync.py upgrade --id <BMad ID>` and fill the
-  skeleton in the same PR.
-- **Implementation.**
-  - Keep the delivery story current: check off tasks, add the file list and references to the dev notes,
-    and complete the dev agent record.
-  - Record each review finding and how it was resolved.
-  - Add a change-log line for every material change after the story was first written.
-- **Changed requirements, invariants or flows.**
-  - A changed requirement amends the PRD.
-  - A changed invariant amends the architecture spine, either as an amended rule or a new AD.
-  - A changed user-facing flow amends the UX specification.
-  - Each amendment goes through the matching skill's update intent, with a memlog entry.
-- **Sprint status is derived.** It is generated from `issue-map.json` by the sync tool; never edit it by
-  hand.
+- **Trabalho novo.** Registre com `scripts/bmad_issue_sync.py new`, que registra a issue, reserva
+  o ID e escreve um esqueleto de história tipado. Preencha as seções obrigatórias da história antes
+  de o PR de entrega ser mesclado. O check `issue-ownership` reprova uma história de entrega tipada
+  que ainda carregue placeholders.
+- **Ao tocar um stub legado.** Rode `scripts/bmad_issue_sync.py upgrade --id <BMad ID>` e preencha
+  o esqueleto no mesmo PR.
+- **Implementação.**
+  - Mantenha a história de entrega atualizada: marque as tarefas concluídas, adicione a lista de
+    arquivos e referências nas notas de dev, e complete o registro do agente de desenvolvimento.
+  - Registre cada achado de revisão e como foi resolvido.
+  - Adicione uma linha de changelog para toda mudança material depois de a história ser escrita
+    pela primeira vez.
+- **Requisitos, invariantes ou fluxos alterados.**
+  - Um requisito alterado emenda o PRD.
+  - Um invariante alterado emenda a espinha da arquitetura, seja como uma regra emendada ou um AD
+    novo.
+  - Um fluxo voltado ao usuário alterado emenda a especificação de UX.
+  - Cada emenda passa pela intenção de atualização da skill correspondente, com uma entrada de
+    memlog.
+- **O status do sprint é derivado.** Ele é gerado a partir de `issue-map.json` pela ferramenta de
+  sincronização; nunca o edite manualmente.
 
-## Parallel reservations merge through a driver
+## Reservas paralelas se mesclam por meio de um driver
 
-Two branches that each reserve a BMad ID both append to `items` in `_bmad-output/issue-map.json`
-and bump `next_ids`, so without help the second to merge conflicts. `.gitattributes` routes the
-map and the derived sprint status through the merge drivers in `scripts/bmad_merge_driver.py`:
+Duas branches que cada uma reserva um ID BMad ambas acrescentam a `items` em
+`_bmad-output/issue-map.json` e incrementam `next_ids`, então, sem ajuda, a segunda a ser mesclada
+entra em conflito. `.gitattributes` roteia o mapa e o status de sprint derivado pelos merge drivers
+em `scripts/bmad_merge_driver.py`:
 
-- **The map** merges item by item. Main's map is kept, the branch's new entries are added in the
-  tool's own JSON format, and `next_ids` takes the larger counter per kind. When main and the
-  branch mapped the same GitHub issue under different IDs, main's entry wins and the driver names
-  the dropped ID; remove that ID's story file from the branch. In a merge, main is the incoming
-  side, since you merge main into your branch; in a rebase, it is the upstream side.
-- **Sprint status** is rendered afresh from the merged map and the merged story files, and that
-  render is the merge result, so the merge commit itself carries the regeneration. It needs the
-  incoming commit, which `git merge` and `git pull` name; in a rebase or cherry-pick it reports a
-  conflict instead, and you run `python3 scripts/bmad_issue_sync.py sprint-status`.
-- **Anything it cannot settle exactly is a conflict**: an unparsable side, a field both sides
-  changed differently, or one ID reserved for two issues. The last keeps both entries, so the
-  audit's duplicate checks still fail on it. Resolve by hand, then regenerate sprint status.
+- **O mapa** mescla item por item. O mapa da main é mantido, as novas entradas da branch são
+  adicionadas no próprio formato JSON da ferramenta, e `next_ids` fica com o contador maior por
+  tipo. Quando a main e a branch mapearam a mesma issue do GitHub sob IDs diferentes, a entrada da
+  main vence e o driver nomeia o ID descartado; remova o arquivo de história desse ID da branch. Em
+  um merge, a main é o lado que chega, já que você mescla a main na sua branch; em um rebase, é o
+  lado upstream.
+- **O status de sprint** é renderizado de novo a partir do mapa mesclado e dos arquivos de história
+  mesclados, e essa renderização é o resultado do merge, então o próprio commit de merge carrega a
+  regeneração. Ele precisa do commit que chega, que `git merge` e `git pull` nomeiam; em um rebase
+  ou cherry-pick, ele relata um conflito em vez disso, e você roda
+  `python3 scripts/bmad_issue_sync.py sprint-status`.
+- **Qualquer coisa que ele não consiga resolver com exatidão é um conflito**: um lado ilegível, um
+  campo que os dois lados mudaram de forma diferente, ou um ID reservado para duas issues. O
+  último mantém as duas entradas, então as verificações de duplicidade da auditoria continuam
+  falhando nele. Resolva manualmente, depois regenere o status de sprint.
 
-`citizen worktree create` registers both drivers in the repository's git config each time it
-runs, writing only a value that differs from the one it expects. It registers them only in the
-repository the running `citizen` checkout belongs to, so another repository that ships a script of
-the same name never has its merges routed through it. To register them in an existing checkout, run:
+`citizen worktree create` registra os dois drivers na configuração git do repositório toda vez que
+roda, escrevendo apenas um valor diferente do que espera. Ele os registra apenas no repositório ao
+qual o checkout do `citizen` em execução pertence, então outro repositório que distribua um script
+de mesmo nome nunca tem seus merges roteados por ele. Para registrá-los em um checkout existente,
+rode:
 
 ```sh
 git config merge.bmad-issue-map.name "BMad issue map"
@@ -121,5 +133,5 @@ git config merge.bmad-sprint-status.name "BMad sprint status"
 git config merge.bmad-sprint-status.driver "python3 scripts/bmad_merge_driver.py sprint-status %O %A %B"
 ```
 
-Git config is shared by every worktree of a repository, so once is enough. Unregistered, git
-merges both files as text, as it did before.
+A configuração do git é compartilhada por toda worktree de um repositório, então uma vez é
+suficiente. Sem registro, o git mescla os dois arquivos como texto, como fazia antes.

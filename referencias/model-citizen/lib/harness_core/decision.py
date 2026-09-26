@@ -1,32 +1,32 @@
-"""The shared decision-provider seam: one contract for "may this action proceed, and how".
+"""A interface compartilhada de provedor de decisão: um único contrato para "esta ação pode prosseguir, e como".
 
-Three operations, transport-agnostic, so a local policy file and a remote control plane answer
-the same questions in the same shape:
+Três operações, agnósticas de transporte, para que um arquivo de política local e um plano de
+controle remoto respondam às mesmas perguntas na mesma forma:
 
     decide(action, counterparty, context) -> Decision
     record(action_outcome) -> None
     learn(approval_stream) -> None
 
-`Action` carries an action class and, when the caller knows it, the grade `grade-bash.py`
-already assigns a command (0 reversible, 3 irreversible). `counterparty` is the
-`repo:<name>/<branch>` slug `counterparty()` derives, so a policy written against a repository
-and branch matches whatever asks the question.
+`Action` carrega uma classe de ação e, quando o chamador a conhece, a nota que `grade-bash.py` já
+atribui a um comando (0 reversível, 3 irreversível). `counterparty` é o slug `repo:<name>/<branch>`
+que `counterparty()` deriva, então uma política escrita contra um repositório e branch combina com
+o que quer que faça a pergunta.
 
-Two providers ship here. `none` is the default and governs nothing: every action is allowed at
-autonomy level 3. `local` reads a user-level and a per-repository policy file, merges them, and
-resolves a level from the result.
-A provider that answers over a transport lives in `harness_core.decisions` and is imported only
-when a configuration names it; `jev` is the one that ships.
-Nothing in this module reaches the network. `grade-bash.py` consults the selected provider for
-every Bash command it would otherwise let through, but only when `governance.provider` is not
-`none`, and it imports this module only then: under `none` the hook's output is exactly what the
-stance alone gives. The binding is tighten-only, so a provider can turn an allow into an ask and
-never an ask into an allow, and a configured provider that raises asks rather than allows.
-`docs/runtime-controls.md` describes the binding from the user's side.
+Dois provedores vêm embutidos aqui. `none` é o padrão e não governa nada: toda ação é permitida no
+nível de autonomia 3. `local` lê um arquivo de política em nível de usuário e um por repositório,
+os mescla, e resolve um nível a partir do resultado.
+Um provedor que responde por um transporte vive em `harness_core.decisions` e é importado só
+quando uma configuração o nomeia; `jev` é o que vem embutido.
+Nada neste módulo alcança a rede. `grade-bash.py` consulta o provedor selecionado para cada
+comando Bash que de outra forma deixaria passar, mas apenas quando `governance.provider` não é
+`none`, e só importa este módulo nesse caso: sob `none` a saída do hook é exatamente o que a stance
+sozinha dá. O vínculo só aperta, nunca afrouxa, então um provedor pode transformar um allow em ask
+e nunca um ask em allow, e um provedor configurado que levanta pedidos em vez de permitir.
+`docs/runtime-controls.md` descreve o vínculo do lado do usuário.
 
-`Decision.outcome` has three values — `allow`, `ask`, `deny`. Neither provider here ever denies;
-`deny` exists because a provider that can refuse must have somewhere to say so, and a consumer
-written against the contract should handle it from the first day.
+`Decision.outcome` tem três valores — `allow`, `ask`, `deny`. Nenhum dos dois provedores aqui nega
+jamais; `deny` existe porque um provedor que pode recusar precisa ter onde dizê-lo, e um consumidor
+escrito contra o contrato deveria tratá-lo desde o primeiro dia.
 """
 import contextlib
 import importlib.util
@@ -39,54 +39,56 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
 
-# The classes a caller may ask about. Closed on purpose: a typo in a policy file that silently
-# governs nothing is worse than a policy file that refuses to load.
+# As classes sobre as quais um chamador pode perguntar. Fechado de propósito: um erro de digitação
+# num arquivo de política que silenciosamente não governa nada é pior que um arquivo de política
+# que se recusa a carregar.
 ACTION_CLASSES = ("coding.shell_exec", "coding.git_commit", "coding.git_push", "coding.deploy",
                   "coding.file_write", "coding.pr_merge")
 OUTCOMES = ("allow", "ask", "deny")
 LEVELS = (1, 2, 3)
 ACTION_OUTCOMES = ("completed", "skipped", "failed")
 
-# What each autonomy variant implies when no policy names a level for the action. The same
-# thresholds `grade-bash.py` grades under, so a repository with no policy file behaves exactly
-# as the stance in force already says it should.
+# O que cada variante de autonomia implica quando nenhuma política nomeia um nível para a ação. Os
+# mesmos limiares sob os quais `grade-bash.py` avalia, para que um repositório sem arquivo de
+# política se comporte exatamente como a stance em vigor já diz que deveria.
 STANCE_LEVELS = {"execute": 3, "confirm-writes": 2, "ask": 1}
-# Unresolvable stance: the strictest variant, for `grade-bash.py`'s reason — a gate that cannot
-# read its own configuration must not widen authority on the strength of not knowing.
+# Stance não resolvível: a variante mais estrita, para a razão de `grade-bash.py` — um portão que
+# não consegue ler sua própria configuração não deve ampliar autoridade com base em não saber.
 STRICTEST_LEVEL = 1
-# A deploy is never fully autonomous, whatever a policy file says. A cap in the file may lower
-# this and may not raise it.
+# Um deploy nunca é totalmente autônomo, seja o que for que um arquivo de política diga. Um teto
+# no arquivo pode baixar isso e não pode elevar.
 BUILTIN_CAPS = {"coding.deploy": 2}
-# An action whose grade the caller does not know is judged at 1, never at 3 — `grade-bash.py`'s
-# rule for a command it cannot recognise, for the same reason.
+# Uma ação cuja nota o chamador não conhece é julgada em 1, nunca em 3 — a regra de
+# `grade-bash.py` para um comando que não consegue reconhecer, pela mesma razão.
 UNKNOWN_GRADE = 1
 
 POLICY_FILE = Path(".agent-harness") / "governance.json"
-# The user-level policy sits beside `config.json`, in the same schema as the repository file.
+# A política em nível de usuário fica ao lado de `config.json`, no mesmo schema do arquivo de repositório.
 USER_POLICY_NAME = "governance.json"
 USER_LAYER = "user policy"
 REPOSITORY_LAYER = "repository policy"
 BUILTIN_SOURCE = "built-in"
 POLICY_KEYS = ("defaults", "pairs", "caps")
-# The point name a provider's own outcome rows carry in the decision ledger. Deliberately not in
-# `decisions.POINTS`: that tuple names the hook points whose rows the report expects to exist.
-# The rows `grade-bash.py` writes for each decision it asks a provider for carry its own
-# `governance` point instead.
+# O nome de ponto que as próprias linhas de resultado de um provedor carregam no ledger de
+# decisão. Deliberadamente fora de `decisions.POINTS`: essa tupla nomeia os pontos de hook cujas
+# linhas o relatório espera que existam. As linhas que `grade-bash.py` escreve para cada decisão
+# que pede a um provedor carregam seu próprio ponto `governance` em vez disso.
 LEDGER_POINT = "decision-provider"
 
 
 class PolicyError(ValueError):
-    """A governance policy file that cannot be honoured as written.
+    """Um arquivo de política de governança que não pode ser honrado como está escrito.
 
-    Raised rather than shrugged off: a malformed policy is a governance question nobody has
-    answered, and reading it as "no policy" would quietly grant whatever it meant to withhold.
-    Every call site turns this into one line naming the file and the fault.
+    Levantado em vez de ignorado: uma política malformada é uma pergunta de governança que
+    ninguém respondeu, e lê-la como "nenhuma política" concederia silenciosamente o que ela
+    pretendia negar. Todo ponto de chamada transforma isso numa única linha nomeando o arquivo e
+    a falha.
     """
 
 
 @dataclass(frozen=True)
 class Action:
-    """What is about to happen: an action class, and the grade of it where one is known."""
+    """O que está prestes a acontecer: uma classe de ação, e sua nota quando conhecida."""
 
     action_class: str
     grade: Optional[int] = None
@@ -100,7 +102,7 @@ class Action:
 
 @dataclass(frozen=True)
 class ActionOutcome:
-    """How an action that was decided on actually turned out."""
+    """Como uma ação sobre a qual se decidiu de fato se desenrolou."""
 
     action_class: str
     counterparty: str
@@ -110,11 +112,12 @@ class ActionOutcome:
 
 @dataclass(frozen=True)
 class Decision:
-    """One provider's answer.
+    """A resposta de um provedor.
 
-    `injected_cognition` is the part a runtime may put in front of an agent or a person:
-    `rule_matches` names every policy line that bore on the answer, verbatim enough to quote,
-    and the two messages are text for the agent and for the user, or None when there is none.
+    `injected_cognition` é a parte que um runtime pode colocar diante de um agente ou de uma
+    pessoa: `rule_matches` nomeia toda linha de política que influenciou a resposta, literal o
+    bastante para ser citada, e as duas mensagens são texto para o agente e para o usuário, ou
+    None quando não há nenhuma.
     """
 
     outcome: str
@@ -133,17 +136,17 @@ def empty_cognition() -> Dict[str, Any]:
     return {"rule_matches": [], "agent_message": None, "user_message": None}
 
 
-# ------------------------------------------------------------------ the shared ledger
+# ------------------------------------------------------------------ o ledger compartilhado
 
 _HOOK_MODULES: Dict[str, Any] = {}
 
 
 def _hook_module(name: str, root: Optional[Path] = None):
-    """A module from the hook directory, loaded by file, or None when it is not there.
+    """Um módulo do diretório de hooks, carregado por arquivo, ou None quando não está lá.
 
-    `claude/hooks` is a symlink to `policy/hooks`; both names are tried for the reason
-    `catalog.posture_module` gives. Loading the hook's own file is what keeps one writer for
-    the decision ledger and one derivation of the counterparty slug.
+    `claude/hooks` é um symlink para `policy/hooks`; ambos os nomes são tentados pela razão que
+    `catalog.posture_module` dá. Carregar o próprio arquivo do hook é o que mantém um único
+    escritor para o ledger de decisão e uma única derivação do slug de contraparte.
     """
     root = ROOT if root is None else Path(root)
     key = str(root) + "/" + name
@@ -168,20 +171,20 @@ UNKNOWN_COUNTERPARTY = "repo:unknown/local"
 
 
 def counterparty(cwd: Optional[str] = None) -> str:
-    """`repo:<name>/<branch>` for a working directory; `locate` says how it is derived."""
+    """`repo:<name>/<branch>` para um diretório de trabalho; `locate` diz como é derivado."""
     return locate(cwd)[0]
 
 
 def locate(cwd: Optional[str] = None) -> Tuple[str, Optional[str]]:
-    """`(counterparty, working-tree root)` for a working directory.
+    """`(counterparty, raiz da working tree)` para um diretório de trabalho.
 
-    Derived through `usage-log.py`'s own git helper, as the usage ledger derives its repository
-    and branch, with one difference: `<name>` is the repository's, read from the common git
-    directory, so a linked worktree in a directory named for its task still names the
-    repository it belongs to, and a policy keyed on `repo:<name>` governs every worktree of it.
-    The ledger's `repo` field keeps the worktree directory's name. Outside a repository,
-    `repo:unknown/local` and no root: a policy must not silently match a directory that only
-    happens to share a basename with one.
+    Derivado através do próprio auxiliar git de `usage-log.py`, assim como o ledger de uso deriva
+    seu repositório e branch, com uma diferença: `<name>` é o do repositório, lido do diretório
+    git comum, então uma worktree vinculada num diretório nomeado por sua tarefa ainda nomeia o
+    repositório ao qual pertence, e uma política chaveada em `repo:<name>` governa toda worktree
+    dele. O campo `repo` do ledger mantém o nome do diretório da worktree. Fora de um
+    repositório, `repo:unknown/local` e nenhuma raiz: uma política não deve combinar
+    silenciosamente com um diretório que apenas compartilha um nome-base com um repositório.
     """
     cwd = str(Path(cwd).expanduser()) if cwd else os.getcwd()
     module = _hook_module("usage-log")
@@ -196,10 +199,10 @@ def locate(cwd: Optional[str] = None) -> Tuple[str, Optional[str]]:
 
 
 def repository_name(top: str, common: Optional[str]) -> str:
-    """The repository's name: the directory holding its common `.git`, or a bare `<name>.git`.
+    """O nome do repositório: o diretório que guarda seu `.git` comum, ou um `<name>.git` bare.
 
-    Falls back to the working tree's own directory name when the common directory is unknown,
-    as it is under a git too old for `--path-format`.
+    Recai para o nome do próprio diretório da working tree quando o diretório comum é
+    desconhecido, como acontece sob um git velho demais para `--path-format`.
     """
     if common:
         common = os.path.normpath(common)
@@ -225,12 +228,12 @@ def ledger_path(target: Optional[str] = None) -> Optional[Path]:
 
 
 def append_outcome(action_outcome: ActionOutcome, target: Optional[str] = None) -> Optional[str]:
-    """Write one action outcome to the decision ledger. Returns its id, or None.
+    """Escreve um resultado de ação no ledger de decisão. Retorna seu id, ou None.
 
-    The existing `decisions.jsonl`, through the existing writer, never a second file: a reader
-    of the ledger sees provider activity beside the hook decisions it already holds. Never
-    raises, for the reason that module gives — a log that can change an answer is worse than no
-    log — so a caller gets None and carries on.
+    O `decisions.jsonl` já existente, através do escritor já existente, nunca um segundo arquivo:
+    um leitor do ledger vê a atividade do provedor ao lado das decisões de hook que já contém.
+    Nunca levanta exceção, pela razão que aquele módulo dá — um log que pode mudar uma resposta é
+    pior que nenhum log — então um chamador recebe None e continua.
     """
     module = _ledger()
     if module is None:
@@ -249,11 +252,12 @@ _SUPPRESSED = []
 
 @contextlib.contextmanager
 def events_suppressed():
-    """Inside this block, `append_event` writes nothing and says so.
+    """Dentro deste bloco, `append_event` não escreve nada e diz isso.
 
-    For a reporting command: `harness decide` asks a provider what it would answer, and a
-    provider that reaches a service would otherwise leave a row behind for a question nobody
-    acted on. Re-entrant, so nesting it cannot turn logging back on early.
+    Para um comando de relatório: `harness decide` pergunta a um provedor o que ele responderia,
+    e um provedor que alcança um serviço de outra forma deixaria uma linha para trás por uma
+    pergunta sobre a qual ninguém agiu. Reentrante, então aninhá-lo não pode religar o log cedo
+    demais.
     """
     _SUPPRESSED.append(True)
     try:
@@ -263,16 +267,16 @@ def events_suppressed():
 
 
 def suppressed() -> bool:
-    """Whether a reporting command is holding writes open. Read by every ledger this module has."""
+    """Se um comando de relatório está segurando as escritas abertas. Lido por todo ledger que este módulo tem."""
     return bool(_SUPPRESSED)
 
 
 def append_event(name: str, detail: Dict[str, Any], target: Optional[str] = None) -> bool:
-    """Write one `event` row to the decision ledger. Never raises; says whether it wrote.
+    """Escreve uma linha `event` no ledger de decisão. Nunca levanta exceção; diz se escreveu.
 
-    An event carries no `decision_id`, so `decisions.read_rows` skips it and
-    `harness usage --by decision` never counts provider bookkeeping as a judgment nobody
-    labelled. `read_events` below reads them back.
+    Um evento não carrega `decision_id`, então `decisions.read_rows` o pula e
+    `harness usage --by decision` nunca conta a contabilidade do provedor como um julgamento que
+    ninguém rotulou. `read_events` abaixo os lê de volta.
     """
     if suppressed():
         return False
@@ -282,7 +286,7 @@ def append_event(name: str, detail: Dict[str, Any], target: Optional[str] = None
     try:
         if not module.enabled():
             return False
-        # The ledger's own append: one line, one write, and no second file to keep in step.
+        # O append próprio do ledger: uma linha, uma escrita, e nenhum segundo arquivo para manter em sincronia.
         module._append({"kind": "event", "point": LEDGER_POINT, "event": name,
                         "ts": module.now_ts(), "detail": detail,
                         "harness_version": module.harness_version()},
@@ -293,7 +297,7 @@ def append_event(name: str, detail: Dict[str, Any], target: Optional[str] = None
 
 
 def read_events(target: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Every `event` row in the ledger, oldest first. An unreadable file is no events."""
+    """Toda linha `event` no ledger, da mais antiga para a mais nova. Um arquivo ilegível é nenhum evento."""
     path = ledger_path(target)
     if path is None:
         return []
@@ -313,12 +317,12 @@ def read_events(target: Optional[str] = None) -> List[Dict[str, Any]]:
 
 
 def validate_approvals(stream: Iterable[Any]) -> List[Dict[str, Any]]:
-    """The approval records in `stream`, or a `PolicyError` naming the first bad one.
+    """Os registros de aprovação em `stream`, ou um `PolicyError` nomeando o primeiro ruim.
 
-    Shape only: `{action, counterparty, approved: bool, at: iso8601}`. Nothing here learns from
-    them yet — the providers that ship today cannot — and validating the shape is exactly what
-    keeps the seam honest: a caller that hands over garbage is told so now rather than when
-    something finally reads the file.
+    Apenas a forma: `{action, counterparty, approved: bool, at: iso8601}`. Nada aqui aprende com
+    eles ainda — os provedores que vêm embutidos hoje não conseguem — e validar a forma é
+    exatamente o que mantém a interface honesta: um chamador que entrega lixo é avisado agora em
+    vez de quando algo finalmente ler o arquivo.
     """
     if isinstance(stream, (str, bytes, dict)) or stream is None:
         raise PolicyError("learn: the approval stream must be an iterable of records")
@@ -341,10 +345,10 @@ def validate_approvals(stream: Iterable[Any]) -> List[Dict[str, Any]]:
 
 
 def _iso8601(value: str) -> bool:
-    """Whether `value` is an ISO 8601 instant the stdlib on this floor can read.
+    """Se `value` é um instante ISO 8601 que a stdlib deste patamar consegue ler.
 
-    Python 3.9's `fromisoformat` does not accept a trailing `Z`, which is the spelling every
-    row in this repository's ledgers uses, so the one substitution is made before parsing.
+    O `fromisoformat` do Python 3.9 não aceita um `Z` no final, que é a grafia que toda linha nos
+    ledgers deste repositório usa, então a única substituição é feita antes do parse.
     """
     import datetime
 
@@ -355,14 +359,14 @@ def _iso8601(value: str) -> bool:
     return True
 
 
-# ------------------------------------------------------------------ the policy file
+# ------------------------------------------------------------------ o arquivo de política
 
 
 def stance_level(variant: Optional[str] = None, root: Optional[Path] = None) -> int:
-    """The level the autonomy stance implies, or the strictest when nothing resolves it.
+    """O nível que a stance de autonomia implica, ou o mais estrito quando nada o resolve.
 
-    Resolved through `posture.py`, the same file every hook asks, so the provider and the
-    command gate cannot disagree about which variant is in force.
+    Resolvido através de `posture.py`, o mesmo arquivo que todo hook consulta, para que o
+    provedor e o portão de comando não possam discordar sobre qual variante está em vigor.
     """
     if variant is None:
         module = _hook_module("posture", root)
@@ -392,10 +396,10 @@ def _class_map(block: Any, where: str) -> Dict[str, int]:
 
 
 def load_policy(path: Path) -> Dict[str, Dict[str, Any]]:
-    """The policy at `path`, validated, or the empty policy when the file is not there.
+    """A política em `path`, validada, ou a política vazia quando o arquivo não está lá.
 
-    A missing file is a repository that has chosen nothing, which resolves to the stance. A
-    file that exists and cannot be honoured is a `PolicyError`.
+    Um arquivo ausente é um repositório que não escolheu nada, o que resolve para a stance. Um
+    arquivo que existe e não pode ser honrado é um `PolicyError`.
     """
     path = Path(path)
     empty: Dict[str, Dict[str, Any]] = {"defaults": {}, "pairs": {}, "caps": {}}
@@ -422,17 +426,17 @@ def load_policy(path: Path) -> Dict[str, Dict[str, Any]]:
         policy["pairs"] = {slug: _class_map(block, "pairs." + str(slug))
                            for slug, block in pairs.items()}
     except PolicyError as exc:
-        # Two files can now be read, so a fault inside one must say which.
+        # Dois arquivos agora podem ser lidos, então uma falha dentro de um precisa dizer qual.
         raise PolicyError("governance policy " + str(path) + ": " + str(exc))
     return policy
 
 
 def user_policy_file(env: Optional[Dict[str, str]] = None) -> Path:
-    """Where the user-level policy lives: beside `config.json`, found the way it is found.
+    """Onde vive a política em nível de usuário: ao lado de `config.json`, encontrada como é encontrada.
 
-    `HARNESS_HOME`, then `HOME`, then the account's home, then `.config/agent-harness` — the
-    same lookup `bin/harness` and `posture.py` use for `config.json`, so a temporary home moves
-    both files together.
+    `HARNESS_HOME`, depois `HOME`, depois a home da conta, depois `.config/agent-harness` — a
+    mesma busca que `bin/harness` e `posture.py` usam para `config.json`, então uma home
+    temporária move os dois arquivos juntos.
     """
     env = os.environ if env is None else env
     home = env.get("HARNESS_HOME") or env.get("HOME") or str(Path.home())
@@ -441,12 +445,13 @@ def user_policy_file(env: Optional[Dict[str, str]] = None) -> Path:
 
 def merge_policies(layers: Iterable[Tuple[str, Path, Dict[str, Dict[str, Any]]]]
                    ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, str]]:
-    """Merge `(label, path, policy)` layers, lowest precedence first, into one policy.
+    """Mescla camadas `(label, path, policy)`, precedência mais baixa primeiro, numa única política.
 
-    Returns `(policy, sources)`. `defaults` and each pair's classes take the later layer's value;
-    `caps` take the lower value, so no layer can lift a ceiling another set. `sources` maps each
-    entry's rule name (`defaults.<class>`, `pairs.<slug>.<class>`, `caps.<class>`) to the
-    `"<label> <path>"` that supplied it, for the reason and the rule matches.
+    Retorna `(policy, sources)`. `defaults` e as classes de cada par assumem o valor da camada
+    mais recente; `caps` assumem o valor mais baixo, então nenhuma camada pode elevar um teto que
+    outra baixou. `sources` mapeia o nome de regra de cada entrada (`defaults.<class>`,
+    `pairs.<slug>.<class>`, `caps.<class>`) para o `"<label> <path>"` que a forneceu, para a razão
+    e as correspondências de regra.
     """
     merged: Dict[str, Dict[str, Any]] = {"defaults": {}, "pairs": {}, "caps": {}}
     sources: Dict[str, str] = {}
@@ -469,9 +474,9 @@ def merge_policies(layers: Iterable[Tuple[str, Path, Dict[str, Dict[str, Any]]]]
 
 
 def repository_slug(counterparty: str) -> Optional[str]:
-    """`repo:<name>` for a `repo:<name>/<branch>` slug, or None when there is no branch part.
+    """`repo:<name>` para um slug `repo:<name>/<branch>`, ou None quando não há parte de branch.
 
-    The name ends at the first `/`, because a branch name may itself contain slashes.
+    O nome termina na primeira `/`, porque um nome de branch pode em si conter barras.
     """
     if not counterparty.startswith("repo:") or "/" not in counterparty:
         return None
@@ -479,50 +484,50 @@ def repository_slug(counterparty: str) -> Optional[str]:
 
 
 def cap_for(action_class: str, policy: Dict[str, Dict[str, Any]]) -> Optional[int]:
-    """The ceiling on this action's level: the lower of the file's cap and the built-in one."""
+    """O teto sobre o nível desta ação: o mais baixo entre o teto do arquivo e o embutido."""
     caps = [c for c in (policy.get("caps", {}).get(action_class),
                         BUILTIN_CAPS.get(action_class)) if c is not None]
     return min(caps) if caps else None
 
 
 def outcome_for(level: int, grade: int) -> str:
-    """`allow` or `ask`, by the thresholds `grade-bash.py` already grades under.
+    """`allow` ou `ask`, pelos limiares sob os quais `grade-bash.py` já avalia.
 
-    Level 3 allows every grade; level 2 asks at grade 2 and up; level 1 asks at grade 1 and up.
+    Nível 3 permite toda nota; nível 2 pergunta na nota 2 e acima; nível 1 pergunta na nota 1 e acima.
     """
     if level >= 3:
         return "allow"
     return "ask" if grade >= level else "allow"
 
 
-# ------------------------------------------------------------------ the providers
+# ------------------------------------------------------------------ os provedores
 
 
 class DecisionProvider(ABC):
-    """The contract every provider answers, whatever sits behind it."""
+    """O contrato que todo provedor responde, seja lá o que estiver por trás dele."""
 
     name = ""
 
     @abstractmethod
     def decide(self, action: Action, counterparty: str,
                context: Optional[Dict[str, Any]] = None) -> Decision:
-        """Whether this action may proceed, and what to put in front of the agent."""
+        """Se esta ação pode prosseguir, e o que colocar diante do agente."""
 
     @abstractmethod
     def record(self, action_outcome: ActionOutcome) -> None:
-        """Note how an action turned out. Never raises, never changes a decision."""
+        """Anota como uma ação se desenrolou. Nunca levanta exceção, nunca muda uma decisão."""
 
     @abstractmethod
     def learn(self, approval_stream: Iterable[Any]) -> None:
-        """Take a stream of past approvals. May be a no-op; must reject a malformed stream."""
+        """Recebe um fluxo de aprovações passadas. Pode ser um no-op; deve rejeitar um fluxo malformado."""
 
 
 class NullProvider(DecisionProvider):
-    """Governs nothing: every action is allowed at level 3.
+    """Não governa nada: toda ação é permitida no nível 3.
 
-    The default, and the behaviour of a harness with no governance at all — which is what every
-    installation has today. It still records outcomes, so the ledger is populated before any
-    policy exists to be measured against it.
+    O padrão, e o comportamento de um harness sem nenhuma governança — que é o que toda
+    instalação tem hoje. Ele ainda registra resultados, então o ledger é povoado antes que
+    qualquer política exista para ser medida contra ele.
     """
 
     name = "none"
@@ -542,22 +547,23 @@ class NullProvider(DecisionProvider):
 
 
 class LocalProvider(DecisionProvider):
-    """A user-level and a per-repository policy file, resolved against the autonomy stance.
+    """Um arquivo de política em nível de usuário e um por repositório, resolvidos contra a stance de autonomia.
 
-    Both files share one schema. `.agent-harness/governance.json` in the repository, and
-    `governance.json` beside `config.json` for the user:
+    Ambos os arquivos compartilham um schema. `.agent-harness/governance.json` no repositório, e
+    `governance.json` ao lado de `config.json` para o usuário:
 
         {"defaults": {"coding.git_push": 2},
          "pairs": {"repo:agent-harness/main": {"coding.git_push": 1},
                    "repo:agent-harness": {"coding.pr_merge": 2}},
          "caps": {"coding.deploy": 2}}
 
-    The repository file wins over the user file for `defaults` and pair entries; `caps` combine
-    by the lower value. Resolution is the exact `repo:<name>/<branch>` pair, then the
-    whole-repository `repo:<name>` pair, then the class default, then the level the autonomy
-    stance implies. A cap is a ceiling the resolved level never exceeds, and `coding.deploy`
-    carries a built-in cap of 2 that a file may lower and may not raise: a deploy is never fully
-    autonomous. The reason and every rule match name the file that supplied the level.
+    O arquivo de repositório vence sobre o arquivo do usuário para `defaults` e entradas de par;
+    `caps` se combinam pelo valor mais baixo. A resolução é o par exato
+    `repo:<name>/<branch>`, depois o par de repositório inteiro `repo:<name>`, depois o padrão da
+    classe, depois o nível que a stance de autonomia implica. Um teto é um limite que o nível
+    resolvido nunca ultrapassa, e `coding.deploy` carrega um teto embutido de 2 que um arquivo
+    pode baixar e não pode elevar: um deploy nunca é totalmente autônomo. A razão e cada
+    correspondência de regra nomeiam o arquivo que forneceu o nível.
     """
 
     name = "local"
@@ -575,7 +581,7 @@ class LocalProvider(DecisionProvider):
         self._sources: Dict[str, str] = {}
 
     def policy_files(self) -> List[Path]:
-        """The files this provider reads, lowest precedence first."""
+        """Os arquivos que este provedor lê, precedência mais baixa primeiro."""
         return [self.user_policy_path, self.policy_path]
 
     def policy(self) -> Dict[str, Dict[str, Any]]:
@@ -620,8 +626,7 @@ class LocalProvider(DecisionProvider):
         outcome = outcome_for(level, grade)
         described = source + (" in " + origin if origin else "")
         if capped:
-            # The level reported is the cap's, so the reason names the cap, not only the rule
-            # it lowered.
+            # O nível reportado é o do teto, então a razão nomeia o teto, não só a regra que ele baixou.
             described += ", capped by " + capped
         reason = ("governance: local, level %d, grade %s -> %s (%s)"
                   % (level, "unknown" if action.grade is None else str(grade), outcome,
@@ -645,13 +650,13 @@ class LocalProvider(DecisionProvider):
 
 
 PROVIDERS = {NullProvider.name: NullProvider, LocalProvider.name: LocalProvider}
-# A provider that answers over a transport lives in `harness_core.decisions` and imports this
-# module, so it is named here and loaded only when a configuration asks for it.
+# Um provedor que responde por um transporte vive em `harness_core.decisions` e importa este
+# módulo, então é nomeado aqui e carregado só quando uma configuração o pede.
 TRANSPORT_PROVIDERS = {"jev": ("harness_core.decisions.jev", "JevProvider")}
 
 
 def provider_class(name: str):
-    """The class a provider name selects, importing a transport provider on demand."""
+    """A classe que um nome de provedor seleciona, importando um provedor de transporte sob demanda."""
     if name in PROVIDERS:
         return PROVIDERS[name]
     if name in TRANSPORT_PROVIDERS:
@@ -668,10 +673,10 @@ def provider_class(name: str):
 
 
 def select_provider(config: Optional[Dict[str, Any]] = None, **kwargs) -> DecisionProvider:
-    """The provider `governance.provider` names, `none` by default.
+    """O provedor que `governance.provider` nomeia, `none` por padrão.
 
-    An unknown name is refused rather than defaulted: a configuration that asks for governance
-    nobody can supply must not come back as governance nobody applied.
+    Um nome desconhecido é recusado em vez de assumir um padrão: uma configuração que pede uma
+    governança que ninguém pode fornecer não deve voltar como governança que ninguém aplicou.
     """
     block = (config or {}).get("governance")
     name = block.get("provider") if isinstance(block, dict) else None
@@ -683,7 +688,7 @@ def select_provider(config: Optional[Dict[str, Any]] = None, **kwargs) -> Decisi
         kwargs.pop("user_policy_path", None)
         kwargs.pop("variant", None)
     if name in TRANSPORT_PROVIDERS:
-        # A provider that leaves the machine reads its own opt-in block, so selecting it is
-        # never on its own enough to make it call anything.
+        # Um provedor que sai da máquina lê seu próprio bloco de opt-in, então selecioná-lo nunca
+        # é por si só suficiente para fazê-lo chamar qualquer coisa.
         kwargs.setdefault("config", config or {})
     return cls(**kwargs)

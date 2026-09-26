@@ -1,134 +1,148 @@
-# Spike: would an in-run budget nudge to a running subagent earn its weight?
+# Spike: um aviso de orçamento durante a execução para um subagente em execução valeria seu peso?
 
-**Status:** `failed` — do not build, 2026-09-22. The measured numbers did not meet the exit
-criterion, and the criterion was not adjusted. Issue [#322](https://github.com/JakeSelby/agent-harness/issues/322).
+**Status:** `failed` — não construir, 2026-09-22. Os números medidos não atenderam ao critério de
+saída, e o critério não foi ajustado. Issue [#322](https://github.com/JakeSelby/agent-harness/issues/322).
 
-## Question
+## Pergunta
 
-A subagent learns its soft budget in its brief and hears nothing afterwards. Does a mid-run nudge
-— one line naming actual against budget, denying nothing — reach enough over-budget runs, early
-enough in them, to pay for the machinery it needs: an incremental transcript reader on every
-subagent tool call, which is the heaviest piece of the usage feed?
+Um subagente aprende seu orçamento flexível em seu brief e não ouve mais nada depois disso. Um
+aviso no meio da execução — uma linha nomeando o real contra o orçamento, sem negar nada — alcança
+execuções acima do orçamento em número suficiente, e cedo o bastante nelas, para pagar pela
+maquinaria que exige: um leitor incremental de transcrição em toda chamada de ferramenta de
+subagente, que é a peça mais pesada do feed de uso?
 
-## Cheapest experiment
+## Experimento mais barato
 
-The telemetry to answer it already exists, so nothing was built and nothing was run live. A
-throwaway script read two things on one machine:
+A telemetria para responder isso já existe, então nada foi construído e nada foi rodado ao vivo.
+Um script descartável leu duas coisas em uma máquina:
 
-- `~/.local/state/agent-harness/usage.jsonl`, for every `kind: "subagent"` row carrying
-  `budget_output_tokens` — the **recorded** sample, written by 0.11.1 when briefs already carried
-  budgets.
-- The same ledger's earlier Claude Code subagent rows, whose role is priced in
-  `primitives/stances/cost/balanced.json`, with today's budget applied retrospectively — the
-  **reconstructed** sample. Those runs predate budgets in the brief, so they stand for behaviour
-  with no budget signal at all.
+- `~/.local/state/agent-harness/usage.jsonl`, para toda linha `kind: "subagent"` que carrega
+  `budget_output_tokens` — a amostra **registrada**, escrita pela 0.11.1 quando os briefs já
+  carregavam orçamentos.
+- As linhas de subagente anteriores do Claude Code do mesmo ledger, cujo papel é precificado em
+  `primitives/stances/cost/balanced.json`, com o orçamento de hoje aplicado retroativamente — a
+  amostra **reconstruída**. Essas execuções são anteriores a orçamentos no brief, então
+  representam o comportamento sem nenhum sinal de orçamento.
 
-For each row the script rebuilt the run's cumulative output curve from the agent's own transcript
-under `~/.claude/projects/<project>/<session>/subagents/`, one point per assistant message, each
-message id counted once at its largest `output_tokens`, in file order, with the cumulative tool-use
-count beside it. Where one agent id existed under two project directories the fullest transcript
-was taken; every row's curve total then equalled its ledger total exactly, 89 of 89 and 235 of 235,
-which is the check that the right file was read. The curve gives what the ledger alone cannot: the
-point in a run where a threshold was crossed, and how much run was left after it.
+Para cada linha o script reconstruiu a curva cumulativa de saída da execução a partir da própria
+transcrição do agente sob `~/.claude/projects/<project>/<session>/subagents/`, um ponto por
+mensagem de assistente, cada id de mensagem contado uma vez em seu maior `output_tokens`, na ordem
+do arquivo, com a contagem cumulativa de uso de ferramenta ao lado. Onde um id de agente existia
+sob dois diretórios de projeto, a transcrição mais completa foi usada; o total da curva de cada
+linha então igualava exatamente o total do ledger, 89 de 89 e 235 de 235, o que é a verificação de
+que o arquivo certo foi lido. A curva dá o que o ledger sozinho não consegue: o ponto de uma
+execução onde um limite foi cruzado, e quanto de execução restava depois disso.
 
-What is faked: nothing was nudged, so every "could have saved" figure is the **ceiling** — the
-tokens emitted after the crossing, on the assumption that a nudged agent stops dead. A real nudge
-saves some fraction of that.
+O que é simulado: nada foi avisado de fato, então toda cifra de "poderia ter economizado" é o
+**teto**: os tokens emitidos depois do cruzamento, sob a suposição de que um agente avisado para
+de imediato. Um aviso real economiza uma fração disso.
 
-## Exit criterion
+## Critério de saída
 
-Fixed before the curve scan, from the issue's own framing — the nudge must be worth an incremental
-reader on every subagent tool call:
+Fixado antes da varredura da curva, a partir da própria formulação da issue — o aviso precisa
+valer um leitor incremental em toda chamada de ferramenta de subagente:
 
-- it fires on **at least 10%** of budgeted subagent runs, and
-- at the crossing the median firing run still has **at least 10 tool calls** left, so the nudge can
-  be acted on, and
-- the output emitted after the crossing is **at least 10%** of all subagent output tokens.
+- ele dispara em **pelo menos 10%** das execuções de subagente com orçamento, e
+- no cruzamento, a execução mediana que disparou ainda tem **pelo menos 10 chamadas de
+  ferramenta** restantes, para que o aviso possa ser posto em prática, e
+- a saída emitida depois do cruzamento é **pelo menos 10%** de todos os tokens de saída de
+  subagente.
 
-Two of the three were missed.
+Dois dos três não foram atendidos.
 
-## Machine
+## Máquina
 
-Apple M5 Pro, 24 GB, macOS 26.5, arm64. One developer machine, one ledger:
-3,477 rows, 3,085 of them subagents, of which 2,778 Claude Code. The budgeted window is
-2026-09-21 to 2026-09-23 at harness 0.11.1; the reconstructed window is everything before it.
-Every figure below is that machine's, and a second machine could differ.
+Apple M5 Pro, 24 GB, macOS 26.5, arm64. Uma máquina de desenvolvedor, um ledger:
+3.477 linhas, 3.085 delas subagentes, das quais 2.778 Claude Code. A janela com orçamento é de
+2026-09-21 a 2026-09-23 no harness 0.11.1; a janela reconstruída é tudo antes disso. Todo número
+abaixo é dessa máquina, e uma segunda máquina poderia diferir.
 
-## Measured
+## Medido
 
-Recorded sample — 89 subagent rows whose brief carried a budget:
+Amostra registrada — 89 linhas de subagente cujo brief carregava um orçamento:
 
-- 2 of 89 runs (2.2%) ended over `budget_output_tokens`. Both were `builder`; no other role
-  overran once.
-- The median run finished at 0.17 of its budget; p75 0.32, p90 0.53, p95 0.87, max 1.66.
-- Total excess on the two over-budget runs: 118,056 output tokens, 4.5% of the 2,594,799 output
-  tokens those 89 runs spent.
-- A nudge at 1.0× budget would have fired twice in 89 runs, each time with real runway — 19 and 67
-  tool calls left, at 18% of the run's wall clock — addressing at most 115,713 tokens.
-- A nudge at 0.8× would have fired 6 times; 4 of those 6 runs ended under budget, a two-to-one
-  false-alarm rate. It would have addressed at most 161,579 tokens on the runs that did overrun.
-- Tool calls are not a usable proxy for the same signal: 4 runs of 89 exceeded
-  `budget_tool_calls`, all `builder`, and only 1 of those 4 also exceeded its token budget.
+- 2 de 89 execuções (2,2%) terminaram acima de `budget_output_tokens`. As duas eram `builder`;
+  nenhum outro papel excedeu uma única vez.
+- A execução mediana terminou em 0,17 do seu orçamento; p75 0,32, p90 0,53, p95 0,87, máx 1,66.
+- Excesso total nas duas execuções acima do orçamento: 118.056 tokens de saída, 4,5% dos
+  2.594.799 tokens de saída que essas 89 execuções gastaram.
+- Um aviso em 1,0× do orçamento teria disparado duas vezes em 89 execuções, cada vez com margem
+  real — 19 e 67 chamadas de ferramenta restantes, a 18% do tempo de relógio da execução —
+  endereçando no máximo 115.713 tokens.
+- Um aviso em 0,8× teria disparado 6 vezes; 4 dessas 6 execuções terminaram abaixo do orçamento,
+  uma taxa de falso alarme de dois para um. Teria endereçado no máximo 161.579 tokens nas
+  execuções que de fato excederam.
+- Chamadas de ferramenta não são um proxy utilizável para o mesmo sinal: 4 execuções de 89
+  excederam `budget_tool_calls`, todas `builder`, e apenas 1 dessas 4 também excedeu seu
+  orçamento de tokens.
 
-Reconstructed sample — 235 earlier runs, no budget in the brief, today's budget applied:
+Amostra reconstruída — 235 execuções anteriores, sem orçamento no brief, com o orçamento de hoje
+aplicado:
 
-- 51 of 235 (21.7%) ended over budget, and the excess is 714,033 tokens, 8.9% of 8,026,505.
-- The overruns are marginal and spread across four roles: `reviewer` 15, `gatherer` 14, `builder`
-  14, `spec-reviewer` 8, with the smallest twelve ratios between 1.00 and 1.07.
-- **This is the finding that decides it.** At the 1.0× crossing the median firing run had **1 tool
-  call left**; 23 of 51 had none at all and 29 of 51 had two or fewer. At 0.8× the median firing run
-  had 1 call left and 41 of 92 fires had none. A nudge delivered on a tool call the agent never
-  makes is not delivered.
-- The 0.8× false-alarm rate is the same shape at scale: 41 of 92 fires ended under budget.
+- 51 de 235 (21,7%) terminaram acima do orçamento, e o excesso é de 714.033 tokens, 8,9% de
+  8.026.505.
+- Os excessos são marginais e distribuídos entre quatro papéis: `reviewer` 15, `gatherer` 14,
+  `builder` 14, `spec-reviewer` 8, com as doze menores razões entre 1,00 e 1,07.
+- **Este é o achado que decide tudo.** No cruzamento de 1,0×, a execução mediana que disparou
+  tinha **1 chamada de ferramenta restante**; 23 de 51 não tinham nenhuma e 29 de 51 tinham duas
+  ou menos. Em 0,8×, a execução mediana que disparou tinha 1 chamada restante e 41 de 92 disparos
+  não tinham nenhuma. Um aviso entregue em uma chamada de ferramenta que o agente nunca faz não é
+  entregue.
+- A taxa de falso alarme de 0,8× tem o mesmo formato em escala: 41 de 92 disparos terminaram
+  abaixo do orçamento.
 
-Volume, for the cost side: 77,943 subagent tool calls are recorded on this machine against 89
-budgeted runs' 4,167. The feed today runs on four parent-thread events per spawn; a nudge on the
-subagent's own `PostToolUse` runs on every one of those calls.
+Volume, para o lado do custo: 77.943 chamadas de ferramenta de subagente estão registradas nesta
+máquina contra as 4.167 das 89 execuções com orçamento. O feed hoje roda em quatro eventos do fio
+pai por spawn; um aviso no próprio `PostToolUse` do subagente roda em cada uma dessas chamadas.
 
-## Where a nudge would have to ride
+## Onde um aviso teria que se apoiar
 
-- **Not `SubagentStop`** — the run is over, and the feed already reports the total there.
-- **The subagent's own `PostToolUse`** is the only event inside a running subagent. Hooks do fire
-  inside a subagent: 22 hook-feedback records were found structurally in this machine's subagent
-  transcripts, every one of them a `tool_result` block on a sidechain `user` record, 18 from
-  `PreToolUse` and 2 from `PostToolUse`. The runtime's hook documentation agrees, and adds that the
-  payload carries `agent_id` and `agent_type` inside a subagent, which is the identification a
-  per-agent "once only" latch needs.
-- `transcript_path` in that payload is the **parent's** transcript, not the agent's, so the nudge
-  would derive the agent's file the way `usage-feed.py` already does from the session id and the
-  agent id. The incremental reader — saved offset, inode and first-record hash, byte and clock
-  budgets — exists there and would be reused rather than rewritten. So the harness *can* address a
-  running subagent; it is the value, not the mechanism, that fails here.
+- **Não `SubagentStop`** — a execução já acabou, e o feed já relata o total ali.
+- **O próprio `PostToolUse` do subagente** é o único evento dentro de um subagente em execução.
+  Hooks de fato disparam dentro de um subagente: 22 registros de feedback de hook foram
+  encontrados estruturalmente nas transcrições de subagente desta máquina, cada um deles um bloco
+  `tool_result` em um registro `user` de sidechain, 18 de `PreToolUse` e 2 de `PostToolUse`. A
+  documentação de hooks do runtime concorda, e acrescenta que o payload carrega `agent_id` e
+  `agent_type` dentro de um subagente, que é a identificação de que uma trava "uma vez só" por
+  agente precisa.
+- `transcript_path` nesse payload é a transcrição **do pai**, não a do agente, então o aviso
+  precisaria derivar o arquivo do agente da mesma forma que `usage-feed.py` já faz, a partir do id
+  de sessão e do id de agente. O leitor incremental — offset salvo, inode e hash do primeiro
+  registro, orçamentos de byte e de relógio — existe ali e seria reaproveitado em vez de
+  reescrito. Então o harness *consegue* endereçar um subagente em execução; é o valor, não o
+  mecanismo, que falha aqui.
 
-## Verdict: do not build
+## Veredito: não construir
 
-Against the criterion: the nudge fires on 2.2% of budgeted runs, not 10%; the tokens it could
-address are 4.5% of subagent output, not 10%. Only the runway test passes, and only on a sample of
-two. The reconstructed sample, an order of magnitude larger, shows why that runway is luck: when
-roles overrun without a budget in the brief, they overrun by a few percent at the very end of the
-run, where a nudge arrives after the last tool call.
+Contra o critério: o aviso dispara em 2,2% das execuções com orçamento, não 10%; os tokens que
+poderia endereçar são 4,5% da saída de subagente, não 10%. Só o teste de margem passa, e só numa
+amostra de dois. A amostra reconstruída, uma ordem de grandeza maior, mostra por que essa margem
+é sorte: quando papéis excedem sem orçamento no brief, excedem por poucos por cento bem no final
+da execução, onde um aviso chega depois da última chamada de ferramenta.
 
-The cheaper reading of the same data is that the brief already did the work. Budgets in briefs
-coincide with overruns falling from 21.7% to 2.2% and the median run landing at 0.17 of budget.
-What remains is one role, `builder`, overrunning a budget that may simply be too small for the work
-it is given — a cost-table question, answered by changing a number, not by a new channel.
+A leitura mais barata dos mesmos dados é que o brief já fez o trabalho. Orçamentos nos briefs
+coincidem com excessos caindo de 21,7% para 2,2% e a execução mediana pousando em 0,17 do
+orçamento. O que resta é um papel, `builder`, excedendo um orçamento que pode simplesmente ser
+pequeno demais para o trabalho que lhe é dado — uma questão de tabela de custo, respondida
+mudando um número, não com um canal novo.
 
-The `switches.nudge_at` key stays as it is. It is already null in `frugal`, empty in `max`, and
-`[1.0, 1.5]` in `balanced` for the turn feed on the parent thread; nothing here changes it, and no
-subagent-side reader is added.
+A chave `switches.nudge_at` permanece como está. Já é nula em `frugal`, vazia em `max`, e
+`[1.0, 1.5]` em `balanced` para o feed de turno no fio pai; nada aqui a muda, e nenhum leitor do
+lado do subagente é adicionado.
 
-## What would change it
+## O que mudaria isso
 
-Re-run this same scan — the ledger already records budget and actual on every subagent row, so it
-costs one script and no new instrumentation — and build when, over a window of at least 200
-budgeted subagent rows:
+Rodar essa mesma varredura de novo — o ledger já registra orçamento e real em toda linha de
+subagente, então custa um script e nenhuma instrumentação nova — e construir quando, sobre uma
+janela de pelo menos 200 linhas de subagente com orçamento:
 
-- over-budget runs are **10% or more** of them, and
-- the excess is **10% or more** of subagent output tokens, and
-- at the 1.0× crossing the median over-budget run still has **10 or more tool calls** left.
+- as execuções acima do orçamento forem **10% ou mais** delas, e
+- o excesso for **10% ou mais** dos tokens de saída de subagente, e
+- no cruzamento de 1,0×, a execução mediana acima do orçamento ainda tiver **10 ou mais chamadas
+  de ferramenta** restantes.
 
-Any one of those alone is not enough: a high overrun rate discovered with no runway is the
-reconstructed sample, and it is the case a nudge cannot help. A narrower trigger would also change
-the answer: if overruns stay concentrated in one role, a nudge restricted to that role is a much
-smaller thing than a reader on every subagent tool call, and it should be spiked separately against
-that role's rows alone.
+Qualquer uma dessas isoladamente não é suficiente: uma taxa de excesso alta descoberta sem margem
+é a amostra reconstruída, e é o caso em que um aviso não pode ajudar. Um gatilho mais restrito
+também mudaria a resposta: se os excessos ficarem concentrados em um papel, um aviso restrito a
+esse papel é algo bem menor que um leitor em toda chamada de ferramenta de subagente, e deveria
+ser investigado separadamente, só contra as linhas desse papel.

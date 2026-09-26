@@ -1,39 +1,43 @@
-# Attribution
+# Atribuição
 
-Recorded per the chosen `licensing` stance (`~/.claude/rules/harness-stances/licensing.md`) and
-the `licensing-review` procedure. This skill is a
-development tool and is not shipped in any product; the record is kept because the policy applies
-to copied material regardless of destination.
+Registrado conforme a postura (stance) `licensing` escolhida
+(`~/.claude/rules/harness-stances/licensing.md`) e o procedimento `licensing-review`. Esta skill é
+uma ferramenta de desenvolvimento e não é entregue em nenhum produto; o registro é mantido porque a
+política se aplica a material copiado independentemente do destino.
 
-| Field | Value |
+| Campo | Valor |
 | --- | --- |
-| **Source** | https://github.com/achimala/dream-loop |
-| **Creator** | Anshu Chimala |
-| **Version** | Repository state as of commit range ending 2026-09-09 (reviewed 2026-09-15) |
-| **Licence** | MIT — permits commercial use, modification and redistribution, requires the copyright and permission notice be preserved |
-| **Licence text** | Reproduced below |
-| **What was taken** | The loop structure (locked target → build → capture → independent judge → fix → exit), the fresh-context judge with a scored rubric and prior-verdict handoff, the stall-detection exit criterion, and the "name the cause and the fix, not the symptom" constraint on judge feedback |
-| **What was not taken** | No code. `scripts/fal-batch.mjs`, `scripts/preview-server.py` and `references/fal.md` were deliberately excluded |
+| **Fonte** | https://github.com/achimala/dream-loop |
+| **Criador** | Anshu Chimala |
+| **Versão** | Estado do repositório no intervalo de commits terminando em 09/09/2026 (revisado em 15/09/2026) |
+| **Licença** | MIT — permite uso comercial, modificação e redistribuição, exige que o aviso de copyright e permissão seja preservado |
+| **Texto da licença** | Reproduzido abaixo |
+| **O que foi retirado** | A estrutura do loop (alvo travado → construir → capturar → juiz independente → corrigir → sair), o juiz de contexto novo com uma rubrica pontuada e handoff do veredito anterior, o critério de saída por estagnação, e a restrição "nomeie a causa e a correção, não o sintoma" no feedback do juiz |
+| **O que não foi retirado** | Nenhum código. `scripts/fal-batch.mjs`, `scripts/preview-server.py` e `references/fal.md` foram deliberadamente excluídos |
 
-## Modifications
+## Modificações
 
-- **Rubrics rewritten.** The original scores Composition / Lighting / Materials / Details for 3D
-  only. Ours adds a UI rubric, and replaces the 3D "Details" axis with **readability at game
-  zoom**.
-- **Hard gates added.** Accessibility, design-token adherence, runtime budget, real-world scale and
-  asset licensing are pass/fail and block exit at any score. The original has no equivalent.
-- **Objective changed.** The original targets pixel-identity — *"not a single pixel should be
-  different"*. Ours treats the target as a reference that loses to the design system, to real-world
-  scale and to accessibility where they conflict.
-- **Asset sourcing removed entirely.** The original ranks internet download first and image-to-3D
-  second, with no licence check, and explicitly instructs the agent to override a user's
-  no-downloads restriction. Both are incompatible with the chosen `licensing` stance and any
-  path-scoped asset rule a project carries; sourcing defers to those rules instead.
-- **Round budget and escalation added**, aligned to the standing autonomous-loop escalation rule.
-- **Tier-based workflow selection dropped.** The original branches on ChatGPT Plus vs Pro
-  subscription tier and includes a Codex-specific orchestration mode. Ours branches on surface.
+- **Rubricas reescritas.** As pontuações originais são Composição / Iluminação / Materiais /
+  Detalhes, apenas para 3D. A nossa adiciona uma rubrica de UI, e substitui o eixo 3D "Detalhes"
+  por **legibilidade no zoom do jogo**.
+- **Gates obrigatórios adicionados.** Acessibilidade, aderência a tokens de design, orçamento de
+  runtime, escala do mundo real e licenciamento de assets são pass/fail e bloqueiam a saída em
+  qualquer pontuação. O original não tem equivalente.
+- **Objetivo mudado.** O original tem como alvo a identidade de pixel — *"não deve haver um único
+  pixel diferente"*. O nosso trata o alvo como uma referência que perde para o sistema de design,
+  para a escala do mundo real e para acessibilidade onde eles conflitam.
+- **Obtenção de assets removida por completo.** O original ranqueia download da internet em
+  primeiro lugar e imagem-para-3D em segundo, sem checagem de licença, e instrui explicitamente o
+  agente a sobrescrever uma restrição de não-baixar do usuário. Ambos são incompatíveis com a
+  postura `licensing` escolhida e qualquer regra de asset com escopo de caminho que um projeto
+  carregue; a obtenção defere a essas regras em vez disso.
+- **Orçamento de rodadas e escalonamento adicionados**, alinhados à regra permanente de
+  escalonamento de loop autônomo.
+- **Seleção de workflow baseada em tier removida.** O original bifurca entre o tier de assinatura
+  ChatGPT Plus vs Pro e inclui um modo de orquestração específico do Codex. O nosso bifurca por
+  superfície.
 
-## MIT Licence
+## Licença MIT
 
 ```
 MIT License

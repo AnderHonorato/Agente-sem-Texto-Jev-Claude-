@@ -415,26 +415,26 @@ def worktree_key(stamp, path):
 
 
 def unseen_worktrees(removed, state):
-    """The `removed worktree` lines this run has not already acted on, oldest first."""
+    """As linhas `removed worktree` sobre as quais esta execução ainda não agiu, mais antigas primeiro."""
     seen = set(state["recreated"])
     return [(stamp, path) for stamp, path in removed if worktree_key(stamp, path) not in seen]
 
 
 def record_worktree(state, stamp, path):
     state["recreated"].append(worktree_key(stamp, path))
-    # One outage's worth of keys is all that matters; the log itself rotates far more slowly.
+    # Chaves de uma interrupção só é o que importa; o log em si gira muito mais devagar.
     state["recreated"] = state["recreated"][-256:]
     return state
 
 
 def reconnect_is_due(session_id, state, now):
-    """Whether heal may re-queue this session now: at most once per `RECONNECT_EVERY_SECONDS`."""
+    """Se heal pode recolocar esta sessão na fila agora: no máximo uma vez por `RECONNECT_EVERY_SECONDS`."""
     last = state.get("reconnected", {}).get(str(session_id))
     return not isinstance(last, (int, float)) or now - last >= RECONNECT_EVERY_SECONDS
 
 
 def record_reconnect(state, session_id, now):
-    """Stamp one attempt, and forget the ones old enough that they no longer hold anything back."""
+    """Carimba uma tentativa, e esquece as antigas o bastante para não segurarem mais nada."""
     kept = {sid: when for sid, when in state.get("reconnected", {}).items()
             if isinstance(when, (int, float)) and now - when < RECONNECT_EVERY_SECONDS}
     kept[str(session_id)] = int(now)
@@ -443,15 +443,15 @@ def record_reconnect(state, session_id, now):
 
 
 def worktree_branch(path):
-    """The branch name Claude Code gives a spawned session's worktree: `worktree-<dirname>`."""
+    """O nome de branch que o Claude Code dá à worktree de uma sessão disparada: `worktree-<dirname>`."""
     return "worktree-" + Path(path).name
 
 
 def worktree_add_argv(root, path, branch, base, branch_exists):
-    """`git worktree add`, attaching the session's branch when it survived the cleanup.
+    """`git worktree add`, anexando o branch da sessão quando sobreviveu à limpeza.
 
-    The host deletes the checkout but not always the branch, and re-creating a branch that
-    exists fails, so the two cases take different argument forms.
+    O host apaga o checkout mas nem sempre o branch, e recriar um branch que existe falha,
+    então os dois casos assumem formas de argumento diferentes.
     """
     argv = ["git", "-C", str(root), "worktree", "add"]
     return argv + ([str(path), branch] if branch_exists else [str(path), "-b", branch, str(base)])

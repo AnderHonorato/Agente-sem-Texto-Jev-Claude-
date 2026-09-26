@@ -41,18 +41,18 @@ from harness_core import compatibility, frameworks  # noqa: E402  (after ROOT, w
 VERSION = (ROOT / "VERSION").read_text().strip()
 DEFAULT_MODEL = "haiku"
 TURN_TIMEOUT = 300
-# Authentication this machine already holds, passed through by name. A value is never read,
-# logged or written by this runner. Profile and file pointers travel, and so do the AWS session
-# variables, because a container holds its credentials there and no profile exists to fall back
-# on. `AWS_*` file pointers are re-anchored at the real home because the probe's HOME is
-# disposable and an unset pointer hangs the provider lookup.
+# Autenticação que esta máquina já possui, repassada pelo nome. Um valor nunca é lido, registrado
+# ou escrito por este runner. Ponteiros de perfil e arquivo viajam, e também as variáveis de
+# sessão da AWS, porque um container guarda suas credenciais ali e não existe perfil para cair de
+# volta. Ponteiros de arquivo `AWS_*` são reancorados no home real porque o HOME da sonda é
+# descartável e um ponteiro não definido trava a busca do provedor.
 AUTH_PASSTHROUGH = (
     "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_BASE_URL",
     "ANTHROPIC_MODEL",
     "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_SKIP_BEDROCK_AUTH",
     "AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "AWS_SHARED_CREDENTIALS_FILE",
-    # The secret-key name is split, as it is in claude/hooks/rule-detectors.py, so the lint's
-    # own pattern does not match this list of variable names.
+    # O nome da chave secreta é dividido, como em claude/hooks/rule-detectors.py, para que o
+    # próprio padrão do lint não combine com esta lista de nomes de variável.
     "AWS_CONFIG_FILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET" "_ACCESS_KEY", "AWS_SESSION_TOKEN",
     "CLOUD_ML_REGION", "ANTHROPIC_VERTEX_PROJECT_ID", "GOOGLE_APPLICATION_CREDENTIALS",
     "OPENAI_API_KEY", "PATH", "SHELL", "LANG", "TERM", "TMPDIR", "SSL_CERT_FILE",
@@ -69,13 +69,13 @@ SECRET_SHAPES = (
 REDACTED = "<redacted>"
 NOT_AUTOMATED = "not automated yet"
 
-# A client surface the runner can drive. `home_var` is the environment variable that moves the
-# client's whole configuration home, which is what makes a disposable home possible at all;
-# `observed` records whether a real round has ever been run through this runner against that
-# surface. The Codex rows are derived from `adapters/codex/worker.py` (invocation and home),
-# `lib/harness_core/codex_client.py` (how the client is asked things offline) and
-# `policy/hooks/usage-log.py` with docs/usage.md (rollout layout) — no Codex round has been run
-# through this runner, so they are `observed: False` until one confirms them.
+# Uma superfície de cliente que o runner consegue conduzir. `home_var` é a variável de ambiente
+# que move o home de configuração inteiro do cliente, que é o que torna um home descartável
+# possível. `observed` registra se uma rodada de verdade já foi rodada por este runner contra
+# aquela superfície. As linhas do Codex são derivadas de `adapters/codex/worker.py` (invocação e
+# home), `lib/harness_core/codex_client.py` (como o cliente é consultado offline) e
+# `policy/hooks/usage-log.py` com docs/usage.md (layout do rollout) — nenhuma rodada do Codex foi
+# rodada por este runner, então elas são `observed: False` até que uma confirme.
 CLIENTS = {
     "claude-code-cli-macos": {"runtime": "claude-code", "platform": "macos", "command": "claude",
                               "home_var": "CLAUDE_CONFIG_DIR", "home_dir": ".claude",
@@ -95,7 +95,7 @@ UNOBSERVED_HOME = ("this runner's %s configuration home has not been confirmed a
 
 
 class Unverified(Exception):
-    """The runner could not observe the behaviour the case is about."""
+    """O runner não conseguiu observar o comportamento sobre o qual o caso é."""
 
 
 def catalog():
@@ -103,7 +103,7 @@ def catalog():
 
 
 def redact(text, extra=()):
-    """Strip home paths, session identifiers and anything shaped like a credential."""
+    """Remove caminhos de home, identificadores de sessão e qualquer coisa com forma de credencial."""
     text = str(text)
     for path in [str(item) for item in extra] + [str(Path.home()), tempfile.gettempdir()]:
         if path and path != "/":
@@ -135,11 +135,11 @@ def client_version(command):
 
 
 def keychain(home, host=None):
-    """Give a disposable home its own default keychain on macOS; a no-op elsewhere.
+    """Dá a um home descartável seu próprio keychain padrão no macOS; é um no-op em outro lugar.
 
-    macOS resolves the default keychain under `HOME`, and a client that stores an item with none
-    there raises a system dialog on every launch. A throwaway keychain at the default path keeps
-    the store silent and away from the operator's login keychain.
+    O macOS resolve o keychain padrão sob `HOME`, e um cliente que guarda um item sem nenhum ali
+    levanta um diálogo de sistema a cada lançamento. Um keychain descartável no caminho padrão
+    mantém o armazenamento silencioso e longe do keychain de login do operador.
     """
     if (host or platform.system()) != "Darwin":
         return None

@@ -1,8 +1,8 @@
-"""Registering the observation entry point, and the bare-arm install that carries only it (AD-23).
+"""Registro do ponto de entrada de observação, e a instalação do braço nu que carrega só ele (AD-23).
 
-The recorder itself is `harness_core.observer`. Its registration reads which events each runtime
-raises from `lifecycle.EVENTS`, the one declaration `hook.py` is registered from too, so the two
-entry points cannot disagree on events. Nothing here routes through the dispatcher.
+O registrador em si é `harness_core.observer`. Seu registro lê quais eventos cada runtime dispara
+a partir de `lifecycle.EVENTS`, a mesma declaração da qual `hook.py` também é registrado, então os
+dois pontos de entrada não podem discordar sobre eventos. Nada aqui roteia através do dispatcher.
 """
 import json
 import shlex
@@ -13,7 +13,7 @@ from harness_core import lifecycle, observer
 
 MARKER = "# harness:observe-"
 TIMEOUT = 5
-# The runtime file each bare install writes its registration into.
+# O arquivo de runtime no qual cada instalação nua escreve seu registro.
 SETTINGS_FILE = {"claude-code": "settings.json", "codex": "hooks.json"}
 ENTRY = "observe.py"
 
@@ -29,7 +29,7 @@ def hooks_for(command, runtime):
 
 
 def registration(root, runtime):
-    """The hooks block that registers `adapters/<runtime>/observe.py` for every event it raises."""
+    """O bloco de hooks que registra `adapters/<runtime>/observe.py` para cada evento que dispara."""
     if runtime not in SETTINGS_FILE:
         raise ValueError("unknown runtime")
     script = Path(root) / "adapters" / runtime / "observe.py"

@@ -901,9 +901,9 @@ def _dispatch(runtime, payload):
                 contexts.append(feed)
         return {"hookSpecificOutput": {"hookEventName": kind, "additionalContext": "\n".join(contexts)}} if any(contexts) else {}
     if kind in FEED_EVENTS:
-        # A feed never denies, never blocks and never speaks for another policy, so it answers
-        # its own two events alone. The approvals recorder speaks for nothing either: it only
-        # keeps the `approve <code>` replies in the user's prompt.
+        # Um feed nunca nega, nunca bloqueia e nunca fala por outra política, então responde
+        # apenas por seus próprios dois eventos. O registrador de aprovações também não fala por
+        # nada: só guarda as respostas `approve <code>` no prompt do usuário.
         if runtime != "claude-code":
             return {}
         if kind == "UserPromptSubmit":
@@ -914,10 +914,10 @@ def _dispatch(runtime, payload):
     if kind == "Stop":
         return invoke("stop-gate", event)
     if kind == "SessionEnd":
-        # Nothing will arrive for this session again, so an ask with no PostToolUse is settled:
-        # the command did not run. Done before the usage worker is spawned, and bounded by the
-        # session's own rows, so the 1.5-second SessionEnd budget pays for one read of a file
-        # that only a permission prompt writes to.
+        # Nada mais vai chegar para esta sessão, então um ask sem PostToolUse está decidido: o
+        # comando não rodou. Feito antes do worker de uso ser disparado, e limitado pelas
+        # próprias linhas da sessão, então o orçamento de 1,5 segundo do SessionEnd paga por uma
+        # única leitura de um arquivo em que só um prompt de permissão escreve.
         log = decisions()
         if log is not None:
             log.close_session(event.get("session_id") or "")

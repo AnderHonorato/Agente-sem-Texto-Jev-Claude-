@@ -460,7 +460,7 @@ def git_ok(args):
 
 
 def strip_redirects(tokens):
-    """Tokens with safe redirections removed; None when any redirection writes a file."""
+    """Tokens com redirecionamentos seguros removidos; None quando algum redirecionamento escreve um arquivo."""
     cleaned = []
     i = 0
     while i < len(tokens):
@@ -477,19 +477,19 @@ def strip_redirects(tokens):
         elif WRITE_REDIRECTS.match(t) and target == "/dev/null":
             i += 2
         else:
-            return None  # a file is written, or an operator this hook does not model
+            return None  # um arquivo é escrito, ou um operador que este hook não modela
     return cleaned
 
 
 def segment_ok(tokens):
-    """True when a single simple command (already free of substitutions and of the
-    structural keywords) is read-only."""
+    """True quando um único comando simples (já livre de substituições e das
+    palavras-chave estruturais) é somente leitura."""
     tokens = strip_redirects(tokens)
     if not tokens:
         return False
-    # Strip leading assignments (LANG=C, S=/path, NAME=value cmd ...). A segment
-    # that is nothing but assignments runs no command, so it is read-only — unless
-    # the variable steers a command that runs later in the same call.
+    # Remove atribuições iniciais (LANG=C, S=/path, NAME=value cmd ...). Um segmento
+    # que é só atribuições não roda comando nenhum, então é somente leitura — a menos que
+    # a variável direcione um comando que roda depois na mesma chamada.
     while tokens and ASSIGN_RE.match(tokens[0]):
         if not assignment_ok(tokens[0]):
             return False
@@ -498,12 +498,12 @@ def segment_ok(tokens):
         return True
     for t in tokens:
         if "$(" in t or "`" in t or "<(" in t or ">(" in t:
-            return False  # an unextracted substitution: fail closed
+            return False  # uma substituição não extraída: falha fechado
     head = tokens[0]
     if "/" in head:
         base, _, prog = head.rpartition("/")
         if base not in SAFE_BIN_DIRS:
-            return False  # a relative path, or a binary outside the system directories
+            return False  # um caminho relativo, ou um binário fora dos diretórios do sistema
     else:
         prog = head
     args = tokens[1:]
@@ -535,7 +535,7 @@ def segment_ok(tokens):
         if prog == "sysctl" and any("=" in a for a in args):
             return False
         if prog == "date" and any(not a.startswith("+") for a in positionals(args)):
-            return False  # a bare MMDDhhmm operand sets the clock
+            return False  # um operando MMDDhhmm puro ajusta o relógio
         return True
     if prog == "awk":
         return not any(AWK_FORBIDDEN.search(a) for a in args)
@@ -554,7 +554,7 @@ def segment_ok(tokens):
 
 
 def _match_paren(s, start):
-    """s[start] == '('. Return the index of the matching ')', or None. Quote-aware."""
+    """s[start] == '('. Retorna o índice do ')' correspondente, ou None. Ciente de aspas."""
     depth = 0
     i = start
     n = len(s)
@@ -589,10 +589,10 @@ def _match_paren(s, start):
 
 
 def _strip_subs(cmd, depth):
-    """Replace every command/process/arithmetic substitution in `cmd` with a
-    placeholder, verifying each command substitution is itself read-only. Returns
-    the rewritten string, or None if any substitution is not read-only or the text
-    does not parse."""
+    """Substitui toda substituição de comando/processo/aritmética em `cmd` por um
+    placeholder, verificando se cada substituição de comando é em si somente leitura. Retorna
+    a string reescrita, ou None se alguma substituição não for somente leitura ou o texto
+    não parsear."""
     out = []
     i = 0
     n = len(cmd)

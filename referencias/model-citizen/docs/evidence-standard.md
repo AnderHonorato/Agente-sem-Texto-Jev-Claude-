@@ -1,213 +1,234 @@
-# Evidence standard for published results
+# Padrão de evidência para resultados publicados
 
-A published result is a claim about what the harness does, measured against Claude Code with no
-harness at all. This page lists the twelve things every published proof set carries, and for each
-one what satisfies it. A proof set that misses an item makes no claim on that item's ground. An item
-that genuinely does not apply is marked not applicable with its reason; a blank is a miss.
+Um resultado publicado é uma alegação sobre o que o harness faz, medida contra o Claude Code sem
+harness nenhum. Esta página lista as doze coisas que todo conjunto de prova publicado carrega, e
+para cada uma o que a satisfaz. Um conjunto de prova que perde um item não faz nenhuma alegação
+sobre o terreno desse item. Um item que genuinamente não se aplica é marcado como não aplicável
+com seu motivo; um espaço em branco é uma falta.
 
-The cost comparison is defined by SM-2 in the product requirements. Where SM-2 defines a term, this
-page quotes it rather than restating it, and the quotation governs. The replay that produces the rows
-is described in [cost benchmarks](benchmarks.md). Individual spikes follow the lighter record in
-[spikes](spikes/README.md); this standard is for results that are published as claims.
+A comparação de custo é definida por SM-2 nos requisitos de produto. Onde SM-2 define um termo,
+esta página o cita em vez de reafirmá-lo, e a citação vale. A reprodução que produz as linhas está
+descrita em [benchmarks de custo](benchmarks.md). Spikes individuais seguem o registro mais leve em
+[spikes](spikes/README.md); este padrão é para resultados publicados como alegações.
 
-## How a proof set is checked
+## Como um conjunto de prova é verificado
 
-- Every item below is present, or marked not applicable with a reason this page allows.
-- The pre-registration (item 1) was committed before the first trial, and the history shows it.
-- Every published figure can be re-derived from the proof set's own rows without calling a model.
+- Todo item abaixo está presente, ou marcado como não aplicável com um motivo que esta página
+  permite.
+- O pré-registro (item 1) foi commitado antes do primeiro trial, e o histórico mostra isso.
+- Todo número publicado pode ser rederivado das próprias linhas do conjunto de prova sem chamar um
+  modelo.
 
-A verifier that checks these mechanically is planned for proof set 1 (#799). Until it ships, the
-check is done by a reviewer against this page.
+Um verificador que checa isso mecanicamente está planejado para o conjunto de prova 1 (#799). Até
+que seja lançado, a verificação é feita por um revisor contra esta página.
 
-## The twelve items
+## Os doze itens
 
-### 1. A pre-registered plan
+### 1. Um plano pré-registrado
 
-**What it is:** hypotheses, primary metric, guardrails, sample size, stopping rule and multiplicity,
-written down before the run.
+**O que é:** hipóteses, métrica primária, salvaguardas, tamanho de amostra, regra de parada e
+multiplicidade, escritos antes da execução.
 
-**Satisfied by:** a filled copy of the [pre-registration template](pre-registration-template.md),
-committed to this repository before the first trial of the run it governs. Every section of the
-template has content or an explicit "none" with a reason. The order is checkable: the committer date
-of the commit that adds the filled plan precedes the start time of the earliest trial in the proof
-set's rows, and that commit is an ancestor of the commit the run was taken at. Those two checks order
-the commits, but whoever commits sets the committer date, so they do not prove the plan was public
-before the run. Merge the plan's pull request before the first trial: the check also compares the
-merge time GitHub records for that pull request with the start of the earliest trial. An edit after
-the first trial does not change the plan; it is an appended, dated entry in the plan's deviation log,
-and the published result lists every deviation.
+**Satisfeito por:** uma cópia preenchida do [modelo de pré-registro](pre-registration-template.md),
+commitada neste repositório antes do primeiro trial da execução que governa. Toda seção do modelo
+tem conteúdo ou um "none" explícito com um motivo. A ordem é verificável: a data de committer do
+commit que adiciona o plano preenchido precede o horário de início do trial mais antigo nas linhas
+do conjunto de prova, e esse commit é ancestral do commit em que a execução foi feita. Essas duas
+verificações ordenam os commits, mas quem faz o commit define a data de committer, então elas não
+provam que o plano era público antes da execução. Faça o merge do pull request do plano antes do
+primeiro trial: a verificação também compara o horário de merge que o GitHub registra para esse
+pull request com o início do trial mais antigo. Uma edição depois do primeiro trial não muda o
+plano; é uma entrada anexada e datada no registro de desvios do plano, e o resultado publicado
+lista todo desvio.
 
-SM-2 fixes the defaults the plan starts from. Its hypothesis:
+SM-2 fixa os padrões dos quais o plano parte. Sua hipótese:
 
-> **Pre-registered hypothesis:** the harness lowers Cost-of-Pass against bare, with an expected ratio of
-> 0.85, and does not lower the pass rate by more than the non-inferiority margin δ. δ is fixed at 0.125,
-> one task's share of the original eight-task set, and does not shrink as the set grows.
+> **Hipótese pré-registrada:** o harness reduz o Custo-por-Aprovação (Cost-of-Pass) em relação ao
+> nu, com uma razão esperada de 0,85, e não reduz a taxa de aprovação em mais que a margem de
+> não-inferioridade δ. δ é fixada em 0,125, a fração de uma tarefa do conjunto original de oito
+> tarefas, e não encolhe conforme o conjunto cresce.
 
-Its power statement, which the sample-size section of the plan answers:
+Sua afirmação de poder, que a seção de tamanho de amostra do plano responde:
 
-> **Power:** five or more trials per task and arm, and α 0.05 two-sided. The task set and the trial
-> count are sized for a joint power of 0.8 on both tests of the decision rule, assuming a true ratio of
-> 0.85 and equal pass rates. The minimum detectable effect is stated before the run and is at most 15%.
-> The set includes long multi-turn tasks.
+> **Poder:** cinco ou mais trials por tarefa e braço, e α 0,05 bicaudal. O conjunto de tarefas e a
+> contagem de trials são dimensionados para um poder conjunto de 0,8 nos dois testes da regra de
+> decisão, assumindo uma razão verdadeira de 0,85 e taxas de aprovação iguais. O efeito mínimo
+> detectável é declarado antes da execução e é no máximo 15%. O conjunto inclui tarefas longas de
+> múltiplos turnos.
 
-Its decision rule:
+Sua regra de decisão:
 
-> **Decision rule:** the hypothesis is supported only when both conditions hold:
-> - the paired, task-clustered 95% interval on the Cost-of-Pass ratio lies wholly below 1.0;
-> - pass-rate non-inferiority holds: the lower bound of the paired, task-clustered 95% interval on the
->   pass-rate difference (harness minus bare) is above −δ.
+> **Regra de decisão:** a hipótese é sustentada apenas quando ambas as condições valem:
+> - o intervalo pareado de 95%, agrupado por tarefa, sobre a razão de Custo-por-Aprovação fica
+>   inteiramente abaixo de 1,0;
+> - a não-inferioridade da taxa de aprovação se sustenta: o limite inferior do intervalo pareado de
+>   95%, agrupado por tarefa, sobre a diferença de taxa de aprovação (harness menos nu) está acima
+>   de −δ.
 
-The two conditions are one joint test, since both must hold, so they need no correction for
-multiplicity. Any further test that could support a claim, such as the long-task subset or a
-per-module figure, is named in the plan with its correction, or is labelled exploratory and supports
-no claim.
+As duas condições são um único teste conjunto, já que ambas precisam valer, então não exigem
+correção para multiplicidade. Qualquer teste adicional que possa sustentar uma alegação, como o
+subconjunto de tarefas longas ou um número por módulo, é nomeado no plano com sua correção, ou é
+rotulado exploratório e não sustenta nenhuma alegação.
 
-### 2. A frozen task set with a reference solution per task
+### 2. Um conjunto de tarefas congelado com uma solução de referência por tarefa
 
-**What it is:** the tasks are fixed before the run, each has a solution known to pass, and the set is
-audited for task validity and outcome validity.
+**O que é:** as tarefas são fixadas antes da execução, cada uma tem uma solução conhecida como
+aprovada, e o conjunto é auditado por validade de tarefa e validade de resultado.
 
-**Satisfied by:** a task manifest pinned by commit, which the plan names. In this repository that is
-`benchmarks/tasks.json`, where each task names the commit it starts from and a `good_sha` that solves
-it. Every task passes three audits, recorded in the proof set:
+**Satisfeito por:** um manifesto de tarefas fixado por commit, que o plano nomeia. Neste
+repositório é `benchmarks/tasks.json`, onde cada tarefa nomeia o commit de onde parte e um
+`good_sha` que a resolve. Toda tarefa passa por três auditorias, registradas no conjunto de prova:
 
-- **Task validity:** the prompt is enough to do the task, and the reference solution is reachable
-  from the starting commit with the tools and access both arms have.
-- **Outcome validity:** the hidden check passes on the reference solution and fails on the unchanged
-  starting commit. `python3 scripts/cost_bench.py replay --verify-tasks` proves both for every task
-  without calling a model.
-- **No change after the plan:** the manifest the run used is byte-identical to the one the plan pinned.
+- **Validade de tarefa:** o prompt é suficiente para fazer a tarefa, e a solução de referência é
+  alcançável a partir do commit de início com as ferramentas e o acesso que os dois braços têm.
+- **Validade de resultado:** a verificação oculta passa na solução de referência e falha no commit
+  de início inalterado. `python3 scripts/cost_bench.py replay --verify-tasks` prova as duas para
+  toda tarefa sem chamar um modelo.
+- **Nenhuma mudança depois do plano:** o manifesto que a execução usou é idêntico byte a byte ao
+  que o plano fixou.
 
-### 3. Pinned model, CLI, effort, date, container, seeds and fallback rate
+### 3. Modelo, CLI, esforço, data, container, sementes e taxa de fallback fixados
 
-**What it is:** everything that would change the result if it drifted.
+**O que é:** tudo que mudaria o resultado se se desviasse.
 
-**Satisfied by:** per trial, the exact model ID (never an alias), the CLI version, the effort setting,
-the date and time the trial started, the container image digest, and every seed the harness controls,
-such as task order and the bootstrap. Model sampling is not seedable, so the record says so rather than
-implying it is. The fallback rate is the share of trials that ran on a model other than the pinned one,
-read from each trial's own transcript; those trials stay in the rows and are counted, never dropped.
-A run without a container states that, and names the machine, the operating system and the sandbox
-settings instead.
+**Satisfeito por:** por trial, o ID exato do modelo (nunca um alias), a versão da CLI, a
+configuração de esforço, a data e hora em que o trial começou, o digest da imagem do container, e
+toda semente que o harness controla, como ordem de tarefa e o bootstrap. A amostragem de modelo não
+é semeável (seedable), então o registro diz isso em vez de sugerir o contrário. A taxa de fallback
+é a fração de trials que rodaram em um modelo diferente do fixado, lida da própria transcrição de
+cada trial; esses trials permanecem nas linhas e são contados, nunca descartados. Uma execução sem
+container declara isso, e nomeia a máquina, o sistema operacional e as configurações de sandbox em
+vez disso.
 
-### 4. A dated price table
+### 4. Uma tabela de preços datada
 
-**What it is:** the prices every cost figure was computed with.
+**O que é:** os preços com que todo número de custo foi calculado.
 
-**Satisfied by:** a table in the proof set with the price per million tokens for input, output, cache
-writes and cache reads, per model, with the date it was read and the page it was read from. Cost
-figures are computed from token counts and this table, so a later price change is a re-derivation, not
-a rewrite of the rows.
+**Satisfeito por:** uma tabela no conjunto de prova com o preço por milhão de tokens para entrada,
+saída, escritas de cache e leituras de cache, por modelo, com a data em que foi lida e a página de
+onde foi lida. Números de custo são calculados a partir de contagens de token e desta tabela, então
+uma mudança de preço posterior é uma rederivação, não uma reescrita das linhas.
 
-### 5. Paired per-task results with intervals and the intra-cluster correlation
+### 5. Resultados pareados por tarefa com intervalos e a correlação intra-cluster
 
-**What it is:** every task's figures for both arms side by side, the headline intervals, and how
-strongly trials of the same task agree.
+**O que é:** os números de toda tarefa para os dois braços lado a lado, os intervalos principais, e
+o quão fortemente os trials da mesma tarefa concordam.
 
-**Satisfied by:** a row per task and arm with its trials, passes and cost, and the headline intervals
-SM-2 defines:
+**Satisfeito por:** uma linha por tarefa e braço com seus trials, aprovações e custo, e os
+intervalos principais que SM-2 define:
 
-> The paired, task-clustered 95% intervals on the Cost-of-Pass ratio and on the pass-rate difference
-> govern the comparison. They come from a task-clustered paired bootstrap, which resamples tasks and
-> keeps both arms' trials of a task together, or from the delta method.
+> Os intervalos pareados de 95%, agrupados por tarefa, sobre a razão de Custo-por-Aprovação e sobre
+> a diferença de taxa de aprovação governam a comparação. Eles vêm de um bootstrap pareado
+> agrupado por tarefa, que reamostra tarefas e mantém os trials dos dois braços de uma tarefa
+> juntos, ou do método delta.
 
-> Wilson or Bayesian intervals describe each arm's own pass rate. They are descriptive only, as are
-> the per-task figures reported beside the headline.
+> Intervalos de Wilson ou bayesianos descrevem a própria taxa de aprovação de cada braço. São
+> apenas descritivos, assim como os números por tarefa relatados ao lado do principal.
 
-The intra-cluster correlation of pass and of cost within a task is reported beside them, with the
-design effect it implies, `1 + (m − 1) × ICC` for `m` trials per task, so a reader can see how much
-the trials per task added.
+A correlação intra-cluster de aprovação e de custo dentro de uma tarefa é relatada ao lado deles,
+com o efeito de design que ela implica, `1 + (m − 1) × ICC` para `m` trials por tarefa, para que um
+leitor veja o quanto os trials por tarefa acrescentaram.
 
-### 6. A cost-effectiveness view
+### 6. Uma visão de custo-efetividade
 
-**What it is:** cost and pass rate shown together, so a cheaper arm that passes less is visible as
-such.
+**O que é:** custo e taxa de aprovação mostrados juntos, para que um braço mais barato que aprova
+menos seja visível como tal.
 
-**Satisfied by:** a chart or table placing each arm, and each configuration when there are more than
-two, by pass rate against mean cost per attempt, with the Pareto frontier marked and any dominated
-configuration named. The ratio it sits beside is SM-2's:
+**Satisfeito por:** um gráfico ou tabela posicionando cada braço, e cada configuração quando há
+mais de duas, por taxa de aprovação contra custo médio por tentativa, com a fronteira de Pareto
+marcada e qualquer configuração dominada nomeada. A razão ao lado da qual isso se posiciona é a de
+SM-2:
 
-> Each arm's Cost-of-Pass pools the set: the total cost of every attempt divided by the total number
-> of passes. The ratio divides the harness figure by bare's. If either arm passes nothing, the ratio
-> is undefined and the result is reported as a pass-rate result only.
+> O Custo-por-Aprovação de cada braço agrupa o conjunto: o custo total de cada tentativa dividido
+> pelo número total de aprovações. A razão divide o número do harness pelo do nu. Se qualquer um
+> dos braços não aprovar nada, a razão é indefinida e o resultado é relatado apenas como resultado
+> de taxa de aprovação.
 
-### 7. Trajectories and a command that reproduces the run
+### 7. Trajetórias e um comando que reproduz a execução
 
-**What it is:** what each agent actually did, and a way to do it again.
+**O que é:** o que cada agente de fato fez, e uma forma de fazer de novo.
 
-**Satisfied by:** every trial's transcript in the proof set, failed, timed-out and fallback trials
-included, redacted of credentials and personal paths but not shortened. One stated command re-runs
-the whole schedule from the pinned commit and manifest, and one re-derives every published figure from
-the rows without calling a model.
+**Satisfeito por:** a transcrição de todo trial no conjunto de prova, trials falhos, com timeout e
+de fallback incluídos, com credenciais e caminhos pessoais redigidos mas não encurtados. Um comando
+declarado reexecuta todo o cronograma a partir do commit e manifesto fixados, e um rederiva todo
+número publicado a partir das linhas sem chamar um modelo.
 
-### 8. Judge agreement
+### 8. Concordância de juiz
 
-**What it is:** evidence that any judged outcome is judged the way a person would judge it.
+**O que é:** evidência de que qualquer resultado julgado é julgado da forma que uma pessoa
+julgaria.
 
-**Satisfied by:** for every outcome decided by a model or a person rather than a deterministic check,
-Cohen's κ against hand labels on a sample the plan sized, the confusion matrix, and bias audits for
-position or order, length, arm identity (the judge cannot tell which arm produced the output) and
-self-preference (a judge from the same model family as an arm). When every outcome is a deterministic
-check, as the replay's hidden checks are, the item is marked not applicable with that reason.
+**Satisfeito por:** para todo resultado decidido por um modelo ou uma pessoa em vez de uma
+verificação determinística, o κ de Cohen contra rótulos manuais em uma amostra que o plano
+dimensionou, a matriz de confusão, e auditorias de viés para posição ou ordem, extensão, identidade
+de braço (o juiz não consegue dizer qual braço produziu a saída) e autopreferência (um juiz da
+mesma família de modelo que um braço). Quando todo resultado é uma verificação determinística, como
+são as verificações ocultas da reprodução, o item é marcado como não aplicável com esse motivo.
 
-### 9. A contamination check
+### 9. Uma verificação de contaminação
 
-**What it is:** evidence that neither arm could see the answer, and that the two arms had the same
-access.
+**O que é:** evidência de que nenhum dos braços conseguiu ver a resposta, e de que os dois braços
+tinham o mesmo acesso.
 
-**Satisfied by:** a record that the reference solutions were unreachable from inside a trial (no
-later history in the checkout, no network path to the solution), that both arms had identical web
-and network access, and the task dates beside the model's stated training cutoff. SM-2 records why
-this item exists:
+**Satisfeito por:** um registro de que as soluções de referência eram inalcançáveis de dentro de um
+trial (nenhum histórico posterior no checkout, nenhum caminho de rede para a solução), de que os
+dois braços tinham acesso idêntico à web e à rede, e as datas das tarefas ao lado da data de corte
+de treinamento declarada do modelo. SM-2 registra por que este item existe:
 
-> The 23 Sep eight-task runs were unscored and ran with unequal web access between the arms, so they
-> are not a result.
+> As execuções de oito tarefas de 23 de setembro não foram pontuadas e rodaram com acesso à web
+> desigual entre os braços, então não são um resultado.
 
-### 10. Estimand labels
+### 10. Rótulos de estimando (estimand)
 
-**What it is:** each figure says which effect it estimates.
+**O que é:** cada número diz qual efeito estima.
 
-**Satisfied by:** a label on every published figure:
+**Satisfeito por:** um rótulo em todo número publicado:
 
-- **Intention to treat:** every trial as assigned, including crashes, timeouts and fallbacks. This is
-  the headline.
-- **Adherence:** only trials in which the treatment actually happened, such as the mechanism under
-  test firing. SM-4 governs credit: "No saving is credited to a mechanism unless the ledger rows show
-  it fired."
-- **Complier effect:** the effect among trials where the mechanism would fire, estimated from
-  assignment rather than by selecting those trials after the fact.
-- **Hypothetical:** any figure that is computed rather than measured, such as a what-if price or a
-  projected subset, is marked hypothetical where it appears.
+- **Intenção de tratar (intention to treat):** todo trial como atribuído, incluindo travamentos,
+  timeouts e fallbacks. Este é o principal.
+- **Adesão (adherence):** apenas trials em que o tratamento de fato aconteceu, como o mecanismo sob
+  teste disparando. SM-4 governa o crédito: "Nenhuma economia é creditada a um mecanismo a menos
+  que as linhas do ledger mostrem que ele disparou."
+- **Efeito do cumpridor (complier effect):** o efeito entre trials onde o mecanismo dispararia,
+  estimado a partir da atribuição em vez de selecionar esses trials depois do fato.
+- **Hipotético:** qualquer número que é calculado em vez de medido, como um preço hipotético ou um
+  subconjunto projetado, é marcado como hipotético onde aparece.
 
-### 11. Field checks
+### 11. Verificações de campo
 
-**What it is:** checks that matter once a comparison runs on real sessions rather than a replay.
+**O que é:** verificações que importam quando uma comparação roda em sessões reais em vez de uma
+reprodução.
 
-**Satisfied by:**
+**Satisfeito por:**
 
-- **Sample ratio:** the observed count per arm is tested against the assigned split, and a mismatch
-  at p below 0.001 stops the analysis until it is explained. A replay applies this to planned against
-  completed trials per arm.
-- **Novelty:** the effect is reported by exposure period, so an early effect that fades is visible.
-- **CUPED:** when a pre-period covariate is used to reduce variance, the adjusted and the raw figures
-  are both reported, and the covariate is named in the plan.
-- **Dilution:** the share of sessions the treatment could not have affected is reported, with the
-  effect both across all sessions and across the triggered ones.
+- **Razão de amostra:** a contagem observada por braço é testada contra a divisão atribuída, e uma
+  discrepância com p abaixo de 0,001 interrompe a análise até que seja explicada. Uma reprodução
+  aplica isso a trials planejados contra completados por braço.
+- **Novidade:** o efeito é relatado por período de exposição, para que um efeito precoce que
+  desaparece seja visível.
+- **CUPED:** quando uma covariável de pré-período é usada para reduzir variância, tanto o número
+  ajustado quanto o bruto são relatados, e a covariável é nomeada no plano.
+- **Diluição:** a fração de sessões que o tratamento não poderia ter afetado é relatada, com o
+  efeito tanto através de todas as sessões quanto através das disparadas.
 
-A replay-only proof set marks novelty, CUPED and dilution not applicable, with that reason.
+Um conjunto de prova só de reprodução marca novidade, CUPED e diluição como não aplicáveis, com
+esse motivo.
 
-### 12. What we do not claim
+### 12. O que não alegamos
 
-**What it is:** a section in the published result that names the claims its data does not support.
+**O que é:** uma seção no resultado publicado que nomeia as alegações que seus dados não sustentam.
 
-**Satisfied by:** a section headed "What we do not claim" that at least names the models, runtimes,
-task kinds and magnitudes the result does not cover, every mechanism that is not credited, and the
-outcome of SM-2's stop condition when it applies. SM-2 bounds the magnitude:
+**Satisfeito por:** uma seção cabeçalhada "O que não alegamos" que ao menos nomeia os modelos,
+runtimes, tipos de tarefa e magnitudes que o resultado não cobre, todo mecanismo que não é
+creditado, e o resultado da condição de parada de SM-2 quando ela se aplica. SM-2 limita a
+magnitude:
 
-> The result is published with its intervals, whatever it shows. A magnitude is claimed only as far as
-> the interval supports it: "at least 15% cheaper" needs the interval's upper bound at or below 0.85.
+> O resultado é publicado com seus intervalos, seja lá o que mostrar. Uma magnitude só é alegada na
+> medida em que o intervalo a sustenta: "pelo menos 15% mais barato" precisa que o limite superior
+> do intervalo esteja em 0,85 ou abaixo.
 
-## Sources
+## Fontes
 
-SM-2, SM-4 and NFR-15 in the product requirements, and the sources SM-2 cites for Cost-of-Pass,
-clustered and paired intervals, the delta method and small-sample pass-rate intervals.
+SM-2, SM-4 e NFR-15 nos requisitos de produto, e as fontes que SM-2 cita para Custo-por-Aprovação,
+intervalos pareados e agrupados, o método delta e intervalos de taxa de aprovação para amostras
+pequenas.

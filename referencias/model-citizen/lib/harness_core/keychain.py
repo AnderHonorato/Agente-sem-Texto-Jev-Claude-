@@ -1,9 +1,9 @@
-"""The default keychain of a home other than the operator's, on macOS.
+"""O keychain padrão de uma home diferente da do operador, no macOS.
 
-macOS resolves the default keychain under `HOME`. A native client launched in a home without one
-raises a system dialog — "A keychain cannot be found" — whose default button resets the operator's
-keychain settings. Every place that launches a client under a substituted `HOME` goes through this
-module: `provision` before a launch it intends, `missing` before one it can skip.
+O macOS resolve o keychain padrão sob `HOME`. Um cliente nativo lançado numa home sem um levanta
+um diálogo de sistema — "A keychain cannot be found" — cujo botão padrão reseta as configurações
+de keychain do operador. Todo lugar que lança um cliente sob um `HOME` substituído passa por este
+módulo: `provision` antes de um lançamento pretendido, `missing` antes de um que pode ser pulado.
 """
 import os
 import platform
@@ -16,17 +16,18 @@ def default_path(home):
 
 
 def missing(home=None, host=None):
-    """Whether a client launched under `home` would find no default keychain. False off macOS."""
+    """Se um cliente lançado sob `home` não encontraria keychain padrão nenhum. False fora do macOS."""
     if (host or platform.system()) != "Darwin":
         return False
     return not default_path(home or os.environ.get("HOME") or Path.home()).exists()
 
 
 def provision(home, host=None):
-    """Give `home` its own throwaway default keychain; a no-op off macOS or when one exists.
+    """Dá a `home` um keychain padrão descartável próprio; um no-op fora do macOS ou quando um já existe.
 
-    The keychain has an empty password and no lock timeout, so a store succeeds silently and never
-    touches the operator's login keychain. Raises `OSError` when it cannot be created.
+    O keychain tem senha vazia e nenhum timeout de bloqueio, então um armazenamento é bem-sucedido
+    silenciosamente e nunca toca o keychain de login do operador. Levanta `OSError` quando não
+    consegue ser criado.
     """
     if not missing(home, host):
         return None

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the harness filesystem lifecycle against the immutable release baseline."""
+"""Exercita o ciclo de vida do sistema de arquivos do harness contra a linha de base de lançamento imutável."""
 import argparse
 import hashlib
 import json
@@ -42,12 +42,12 @@ def git(root, *args):
 def archive_baseline(root, destination, data):
     commit = git(root, "rev-parse", data["tag"] + "^{commit}")
     if commit != data["commit"]:
-        raise ValueError("baseline tag does not resolve to its pinned commit")
+        raise ValueError("a tag da linha de base não resolve para seu commit fixado")
     result = command("git", "-C", str(root), "archive", "--format=tar",
                      "--prefix=" + data["archive"]["prefix"], data["tag"], binary=True)
     digest = hashlib.sha256(result.stdout).hexdigest()
     if digest != data["archive"]["sha256"]:
-        raise ValueError("baseline source archive digest does not match the pin")
+        raise ValueError("o digest do arquivo de origem da linha de base não combina com o fixado")
     destination.write_bytes(result.stdout)
 
 
@@ -58,7 +58,7 @@ def harness(checkout, home, python, *args, expected=0):
     result = command(python, str(checkout / "bin" / "harness"), *args,
                      cwd=checkout, check=False, env=env)
     if result.returncode != expected:
-        raise AssertionError("harness %s returned %s, expected %s:\n%s" %
+        raise AssertionError("harness %s retornou %s, esperado %s:\n%s" %
                              (" ".join(args), result.returncode, expected,
                               (result.stdout + result.stderr).strip()))
     return result.stdout + result.stderr
@@ -110,13 +110,13 @@ def assert_preserved(home):
     claude = json.loads((home / ".claude" / "settings.json").read_text())
     allowed = claude.get("permissions", {}).get("allow", [])
     if claude.get("theme") != "fixture" or "WebFetch(domain:example.invalid)" not in allowed:
-        raise AssertionError("unrelated Claude configuration changed")
+        raise AssertionError("configuração do Claude não relacionada mudou")
     codex = (home / ".codex" / "config.toml").read_text()
     if 'model = "fixture-model"' not in codex or 'theme = "dark"' not in codex:
-        raise AssertionError("unrelated Codex configuration changed")
+        raise AssertionError("configuração do Codex não relacionada mudou")
     hooks = json.loads((home / ".codex" / "hooks.json").read_text())
     if hooks.get("unrelated") != "keep":
-        raise AssertionError("unrelated Codex hooks configuration changed")
+        raise AssertionError("configuração de hooks do Codex não relacionada mudou")
 
 
 def clean_install(checkout, python, home):
@@ -126,7 +126,7 @@ def clean_install(checkout, python, home):
     first = snapshot(home)
     harness(checkout, home, python, "sync")
     if first != snapshot(home):
-        raise AssertionError("second sync changed effective installed state")
+        raise AssertionError("um segundo sync mudou o estado instalado efetivo")
     harness(checkout, home, python, "uninstall")
     assert_preserved(home)
 
@@ -141,7 +141,7 @@ def upgrade_and_rollback(baseline_checkout, candidate, python, home):
     harness(candidate, home, python, "uninstall")
     harness(baseline_checkout, home, python, "sync")
     if baseline_state != snapshot(home):
-        raise AssertionError("rollback did not restore the baseline effective state")
+        raise AssertionError("o rollback não restaurou o estado efetivo da linha de base")
     harness(baseline_checkout, home, python, "uninstall")
     assert_preserved(home)
 
@@ -153,16 +153,16 @@ def conflict_preservation(checkout, python, home):
     target.write_text("user edit\n")
     output = harness(checkout, home, python, "sync", expected=2)
     if str(target) not in output or "generated content changed" not in output:
-        raise AssertionError("conflict diagnostic did not identify its path and source")
+        raise AssertionError("o diagnóstico de conflito não identificou seu caminho e origem")
     output = harness(checkout, home, python, "uninstall", expected=2)
     if str(target) not in output or target.read_text() != "user edit\n":
-        raise AssertionError("uninstall did not preserve and report the user conflict")
+        raise AssertionError("a desinstalação não preservou e relatou o conflito do usuário")
     assert_preserved(home)
 
 
 def run(root=ROOT, python=sys.executable):
     if git(root, "status", "--porcelain"):
-        raise ValueError("candidate checkout must be clean")
+        raise ValueError("o checkout candidato precisa estar limpo")
     candidate_commit = git(root, "rev-parse", "HEAD")
     data = baseline(root)
     with tempfile.TemporaryDirectory() as temp:

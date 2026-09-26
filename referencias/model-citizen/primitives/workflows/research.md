@@ -5,33 +5,36 @@ argument-hint: <question>
 
 # Research
 
-The question: {{arguments}}
+A pergunta: {{arguments}}
 
-Load the `transcript-hygiene` and `api-verification` skills in full before you spawn anything.
-They carry the return caps and the shared search budget this command depends on.
+Carregue as skills `transcript-hygiene` e `api-verification` por completo antes de gerar
+qualquer coisa. Elas carregam os tetos de retorno e o orçamento de busca compartilhado do qual
+este comando depende.
 
-1. **Split the question into at most three independent dimensions.** Independent means one
-   gatherer's answer never changes another's brief. Fewer is better. If the question is one
-   dependent chain, answer it inline and spawn nothing.
-2. **Route each dimension by where its evidence lives.** A dimension answered from files or a
-   repository goes to an isolated `gatherer` worker — `citizen role run gatherer --workspace
-   <repo> --prompt-file <brief>` — which is offline by design and holds only `Read`, `Grep` and
-   `Glob`; grant extra input directories with `--read-dir`. A dimension that needs the live web
-   goes to an in-session band worker instead (`worker-a` for one search or one fetch, `worker-b`
-   when the finding has to be weighed), spawned in parallel in a single message. Never hand a
-   web dimension to a `gatherer`: it has no web tools and will return the brief unstarted.
-   Every brief, either way, names the exact question for that dimension, the files or sources to
-   start from, a 400-word return cap, the rule that detail goes to a scratchpad file while only
-   the verdict and the decision-changing findings come back, that dimension's share of the
-   session search budget, and what the worker must not decide.
-3. **Synthesize in your own words.** Never paste, quote or lightly edit a report. A finding
-   that does not change the answer does not appear at all. Where two dimensions disagree,
-   adjudicate it yourself and say which source won and why.
-4. **Verify anything load-bearing** before you rely on it: prove a filter bites, spot-check one
-   returned record, count swallowed errors separately from empty results.
+1. **Divida a pergunta em no máximo três dimensões independentes.** Independente significa que a
+   resposta de um coletor nunca muda o briefing de outro. Menos é melhor. Se a pergunta é uma
+   cadeia dependente única, responda-a inline e não gere nada.
+2. **Roteie cada dimensão por onde sua evidência vive.** Uma dimensão respondida a partir de
+   arquivos ou um repositório vai para um worker `gatherer` isolado — `citizen role run gatherer
+   --workspace <repo> --prompt-file <brief>` — que é offline por design e detém apenas `Read`,
+   `Grep` e `Glob`; conceda diretórios de entrada extras com `--read-dir`. Uma dimensão que
+   precisa da web ao vivo vai para um worker de banda em sessão em vez disso (`worker-a` para
+   uma busca ou um fetch, `worker-b` quando o achado precisa ser ponderado), gerado em paralelo
+   numa única mensagem. Nunca passe uma dimensão web para um `gatherer`: ele não tem ferramentas
+   web e vai retornar o briefing não iniciado. Todo briefing, de qualquer forma, nomeia a pergunta
+   exata para aquela dimensão, os arquivos ou fontes de onde começar, um teto de retorno de 400
+   palavras, a regra de que o detalhe vai para um arquivo de scratchpad enquanto apenas o veredito
+   e os achados que mudam decisão voltam, a cota daquela dimensão no orçamento de busca da sessão,
+   e o que o worker não deve decidir.
+3. **Sintetize em suas próprias palavras.** Nunca cole, cite ou edite levemente um relatório. Um
+   achado que não muda a resposta não aparece de forma alguma. Onde duas dimensões discordam,
+   arbitre você mesmo e diga qual fonte venceu e por quê.
+4. **Verifique qualquer coisa relevante** antes de confiar nela: prove que um filtro morde, faça
+   uma checagem pontual num registro retornado, conte erros engolidos separadamente de resultados
+   vazios.
 
-Report as a brief: two or three sentences of bottom line, then up to five findings with the numbers
-behind them and what they mean for the reader. When workers ran, end with the scratchpad file
-paths they wrote and the worker ids `citizen role status` will show, one per line. An
-isolated `gatherer` writes nothing itself: save its returned detail to a scratchpad file yourself
-before you synthesize.
+Relate como um resumo: duas ou três frases de conclusão, depois até cinco achados com os números
+por trás deles e o que significam para o leitor. Quando workers rodaram, termine com os caminhos
+de arquivo de scratchpad que eles escreveram e os ids de worker que `citizen role status` vai
+mostrar, um por linha. Um `gatherer` isolado não escreve nada ele mesmo: salve o detalhe que ele
+retornou num arquivo de scratchpad você mesmo antes de sintetizar.

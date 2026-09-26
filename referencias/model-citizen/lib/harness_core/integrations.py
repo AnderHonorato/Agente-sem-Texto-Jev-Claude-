@@ -1,7 +1,7 @@
-"""User-selected implementation bindings and pinned viewer references.
+"""Vínculos de implementação escolhidos pelo usuário e referências de visualizador fixadas.
 
-Adapters own viewer state. This module resolves executables and records their acknowledged
-references; inspecting configuration never executes an adapter.
+Adaptadores possuem o estado do visualizador. Este módulo resolve executáveis e registra suas
+referências reconhecidas; inspecionar configuração nunca executa um adaptador.
 """
 import json
 import os
@@ -181,7 +181,7 @@ def require_available(binding):
 
 
 def invoke(binding, operation, payload=None, request_id=None, timeout=30):
-    """Execute a bounded JSON adapter call; a timeout never implies cancellation."""
+    """Executa uma chamada de adaptador JSON limitada; um timeout nunca implica cancelamento."""
     require_available(binding)
     if operation not in OPERATIONS:
         fail("unsupported-operation", "unknown viewer operation")
@@ -259,7 +259,7 @@ def session_path(directory, reference):
 
 
 def observation(response):
-    """Keep continuation evidence without duplicating arbitrary adapter response data."""
+    """Guarda a evidência de continuação sem duplicar dados arbitrários da resposta do adaptador."""
     result = {key: response[key] for key in ("request_id", "operation", "implementation", "status", "error") if key in response}
     details = response.get("result", {})
     details = details if isinstance(details, dict) else {}
@@ -285,7 +285,7 @@ def observe_session(path, response):
 
 def viewer(root, config, directory, operation, payload=None, reference=None,
            implementation=None, adapter=None, request_id=None, timeout=30):
-    """Pin the adapter when opening; later selection changes cannot redirect a session."""
+    """Fixa o adaptador ao abrir; mudanças posteriores de seleção não podem redirecionar uma sessão."""
     if payload is not None and not isinstance(payload, dict):
         fail("invalid-input", "operation input must be an object")
     payload = deepcopy(payload or {})
@@ -307,7 +307,7 @@ def viewer(root, config, directory, operation, payload=None, reference=None,
         item = descriptor(binding["descriptor"])
         if item["capability"] != CAPABILITY:
             fail("invalid-session", "pinned adapter belongs to another capability")
-        # Availability is checked now without resolving the current selection.
+        # A disponibilidade é checada agora sem resolver a seleção atual.
         exe = Path(binding["descriptor"]["argv"][0])
         binding["availability"] = "available" if exe.is_file() and os.access(str(exe), os.X_OK) else "unavailable"
         binding["reason"] = "pinned adapter executable is unavailable"

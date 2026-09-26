@@ -5,10 +5,11 @@ argument-hint: [note to carry into the next session]
 
 # Handoff
 
-Note to carry over: {{arguments}}
+Nota para carregar adiante: {{arguments}}
 
-1. **Overwrite `.agent-harness/progress.md`** at the repository root, or in the current directory when
-   there is no repository. It is a snapshot, never append; session start reads its first eighty lines. Use exactly these headings:
+1. **Sobrescreva `.agent-harness/progress.md`** na raiz do repositório, ou no diretório atual
+   quando não há repositório. É um snapshot, nunca um anexo; o início de sessão lê suas primeiras
+   oitenta linhas. Use exatamente estes cabeçalhos:
 
    ```markdown
    # Handoff <ISO date>
@@ -20,21 +21,25 @@ Note to carry over: {{arguments}}
    ## Learnings
    ```
 
-   Fill them from this session, not from the file you are replacing. **Done** and **Open** are
-   short bullets naming files and commands. **Next command** is one runnable line and nothing
-   else. **Decisions needed** is what only the user can settle. **Learnings** is what you would
-   have wanted to know when this session started.
+   Preencha-os a partir desta sessão, não a partir do arquivo que você está substituindo. **Done**
+   e **Open** são marcadores curtos nomeando arquivos e comandos. **Next command** é uma linha
+   executável e nada mais. **Decisions needed** é o que só o usuário pode resolver. **Learnings**
+   é o que você gostaria de ter sabido quando esta sessão começou.
 
-2. **Save the shared task contract.** Read `citizen task show` first. Write a JSON input with
-   `objective`, `next_steps`, `decisions`, and `artifacts`; add the framework checkout and
-   baseline when a planning framework owns the artifacts. Save with `citizen task save --input <file> --runtime <runtime>
-   --revision <current-revision>`. The next runtime reads the same data, rechecks the tree,
-   and establishes its own permissions. A handoff never transfers an approval.
+2. **Salve o contrato de tarefa compartilhado.** Leia `citizen task show` primeiro. Escreva uma
+   entrada JSON com `objective`, `next_steps`, `decisions`, e `artifacts`; adicione o checkout do
+   framework e a linha de base quando um framework de planejamento é dono dos artefatos. Salve com
+   `citizen task save --input <file> --runtime <runtime> --revision <current-revision>`. O
+   próximo runtime lê os mesmos dados, reverifica a árvore, e estabelece suas próprias
+   permissões. Um handoff nunca transfere uma aprovação.
 
-3. **Promote anything durable.** If a learning would help a future session in this repository —
-   a fix that generalizes, a trap worth avoiding, a command that actually works — append it as
-   a dated bullet to `docs/solutions/<yyyy-mm-dd>-<slug>.md` under the repository root, or under
-   `.agent-harness/` when there is no repository, creating the folder when it is missing. One or two sentences, carrying the command or the path, so a correction becomes an
-   artifact instead of a prompt the user has to repeat. Nothing durable, no file.
+3. **Promova qualquer coisa durável.** Se um aprendizado ajudaria uma sessão futura neste
+   repositório — uma correção que generaliza, uma armadilha que vale a pena evitar, um comando que
+   de fato funciona — anexe-o como um marcador datado a `docs/solutions/<yyyy-mm-dd>-<slug>.md`
+   sob a raiz do repositório, ou sob `.agent-harness/` quando não há repositório, criando a pasta
+   quando estiver faltando. Uma ou duas frases, carregando o comando ou o caminho, para que uma
+   correção vire um artefato em vez de um prompt que o usuário precisa repetir. Nada durável,
+   nenhum arquivo.
 
-End the turn with the two paths: the progress file, and the solutions file if you wrote one.
+Termine o turno com os dois caminhos: o arquivo de progresso, e o arquivo de soluções se você
+escreveu um.

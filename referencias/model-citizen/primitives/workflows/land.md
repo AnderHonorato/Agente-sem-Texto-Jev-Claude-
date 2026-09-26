@@ -5,38 +5,43 @@ argument-hint: <pull request number or URL> [worktree name]
 
 # Land
 
-What to land: {{arguments}}
+O que finalizar: {{arguments}}
 
-**Check first, before changing anything.** This command needs a git repository, a remote, and `gh`
-logged in. Resolve the pull request, the branch behind it, and the worktree that produced it; when
-any of the three is missing, say which and stop. Merging is approval-gated — get an explicit
-go-ahead before the merge — and this command never tags and never deploys.
+**Verifique primeiro, antes de mudar qualquer coisa.** Este comando precisa de um repositório
+git, um remote, e o `gh` autenticado. Resolva o pull request, o branch por trás dele, e a
+worktree que o produziu; quando algum dos três está faltando, diga qual e pare. Mesclar tem gate
+de aprovação — obtenha um sinal verde explícito antes da mesclagem — e este comando nunca cria
+tag e nunca faz deploy.
 
-1. **Verify the head that will merge.** Every required check green on the current head, not on an
-   earlier push; where the repository runs an issue-ownership or closing-link check, confirm that it
-   passed on that same head. A pending, failing or stale check stops the workflow, named. So does an
-   unresolved review thread (GraphQL `reviewThreads`): name it and stop. A fix belongs to `/build`,
-   before approval, and a human's thread is theirs to resolve.
-2. **Merge it** with `gh pr merge --squash --delete-branch`, into the default branch.
-3. **Fast-forward the shared checkout** on its default branch with `git pull --ff-only`. Anything
-   other than a fast-forward means the branch diverged: stop and report it, never merge locally.
-4. **Remove the worktree and its branch** with `citizen worktree remove <name> --merged`: it
-   ignores the regenerable caches a gate run wrote, removes the checkout, then deletes the branch
-   once it has read a merged pull request whose head commit is the branch tip, the proof that
-   replaces the ancestry a squash merge destroys. Never force a removal. Modified, untracked or
-   other ignored files stop the workflow with the reason and the path, so the work can be read
-   first, and so does a tip that proof does not account for. Add `--also-clear <name>` for a
-   regenerable top-level directory this repository writes that the built-in list misses.
-5. **Audit** with `citizen worktree audit`, and report every stale or dirty checkout it names
-   along with what each still holds. Leave them in place; removing them is the user's call.
-6. **Check the release rule.** Read the repository's own agent instructions for when a release is
-   due. Either state "no release due" with the reason those instructions give, or post a release
-   card — the version, what landed since the last one, the surfaces the instructions require —
-   and wait for approval. Approval belongs to the release, not to this command.
+1. **Verifique a ponta que vai mesclar.** Todo check obrigatório verde na ponta atual, não numa
+   push anterior; onde o repositório roda um check de posse de issue ou de link de fechamento,
+   confirme que ele passou nessa mesma ponta. Um check pendente, falho ou obsoleto para o
+   workflow, nomeado. O mesmo vale para uma thread de revisão não resolvida (GraphQL
+   `reviewThreads`): nomeie-a e pare. Uma correção pertence ao `/build`, antes da aprovação, e uma
+   thread de um humano é dele para resolver.
+2. **Mescle-o** com `gh pr merge --squash --delete-branch`, no branch padrão.
+3. **Faça fast-forward do checkout compartilhado** no seu branch padrão com `git pull --ff-only`.
+   Qualquer coisa além de um fast-forward significa que o branch divergiu: pare e relate isso,
+   nunca mescle localmente.
+4. **Remova a worktree e seu branch** com `citizen worktree remove <name> --merged`: ele ignora
+   os caches regeneráveis que uma execução de gate escreveu, remove o checkout, depois apaga o
+   branch uma vez que leu um pull request mesclado cujo commit de topo é a ponta do branch, a
+   prova que substitui a ancestralidade que uma mesclagem squash destrói. Nunca force uma
+   remoção. Arquivos modificados, não rastreados ou outros ignorados param o workflow com a razão
+   e o caminho, para que o trabalho possa ser lido primeiro, e o mesmo vale para uma ponta que
+   essa prova não contempla. Adicione `--also-clear <name>` para um diretório de nível superior
+   regenerável que este repositório escreve e que a lista embutida não cobre.
+5. **Audite** com `citizen worktree audit`, e relate todo checkout obsoleto ou sujo que ele nomeia
+   junto com o que cada um ainda guarda. Deixe-os no lugar; removê-los é decisão do usuário.
+6. **Verifique a regra de release.** Leia as próprias instruções de agente do repositório para
+   quando um release é devido. Ou declare "nenhum release devido" com a razão que aquelas
+   instruções dão, ou poste um cartão de release — a versão, o que foi finalizado desde o último,
+   as superfícies que as instruções exigem — e espere aprovação. A aprovação pertence ao release,
+   não a este comando.
 
-Step 4 is where a branch gets deleted, behind the merge proof. Never `git branch -D` in your own
-shell, which has no such proof, and keep deletions out of compound commands: the shell-grading
-hook denies a whole compound command when one segment is irreversible.
+O passo 4 é onde um branch é apagado, atrás da prova de mesclagem. Nunca `git branch -D` no seu
+próprio shell, que não tem tal prova, e mantenha exclusões fora de comandos compostos: o hook de
+avaliação de shell nega um comando composto inteiro quando um segmento é irreversível.
 
-Report the merge commit, what was removed, what the audit still shows, and the release decision
-with the line in the repository's instructions it came from.
+Relate o commit de mesclagem, o que foi removido, o que a auditoria ainda mostra, e a decisão de
+release com a linha das instruções do repositório de onde ela veio.

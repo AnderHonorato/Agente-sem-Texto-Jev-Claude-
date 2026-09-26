@@ -5,30 +5,33 @@ argument-hint: <topic or issue number>
 
 # Plan
 
-What to plan: {{arguments}}
+O que planejar: {{arguments}}
 
-1. **Invoke the `plan-authoring` skill and read it in full.** Never write the card from memory
-   of its contract; a hook validates the file you write.
-2. **Delegate the wide reading before plan mode.** `citizen role run planner` writes an artifact
-   and plan mode permits no write but its own plan file, so run it here when delegation pays —
-   active runtime, explicit session model, brief file, `--artifact <new-plan.md>`.
-3. **Ask before entering plan mode**, in one line naming the topic — entering it is the user's
-   call. No plan mode, or the user declines it, and step 8 is the whole command.
-4. **Gather inside plan mode.** Read the issue if you were given a number and read the code the
-   plan will touch; long-form research goes to the scratchpad, never beside the plan file. Ask
-   the user only for what you cannot find yourself, and batch every question into one message.
-5. **Write the Review Card into the plan file plan mode designated.** The runtime names that
-   file and you cannot rename it while planning. The card is the file's first screen and
-   everything else lives below it, under `# Addendum`.
-6. **Post the review message in the skill's shape, then call `ExitPlanMode`.** Leave off its
-   closing build line: the native approval is the gate, so never ask for a typed reply as well.
-7. **Once approved, name the plan and hand it over.** Rename the file to a topic slug in the
-   same directory, never over an existing name — take `-2` and say so — and end by invoking
-   `/build <absolute path>`. The builder commits it, so it reaches the pull request.
-8. **No plan mode:** write the plan under `.agent-harness/plans/` — repository root, or the
-   current directory when there is no repository — named for the topic, open it for the reviewer
-   with an absolute path, and end at the skill's build line.
+1. **Invoque a skill `plan-authoring` e leia-a por completo.** Nunca escreva o card de memória do
+   seu contrato; um hook valida o arquivo que você escreve.
+2. **Delegue a leitura ampla antes do modo de plano.** `citizen role run planner` escreve um
+   artefato e o modo de plano não permite nenhuma escrita além do seu próprio arquivo de plano,
+   então rode-o aqui quando a delegação compensa — runtime ativo, modelo de sessão explícito,
+   arquivo de briefing, `--artifact <new-plan.md>`.
+3. **Pergunte antes de entrar no modo de plano**, em uma linha nomeando o tópico — entrar nele é
+   decisão do usuário. Sem modo de plano, ou o usuário o recusa, e o passo 8 é o comando inteiro.
+4. **Colete dentro do modo de plano.** Leia a issue se lhe deram um número e leia o código que o
+   plano vai tocar; pesquisa extensa vai para o scratchpad, nunca ao lado do arquivo de plano.
+   Pergunte ao usuário apenas o que você não consegue encontrar sozinho, e agrupe toda pergunta
+   numa única mensagem.
+5. **Escreva o Review Card no arquivo de plano que o modo de plano designou.** O runtime nomeia
+   esse arquivo e você não pode renomeá-lo enquanto planeja. O card é a primeira tela do arquivo e
+   tudo mais vive abaixo dele, sob `# Addendum`.
+6. **Poste a mensagem de revisão na forma da skill, depois chame `ExitPlanMode`.** Deixe de fora
+   sua linha de fechamento de build: a aprovação nativa é o gate, então nunca peça por uma resposta
+   digitada também.
+7. **Uma vez aprovado, nomeie o plano e entregue-o.** Renomeie o arquivo para um slug de tópico no
+   mesmo diretório, nunca sobre um nome existente — use `-2` e diga isso — e termine invocando
+   `/build <caminho absoluto>`. O builder o commita, então ele chega ao pull request.
+8. **Sem modo de plano:** escreva o plano sob `.agent-harness/plans/` — raiz do repositório, ou o
+   diretório atual quando não há repositório — nomeado pelo tópico, abra-o para o revisor com um
+   caminho absoluto, e termine na linha de build da skill.
 
-This command needs no repository and no code. Implement nothing; create no branch and no
-worktree, which happens at build. If the user comes back with changes, revise the file, refresh
-its **Changed this round** line, say in chat only what changed, and call `ExitPlanMode` again.
+Este comando não precisa de repositório nem de código. Não implemente nada; não crie branch nem
+worktree, o que acontece no build. Se o usuário voltar com mudanças, revise o arquivo, atualize
+sua linha **Changed this round**, diga no chat apenas o que mudou, e chame `ExitPlanMode` de novo.

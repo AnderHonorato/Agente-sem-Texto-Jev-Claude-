@@ -1,25 +1,26 @@
-"""The usage-ledger row a provider call leaves behind: what it cost, and nothing about what it
-asked.
+"""A linha do ledger de uso que uma chamada de provedor deixa para trás: o que custou, e nada sobre o que perguntou.
 
-A provider that leaves the machine spends tokens and wall-clock time, and both belong beside the
-session spend the ledger already holds — a judgment that costs dollars and is never priced reads
-as free, and a call that adds a second to every hook reads as a fast machine. So each call writes
-one `kind: "decision"` row into `~/.local/state/agent-harness/usage.jsonl` through the ledger's
-own writer, and `harness usage --by provider` prices it from `policy/prices.json` like any other
-row. The write is an append under the ledger lock rather than the rewrite `upsert` does: a row
-nothing ever replaces must not cost a hook a read and a rewrite of the whole file, and the lock
-is what keeps it from interleaving with a session record being refreshed.
+Um provedor que sai da máquina gasta tokens e tempo de relógio, e ambos pertencem ao lado do
+gasto de sessão que o ledger já guarda — um julgamento que custa dólares e nunca é precificado
+lê como grátis, e uma chamada que soma um segundo a cada hook lê como uma máquina rápida. Então
+cada chamada escreve uma linha `kind: "decision"` em `~/.local/state/agent-harness/usage.jsonl`
+através do próprio escritor do ledger, e `harness usage --by provider` a precifica a partir de
+`policy/prices.json` como qualquer outra linha. A escrita é um append sob o lock do ledger em vez
+da reescrita que `upsert` faz: uma linha que nada jamais substitui não deve custar a um hook uma
+leitura e reescrita do arquivo inteiro, e o lock é o que a impede de se entrelaçar com um registro
+de sessão sendo atualizado.
 
-What the row may carry is the same allowlist question `controls.py` answers for the wire, decided
-the same way: the row is built key by key from a fixed list, so a field nobody named has no way
-in. It holds the decision point, the mode, the status, the model ids, the pack and request
-hashes, the token counts and the latency. It never holds the outbound state, an answer's prose,
-a prompt, a file path or an environment value — `row()` reads none of them, and
-`test_jev_decision_rows.py` asserts a row built from a context full of them carries none.
+O que a linha pode carregar é a mesma pergunta de allowlist que `controls.py` responde para a
+rede, decidida da mesma forma: a linha é construída chave por chave a partir de uma lista fixa,
+então um campo que ninguém nomeou não tem caminho de entrada. Ela guarda o ponto de decisão, o
+modo, o status, os ids de modelo, os hashes do pacote e da requisição, as contagens de tokens e a
+latência. Nunca guarda o estado que saiu, a prosa de uma resposta, um prompt, um caminho de
+arquivo ou um valor de ambiente — `row()` não lê nenhum deles, e `test_jev_decision_rows.py`
+garante que uma linha construída a partir de um contexto cheio deles não carrega nenhum.
 
-A call whose usage nobody reported is `partial`, which is how the pricing table already spells
-"unknown": an unpriced row is named in the report's footer, where a zero would have said the
-judgment was free.
+Uma chamada cujo uso ninguém reportou é `partial`, que é como a tabela de preços já soletra
+"desconhecido": uma linha sem preço é nomeada no rodapé do relatório, onde um zero teria dito que
+o julgamento foi de graça.
 """
 import hashlib
 import os
@@ -30,43 +31,44 @@ from typing import Any, Dict, List, Optional
 from .. import decision
 
 KIND = "decision"
-# A decision row is written by the harness itself rather than by a client session, so it names
-# no runtime of its own. Present because `row_key` reads it on every row.
+# Uma linha de decisão é escrita pelo próprio harness em vez de por uma sessão de cliente, então
+# não nomeia runtime próprio. Presente porque `row_key` a lê em toda linha.
 RUNTIME = "harness"
 
-# The token columns every ledger row is priced on. A Jev response reports `input_tokens` and
-# `output_tokens` and there is no third field in its usage contract, so the two cache columns
-# are zero rather than unknown: nothing was served from a cache because no cache was offered.
+# As colunas de token nas quais toda linha do ledger é precificada. Uma resposta Jev reporta
+# `input_tokens` e `output_tokens` e não há um terceiro campo no seu contrato de uso, então as
+# duas colunas de cache são zero em vez de desconhecidas: nada foi servido de um cache porque
+# nenhum cache foi oferecido.
 CACHE_COLUMNS = ("cache_read", "cache_write")
 
 _COUNTER = [0]
 
 
 def _ident(request_hash: Optional[str], now: float) -> str:
-    """A key no concurrent call can collide with.
+    """Uma chave com a qual nenhuma chamada concorrente pode colidir.
 
-    Two identical requests in one session hash the same, and an `upsert` keyed on that hash
-    would keep one row and drop the other; the process, the clock and a counter make the two
-    separate records they are.
+    Duas requisições idênticas numa sessão hasheiam igual, e um `upsert` chaveado nesse hash
+    manteria uma linha e descartaria a outra; o processo, o relógio e um contador fazem delas os
+    dois registros separados que são.
     """
     _COUNTER[0] += 1
     seed = "|".join([str(request_hash or ""), str(os.getpid()), repr(now), str(_COUNTER[0])])
     return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
 
 
-# The one counterparty shape a row may keep verbatim: the slug `decision.counterparty()`
-# derives. Both halves are bounded, because a row is kept for months and a branch name has no
-# length anyone enforces.
+# A única forma de contraparte que uma linha pode manter literalmente: o slug que
+# `decision.counterparty()` deriva. Ambas as metades são limitadas, porque uma linha é mantida
+# por meses e um nome de branch não tem comprimento que ninguém imponha.
 SLUG = re.compile(r"^repo:[A-Za-z0-9._-]{1,64}/[A-Za-z0-9._/-]{1,96}$")
 
 
 def _counterparty(value: Any) -> str:
-    """The counterparty as a row may keep it: the slug shape, or a digest of anything else.
+    """A contraparte como uma linha pode mantê-la: a forma de slug, ou um digest de qualquer outra coisa.
 
-    `counterparty` is a caller's string and part of what goes out in the request, so an
-    absolute path can arrive here — and a path on this machine is exactly what a row kept for
-    months must not hold. A counterparty this module cannot recognise is a short digest, which
-    still groups a report and names nothing.
+    `counterparty` é uma string de um chamador e parte do que sai na requisição, então um caminho
+    absoluto pode chegar aqui — e um caminho nesta máquina é exatamente o que uma linha mantida
+    por meses não deve guardar. Uma contraparte que este módulo não reconhece vira um digest
+    curto, que ainda agrupa um relatório e não nomeia nada.
     """
     slug = str(value or "")
     if SLUG.match(slug):
@@ -75,7 +77,7 @@ def _counterparty(value: Any) -> str:
 
 
 def _repo(counterparty: str) -> str:
-    """The repository name inside a kept `repo:<name>/<branch>` slug, or the slug as kept."""
+    """O nome do repositório dentro de um slug `repo:<name>/<branch>` mantido, ou o slug como foi mantido."""
     if not counterparty.startswith("repo:"):
         return counterparty
     return counterparty[len("repo:"):].split("/")[0]
@@ -86,15 +88,16 @@ def row(point: Optional[str], mode: str, result: Dict[str, Any], action_class: s
         started: Optional[float] = None, judgment: Optional[str] = None,
         severity: Optional[str] = None, base_outcome: Optional[str] = None,
         advised_outcome: Optional[str] = None) -> Dict[str, Any]:
-    """One `kind: "decision"` row, built field by field from a result `jev.ask` returned.
+    """Uma linha `kind: "decision"`, construída campo por campo a partir de um resultado que `jev.ask` retornou.
 
-    `started` is the call's own start, so a row spans the request rather than the instant it
-    finished; with none, the latency on the result is subtracted from `now`.
+    `started` é o próprio início da chamada, então uma linha cobre a requisição inteira em vez do
+    instante em que terminou; sem ele, a latência do resultado é subtraída de `now`.
 
-    The four labels are the decision log's, repeated here rather than joined across two files:
-    a call priced on this report is worth reading beside what it judged and what it would have
-    changed, and a `shadow` row that named neither would measure nothing. They are labels from
-    closed vocabularies — a choice, a level and two outcomes — and never an answer's prose.
+    Os quatro rótulos são os do log de decisão, repetidos aqui em vez de unidos entre dois
+    arquivos: uma chamada precificada neste relatório vale a pena ser lida ao lado do que julgou
+    e do que teria mudado, e uma linha `shadow` que não nomeasse nenhum dos dois não mediria
+    nada. São rótulos de vocabulários fechados — uma escolha, um nível e dois resultados — e
+    nunca a prosa de uma resposta.
     """
     now = time.time() if now is None else now
     usage = result.get("usage") if isinstance(result.get("usage"), dict) else None
@@ -122,8 +125,9 @@ def row(point: Optional[str], mode: str, result: Dict[str, Any], action_class: s
         "started": _stamp(began), "ended": _stamp(now),
     }
     if usage is None:
-        # No usage means no bill anybody can compute. `partial` is what the price table already
-        # reads as unknown, so the row is counted as unpriced rather than as zero dollars.
+        # Nenhum uso significa nenhuma conta que alguém consiga calcular. `partial` é o que a
+        # tabela de preços já lê como desconhecido, então a linha é contada como sem preço em
+        # vez de zero dólares.
         record["partial"] = True
         record["input"] = None
         record["output"] = None
@@ -161,12 +165,12 @@ def _version() -> Optional[str]:
 
 
 def append(record: Dict[str, Any], target: Optional[str] = None) -> bool:
-    """Write one decision row to the usage ledger. Never raises; says whether it wrote.
+    """Escreve uma linha de decisão no ledger de uso. Nunca levanta exceção; diz se escreveu.
 
-    Suppressed with `decision.events_suppressed`, and off entirely when `telemetry.decisions`
-    is off: a user who turned provider logging off did not ask for the same call in a second
-    file. A failed write costs the record and nothing else — a decision must never depend on a
-    ledger, which is the rule `append_event` already follows.
+    Suprimida com `decision.events_suppressed`, e totalmente desligada quando `telemetry.decisions`
+    está off: um usuário que desligou o log do provedor não pediu a mesma chamada num segundo
+    arquivo. Uma escrita que falha custa o registro e nada mais — uma decisão nunca deve depender
+    de um ledger, a regra que `append_event` já segue.
     """
     if decision.suppressed():
         return False
@@ -180,8 +184,9 @@ def append(record: Dict[str, Any], target: Optional[str] = None) -> bool:
         usage.append_row(record, path=target)
         return True
     except Exception as exc:
-        # A swallowed write is unknown, not absent: the failure lands in the errors file every
-        # other ledger writer uses, so a run of empty reports has somewhere to be explained.
+        # Uma escrita engolida é desconhecida, não ausente: a falha cai no arquivo de erros que
+        # todo outro escritor de ledger usa, então uma sequência de relatórios vazios tem onde
+        # ser explicada.
         try:
             usage.record_error(exc, path=target, where="decision-row")
         except Exception:
@@ -190,7 +195,7 @@ def append(record: Dict[str, Any], target: Optional[str] = None) -> bool:
 
 
 def rows(path=None) -> List[Dict[str, Any]]:
-    """Every decision row in the usage ledger, oldest first. An unreadable file is no rows."""
+    """Toda linha de decisão no ledger de uso, mais antiga primeiro. Um arquivo ilegível é nenhuma linha."""
     module = decision._hook_module("usage-log")
     if module is None:
         return []
@@ -200,5 +205,5 @@ def rows(path=None) -> List[Dict[str, Any]]:
             text = stream.read()
     except (OSError, AttributeError):
         return []
-    # The ledger's own reader, so a renamed field is folded here as it is everywhere else.
+    # O próprio leitor do ledger, então um campo renomeado é dobrado aqui como é em todo lugar.
     return [row for row in module.ledger_rows(text) if row.get("kind") == KIND]

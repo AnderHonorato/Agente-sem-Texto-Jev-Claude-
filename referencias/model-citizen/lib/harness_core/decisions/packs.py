@@ -1,17 +1,18 @@
-"""Versioned question packs: content, a version, and the hash of the content.
+"""Pacotes de perguntas versionados: conteúdo, uma versão, e o hash do conteúdo.
 
-A pack in `jev.py` is a plain dict, which is enough to send and not enough to measure. An
-evaluation that says "this threshold holds" is a claim about one set of questions, so the set
-needs a name and a version a later run can be compared against, and a hash that says whether
-the words actually changed. `Pack` is those three, and the registry below is where a named
-version is looked up.
+Um pacote em `jev.py` é um dict comum, o que é suficiente para enviar e insuficiente para medir.
+Uma avaliação que diz "este limiar se sustenta" é uma alegação sobre um conjunto de perguntas,
+então o conjunto precisa de um nome e uma versão contra os quais uma execução futura pode ser
+comparada, e um hash que diga se as palavras de fato mudaram. `Pack` é essas três coisas, e o
+registro abaixo é onde uma versão nomeada é consultada.
 
-Two properties the dict did not have. A pack is **frozen** at construction: the questions are
-canonicalised once and every read deserialises a fresh copy, so nothing a caller holds — task
-content, a context, a mutated response — can reach back and rewrite a criterion between the
-hash being taken and the request being built. And a pack's **identity travels with the result**:
-`identity()` is what `JevProvider` puts on the ledger row beside the request hash, so a row says
-which version of which pack produced it rather than a hash nobody can resolve to words.
+Duas propriedades que o dict não tinha. Um pacote é **congelado** na construção: as perguntas são
+canonicalizadas uma vez e toda leitura desserializa uma cópia nova, então nada que um chamador
+segure — conteúdo de tarefa, um contexto, uma resposta mutada — pode voltar e reescrever um
+critério entre o hash ser tirado e a requisição ser construída. E a **identidade de um pacote
+viaja com o resultado**: `identity()` é o que `JevProvider` coloca na linha do ledger ao lado do
+hash da requisição, então uma linha diz qual versão de qual pacote a produziu em vez de um hash
+que ninguém consegue resolver de volta para palavras.
 """
 import json
 import re
@@ -20,18 +21,18 @@ from typing import Any, Dict, List, Optional
 from . import jev
 
 ID = re.compile(r"[a-z][a-z0-9-]{0,31}")
-# `:` and not `@`: an `id@version` reads as an email address to the repository's own personal
-# data lint, and a spelling that makes every mention of a pack a lint finding is the wrong one.
+# `:` e não `@`: um `id@version` lê como um endereço de e-mail para o próprio lint de dados
+# pessoais do repositório, e uma grafia que torna toda menção a um pacote um achado de lint é a errada.
 SEPARATOR = ":"
 VERSION = re.compile(r"[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}")
 
 
 class Pack:
-    """One named, versioned, frozen question pack.
+    """Um pacote de perguntas nomeado, versionado e congelado.
 
-    `decision=True` also requires the questions `JevProvider.decide` reads, so a pack that
-    would leave that code reading a question nobody asked is refused here rather than at the
-    first call.
+    `decision=True` também exige as perguntas que `JevProvider.decide` lê, então um pacote que
+    deixaria aquele código lendo uma pergunta que ninguém fez é recusado aqui em vez de na
+    primeira chamada.
     """
 
     def __init__(self, pack_id: str, version: str, questions: Any, decision: bool = True):
@@ -48,7 +49,7 @@ class Pack:
 
     @property
     def questions(self) -> Dict[str, Any]:
-        """A fresh copy of the questions. Mutating what this returns changes no future read."""
+        """Uma cópia nova das perguntas. Mutar o que isto retorna não muda nenhuma leitura futura."""
         return json.loads(self._frozen.decode("utf-8"))
 
     def identity(self) -> Dict[str, Any]:
@@ -59,7 +60,7 @@ class Pack:
         return self.pack_id + SEPARATOR + self.version
 
     def verify(self, content_hash: str) -> None:
-        """Raise unless this pack is still the words `content_hash` was taken over."""
+        """Levanta exceção a menos que este pacote ainda seja as palavras sobre as quais `content_hash` foi tirado."""
         if content_hash != self.content_hash:
             raise jev.PackError("pack " + self.key() + " hashes " + self.content_hash
                                 + ", not the " + str(content_hash) + " this result was fitted "
@@ -82,12 +83,12 @@ def _order(version: str):
 
 
 def versions(pack_id: str) -> List[str]:
-    """Every registered version of `pack_id`, oldest first."""
+    """Toda versão registrada de `pack_id`, mais antiga primeiro."""
     return sorted((p.version for p in REGISTRY.values() if p.pack_id == pack_id), key=_order)
 
 
 def get(pack_id: str, version: Optional[str] = None) -> Pack:
-    """A registered pack. With no version, the highest one registered."""
+    """Um pacote registrado. Sem versão, a mais alta registrada."""
     if version is None:
         known = versions(pack_id)
         if not known:
@@ -103,7 +104,7 @@ def get(pack_id: str, version: Optional[str] = None) -> Pack:
 
 
 def resolve(name: Optional[str]) -> Pack:
-    """`pack_id`, `pack_id:version`, or None for the default decision pack."""
+    """`pack_id`, `pack_id:version`, ou None para o pacote de decisão padrão."""
     if not name:
         return get(DECISION_ID)
     pack_id, _, version = str(name).partition(SEPARATOR)
@@ -111,6 +112,6 @@ def resolve(name: Optional[str]) -> Pack:
 
 
 DECISION_ID = "decision"
-# 1.0.0 is the pack `jev.DECISION_PACK` shipped as. The words live there, not here: one pack is
-# one set of words, and a copy would be a second one nobody edits in step.
+# 1.0.0 é a versão sob a qual o pacote `jev.DECISION_PACK` foi lançado. As palavras vivem lá, não
+# aqui: um pacote é um conjunto de palavras, e uma cópia seria um segundo que ninguém edita em sincronia.
 DECISION_V1 = register(Pack(DECISION_ID, "1.0.0", jev.DECISION_PACK))

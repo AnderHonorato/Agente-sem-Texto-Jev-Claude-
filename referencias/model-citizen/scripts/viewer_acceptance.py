@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Opt-in local contract check against an installed standalone viewer (opens a window)."""
+"""Verificação de contrato local opcional contra um visualizador autônomo instalado (abre uma janela)."""
 import argparse
 import hashlib
 import json

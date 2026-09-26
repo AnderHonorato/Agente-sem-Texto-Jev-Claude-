@@ -18,21 +18,21 @@ VIEW_ARGS = ("repo", "view", "--json", "description,repositoryTopics,homepageUrl
 
 
 class GhError(RuntimeError):
-    """`gh` was missing, refused, or returned output that could not be read."""
+    """`gh` estava ausente, recusou, ou retornou saída que não pôde ser lida."""
 
 
 def gh(args, root=ROOT):
-    """Run `gh` and return its stdout, raising `GhError` for every failure mode."""
+    """Roda `gh` e retorna seu stdout, levantando `GhError` para todo modo de falha."""
     try:
         result = subprocess.run(["gh", *args], cwd=str(root), text=True,
                                 capture_output=True, timeout=GH_TIMEOUT_SECONDS)
     except OSError as error:
-        raise GhError("gh is not available: {}".format(error))
+        raise GhError("gh não está disponível: {}".format(error))
     except subprocess.TimeoutExpired:
-        raise GhError("gh timed out after {} seconds".format(GH_TIMEOUT_SECONDS))
+        raise GhError("gh expirou após {} segundos".format(GH_TIMEOUT_SECONDS))
     if result.returncode:
         message = result.stderr.strip() or result.stdout.strip()
-        raise GhError(message or "gh exited {}".format(result.returncode))
+        raise GhError(message or "gh saiu com código {}".format(result.returncode))
     return result.stdout
 
 
@@ -45,10 +45,10 @@ def authenticated(runner=gh):
 
 
 def product(root=ROOT):
-    """About as `product.json` declares it.
+    """O About como `product.json` o declara.
 
-    `homepage` is optional: when the data names none, the live homepage is left
-    alone rather than compared against a value the repository does not hold.
+    `homepage` é opcional: quando os dados não nomeiam nenhuma, a homepage ao vivo é deixada
+    em paz em vez de comparada contra um valor que o repositório não possui.
     """
     data = json.loads((root / "product.json").read_text())
     about = {"description": data["github_description"], "topics": sorted(data["topics"])}
@@ -68,7 +68,7 @@ def published(runner=gh):
 
 
 def differences(wanted, live):
-    """Field names whose live value differs from `product.json`, in a stable order."""
+    """Nomes de campo cujo valor ao vivo difere de `product.json`, em ordem estável."""
     return [field for field in ("description", "topics", "homepage")
             if field in wanted and live[field] != wanted[field]]
 
@@ -78,7 +78,7 @@ def shown(value):
 
 
 def edit_args(wanted, live):
-    """The `gh repo edit` arguments that would make GitHub match `product.json`."""
+    """Os argumentos de `gh repo edit` que fariam o GitHub combinar com `product.json`."""
     args = ["repo", "edit"]
     if live["description"] != wanted["description"]:
         args += ["--description", wanted["description"]]
@@ -102,9 +102,9 @@ def main(argv=None, root=ROOT, runner=gh):
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--check", action="store_true",
-                       help="report drift and exit non-zero when About differs")
+                       help="relata o desvio e sai com código diferente de zero quando o About difere")
     group.add_argument("--apply", action="store_true",
-                       help="write description, topics and homepage to GitHub")
+                       help="escreve descrição, topics e homepage no GitHub")
     args = parser.parse_args(argv)
     wanted = product(root)
     try:

@@ -1,8 +1,9 @@
-# Autonomy stance: confirm writes
+# Postura de autonomia: confirmar escritas
 
-Act freely on reads, analysis and local experiments. For anything that changes shared state —
-commits, pushes, config edits, service restarts, external posts — propose the exact change
-(command, files, branch, remote) and wait for a yes before running it. Batch the proposals so
-the user answers once, not per command.
+Aja livremente em leituras, análises e experimentos locais. Para qualquer coisa que muda estado
+compartilhado — commits, pushes, edições de config, reinícios de serviço, postagens externas —
+proponha a mudança exata (comando, arquivos, branch, remote) e espere um sim antes de rodá-la.
+Agrupe as propostas para que o usuário responda uma vez, não por comando.
 
-If blocked, state what you tried, what failed, and the one minimal thing only the user can do.
+Se bloqueado, declare o que você tentou, o que falhou, e a única coisa mínima que só o usuário
+pode fazer.

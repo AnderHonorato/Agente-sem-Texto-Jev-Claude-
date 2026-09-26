@@ -3,307 +3,329 @@ name: plan-authoring
 description: Write or revise a plan file, proposal, design doc or handoff the user reviews before approving work; carries the Review Card contract and the addendum rules. Use before writing anything into .agent-harness/plans/, and for any markdown deliverable whose job is to get a go/no-go.
 ---
 
-The trigger lives in the `plan-ceremony` stance. This is the contract.
+O gatilho vive na postura (stance) `plan-ceremony`. Este é o contrato.
 
-## Why this exists
+## Por que isto existe
 
-A plan has two audiences and they are not the same reader.
+Um plano tem duas audiências e elas não são o mesmo leitor.
 
-- **The reviewer reviews the approach.** System design, steps, and the decisions that are
-  theirs — in one screen, before they read anything else.
-- **The implementing agent executes it.** Paths, sequencing, edge cases, evidence.
+- **O revisor revisa a abordagem.** Design de sistema, passos, e as decisões que são dele — em
+  uma tela, antes de ler qualquer outra coisa.
+- **O agente implementador o executa.** Caminhos, sequenciamento, casos extremos, evidência.
 
-One document written for both produces the 884-line file the reviewer gets lost in. So a plan
-is one file with a hard seam: a **Review Card** above the first `---`, an **Addendum** below it.
+Um documento escrito para os dois produz o arquivo de 884 linhas no qual o revisor se perde.
+Então um plano é um arquivo com uma costura rígida: um **Review Card** acima do primeiro `---`,
+um **Adendo** abaixo dele.
 
-**Failure test:** if the reviewer has to scroll to learn what is being built, the plan has
-failed, however good the work behind it is.
+**Teste de falha:** se o revisor precisa rolar para saber o que está sendo construído, o plano
+falhou, por melhor que seja o trabalho por trás dele.
 
-## The Review Card
+## O Review Card
 
-Everything above the first `---`. **Target 50 source lines, hard cap 70**, diagram included.
-The one thing allowed to push past 70 is a full `## Decisions for the reviewer` block — three
-lines each, five maximum. Never cut a real decision to hit a budget.
+Tudo acima do primeiro `---`. **Alvo de 50 linhas de fonte, teto rígido de 70**, diagrama
+incluído. A única coisa permitida ultrapassar 70 é um bloco completo de `## Decisões para o
+revisor` — três linhas cada, cinco no máximo. Nunca corte uma decisão real para bater um
+orçamento.
 
-Not an introduction to the plan — the whole plan at review altitude.
+Não uma introdução ao plano — o plano inteiro na altitude de revisão.
 
-These sections, this order. Do not rename them, do not add to them, do not fold one into another.
+Estas seções, nesta ordem. Não as renomeie, não adicione a elas, não dobre uma dentro de outra.
 
-1. **`# <title>`** — 1 line. What gets built, as a noun phrase. Not a sentence.
-2. **Verdict blockquote** — at most 4 lines. Two sentences, what this builds and the mechanism,
-   then one metadata line: Effort · Risk · Blast radius.
-3. **`## At a glance`** — 7 bullets. Outcome · Approach · Touches · New deps · Not in scope ·
-   Exit test · the one open question.
-4. **`## System design`** — at most 15 lines. One diagram, no prose above it, one caption below.
-5. **`## Steps`** — at most 8. Numbered, two lines each: what and where, then the exit test.
-6. **`## Decisions for the reviewer`** — at most 5. Question, recommendation with its reason,
-   alternative. One line each.
-7. **`## Risks`** — at most 3 bullets. One line each: the trigger, and what we do when it fires.
+1. **`# <titulo>`** — 1 linha. O que será construído, como um sintagma nominal. Não uma frase.
+2. **Blockquote de veredito** — no máximo 4 linhas. Duas frases, o que isto constrói e o
+   mecanismo, depois uma linha de metadados: Esforço · Risco · Raio de impacto.
+3. **`## Em resumo`** — 7 marcadores. Resultado · Abordagem · Toca · Novas dependências · Fora do
+   escopo · Teste de saída · a única questão em aberto.
+4. **`## Design do sistema`** — no máximo 15 linhas. Um diagrama, sem prosa acima dele, uma
+   legenda abaixo.
+5. **`## Passos`** — no máximo 8. Numerados, duas linhas cada: o quê e onde, depois o teste de
+   saída.
+6. **`## Decisões para o revisor`** — no máximo 5. Pergunta, recomendação com sua razão,
+   alternativa. Uma linha cada.
+7. **`## Riscos`** — no máximo 3 marcadores. Uma linha cada: o gatilho, e o que fazemos quando
+   ele dispara.
 
-`TEMPLATE.md` in this directory is the skeleton. `EXAMPLE.md` is a real long plan reduced to
-its card.
+`TEMPLATE.md` neste diretório é o esqueleto. `EXAMPLE.md` é um plano longo real reduzido ao seu
+card.
 
-## A plan contains no markdown tables. Anywhere.
+## Um plano não contém tabelas markdown. Em lugar nenhum.
 
-Not in the card, not in the addendum. A markdown table renders as a bordered grid whose first
-column is pinned narrow, so at reading width every cell longer than a clause wraps into a tall,
-ragged block. That is the density a plan exists to avoid, and it is no better below the rule
-than above it.
+Nem no card, nem no adendo. Uma tabela markdown renderiza como uma grade com bordas cuja primeira
+coluna é fixada estreita, então na largura de leitura toda célula mais longa que uma oração quebra
+numa coluna alta e desalinhada. Essa é a densidade que um plano existe para evitar, e ela não é
+melhor abaixo da régua do que acima dela.
 
-- **`## At a glance`** — seven `- **Label** — value` bullets.
-- **`## Steps`** — a numbered list, two lines per step.
-- **Any pairing or mapping** — one bullet per row, with the paired terms bolded together:
-  `- **old/path.ts → new/path.ts** — what changes.`
-- **Anything with a "why" column** — fold the why into the sentence. A three-column table is
-  almost always a list of bullets with an em dash in it.
-- **Not bare bold-label lines**, in any of these: many markdown previews collapse consecutive
-  soft-wrapped lines into one paragraph. The list marker is what guarantees the break.
+- **`## Em resumo`** — sete marcadores `- **Rótulo** — valor`.
+- **`## Passos`** — uma lista numerada, duas linhas por passo.
+- **Qualquer pareamento ou mapeamento** — um marcador por linha, com os termos pareados em
+  negrito juntos: `- **antigo/caminho.ts → novo/caminho.ts** — o que muda.`
+- **Qualquer coisa com uma coluna "porquê"** — dobre o porquê dentro da frase. Uma tabela de três
+  colunas é quase sempre uma lista de marcadores com um travessão dentro.
+- **Não use linhas nuas de rótulo em negrito**, em nenhum destes casos: muitos previews de
+  markdown colapsam linhas consecutivas com quebra suave num único parágrafo. O marcador de lista
+  é o que garante a quebra.
 
-The validator hook rejects any line starting with `|` in a plan file.
+O hook validador rejeita qualquer linha começando com `|` num arquivo de plano.
 
-## There is no Context section in the card
+## Não há seção de Contexto no card
 
-The most common defect: every plan opens with `## Context` and three paragraphs of background.
-Background is addendum material. The verdict's two sentences carry the why — and if they
-cannot, the plan is not yet understood well enough to write.
+O defeito mais comum: todo plano abre com `## Context` e três parágrafos de background.
+Background é material de adendo. As duas frases do veredito carregam o porquê — e se elas não
+conseguem, o plano ainda não está compreendido o suficiente para ser escrito.
 
-## Never in the card, always in the addendum
+## Nunca no card, sempre no adendo
 
-- Working rules, governance constraints, the agent's own operating instructions
-- Evidence tables, verification logs, what was checked and what could not be
-- ID ledgers, allocation tables, file inventories, touch matrices
-- Per-agent or per-handoff narratives
-- Gate registers beyond the one gate that actually blocks
-- Alternatives beyond the single line each already in Decisions
-- Any restatement of the request
+- Regras de trabalho, restrições de governança, as próprias instruções operacionais do agente
+- Tabelas de evidência, logs de verificação, o que foi checado e o que não pôde ser
+- Registros de ID, tabelas de alocação, inventários de arquivo, matrizes de toque
+- Narrativas por agente ou por handoff
+- Registros de gate além do único gate que realmente bloqueia
+- Alternativas além da única linha de cada uma já em Decisões
+- Qualquer reafirmação do pedido
 
-## The diagram
+## O diagrama
 
-The card is reviewed in a plan-mode pane and a chat sidebar, and both show a mermaid fence as
-raw source. The card's diagram is therefore plain text, which renders everywhere.
+O card é revisado num painel de modo plano e numa barra lateral de chat, e ambos mostram uma
+cerca mermaid como fonte crua. O diagrama do card é, portanto, texto puro, que renderiza em
+qualquer lugar.
 
-- **A box-and-arrow drawing in a `text` fence** — `├─▶`, `└─▶`, `──▶`, a dotted `┄┄▶` for a
-  weak or polled link. Cap 12 nodes. If it needs more, the diagram is at the wrong altitude —
-  draw the subsystem being changed, not the whole world.
-- Keep every line under 80 columns; a wrapped line breaks the drawing.
-- Label edges with what moves, not with verbs: `api ── encrypted episode ──▶ web`.
-- Mark the delta so the reader sees what is new: prefix each new or changed node with `*`, and
-  name the marker in the caption.
-- **Mermaid belongs below the `---`,** and in docs that are read on GitHub — a
-  `sequenceDiagram` when ordering across processes is the actual subject. Never on the card.
-- Mandatory when the change crosses more than one component. Omit only for single-file edits.
+- **Um desenho de caixas e setas numa cerca `text`** — `├─▶`, `└─▶`, `──▶`, um `┄┄▶` pontilhado
+  para um link fraco ou por polling. Teto de 12 nós. Se precisa de mais, o diagrama está na
+  altitude errada — desenhe o subsistema sendo mudado, não o mundo inteiro.
+- Mantenha toda linha abaixo de 80 colunas; uma linha quebrada quebra o desenho.
+- Rotule as arestas com o que se move, não com verbos: `api ── episódio criptografado ──▶ web`.
+- Marque o delta para que o leitor veja o que é novo: prefixe cada nó novo ou alterado com `*`, e
+  nomeie o marcador na legenda.
+- **Mermaid pertence abaixo do `---`,** e em docs que são lidos no GitHub — um `sequenceDiagram`
+  quando ordenação entre processos é o assunto real. Nunca no card.
+- Obrigatório quando a mudança atravessa mais de um componente. Omita apenas para edições de
+  arquivo único.
 
-## Steps
+## Passos
 
-A numbered list — these are genuinely ordered — with two lines per step:
+Uma lista numerada — estes são genuinamente ordenados — com duas linhas por passo:
 
 ```markdown
-3. **[Bake the shadow map](#step-3--bake-the-shadow-map)** — `tools/bake/shadow.py`, new file.
-   *Exit:* `terrain_map_8192` writes in under 3 minutes and both shaders sample it once.
+3. **[Fazer o bake do mapa de sombra](#step-3--bake-the-shadow-map)** — `tools/bake/shadow.py`, arquivo novo.
+   *Exit:* `terrain_map_8192` escreve em menos de 3 minutos e ambos os shaders o amostram uma vez.
 ```
 
-- **Line one** is what happens and where, with the title linked to its addendum anchor when it
-  has detail. **Line two** is the exit test, always led by `*Exit:*`.
-- **Every step carries a real exit test** — a command, a render, a passing assertion.
-  "Implemented" is not an exit test.
-- Execution order, and step 1 is the cheapest thing that could invalidate the rest.
-- Past eight steps, group under `### Phase` headings, at most three.
-- A plan names the skills it will run and the order they run in.
+- **Linha um** é o que acontece e onde, com o título vinculado à sua âncora de adendo quando tem
+  detalhe. **Linha dois** é o teste de saída, sempre liderado por `*Exit:*`.
+- **Todo passo carrega um teste de saída real** — um comando, um render, uma asserção que passa.
+  "Implementado" não é um teste de saída.
+- Ordem de execução, e o passo 1 é a coisa mais barata que poderia invalidar o resto.
+- Além de oito passos, agrupe sob cabeçalhos `### Fase`, no máximo três.
+- Um plano nomeia as skills que vai rodar e a ordem em que rodam.
 
-## Spikes inside a plan
+## Spikes dentro de um plano
 
-When a step is an experiment rather than a build, write it as a spike: the question it
-answers, the cheapest experiment that answers it, the exit criterion as a number, and the
-machine the budget was measured on. Read the exit criterion against measured numbers, never
-against impressions.
+Quando um passo é um experimento em vez de uma construção, escreva-o como um spike: a pergunta
+que responde, o experimento mais barato que a responde, o critério de saída como um número, e a
+máquina em que o orçamento foi medido. Leia o critério de saída contra números medidos, nunca
+contra impressões.
 
-## Decisions for the reviewer
+## Decisões para o revisor
 
-Numbered, answerable in chat by number ("1 A, 2 your rec"). Three lines each:
+Numeradas, respondíveis no chat por número ("1 A, 2 sua recomendação"). Três linhas cada:
 
-> **3. Borders from geometry ribbons, or from the attribute texture?**
-> *Recommend* ribbons — the real boundary lines already exist and stay crisp at every zoom.
-> *Alternative* the gradient technique, which we need anyway for runtime cell changes.
+> **3. Bordas a partir de fitas de geometria, ou da textura de atributo?**
+> *Recomendo* fitas — as linhas de fronteira reais já existem e ficam nítidas em todo zoom.
+> *Alternativa* a técnica de gradiente, que precisamos de qualquer forma para mudanças de célula
+> em runtime.
 
-With nothing to decide, write **None — approve to proceed**. Never invent decisions to fill the
-section, and never leave a real one buried in the addendum.
+Com nada a decidir, escreva **Nenhuma — aprove para prosseguir**. Nunca invente decisões para
+preencher a seção, e nunca deixe uma real enterrada no adendo.
 
-## Revisions
+## Revisões
 
-When the plan changes after feedback, one blockquote line directly under the verdict:
+Quando o plano muda depois de feedback, uma linha de blockquote diretamente sob o veredito:
 
-> **Changed this round.** Dropped the CDLOD spike · Gate 2 now blocks publication · +1 day.
+> **Mudou nesta rodada.** Removido o spike de CDLOD · Gate 2 agora bloqueia a publicação · +1
+> dia.
 
-Three items maximum, one line. Delete the previous round's version — the card shows the latest
-delta only. Full revision history lives in the addendum.
+Três itens no máximo, uma linha. Apague a versão da rodada anterior — o card mostra apenas o
+delta mais recente. O histórico completo de revisão vive no adendo.
 
-## The addendum
+## O adendo
 
-Below the first `---`, under `# Addendum`. No budget. Everything the implementing agent needs
-and the reviewer does not.
+Abaixo do primeiro `---`, sob `# Addendum`. Sem orçamento. Tudo que o agente implementador precisa
+e o revisor não.
 
-- One `## Step N — <title>` heading per step with detail, so card rows can anchor to it.
-- Nothing above the rule is repeated below it. If the addendum restates the approach, cut it.
-- Written for an agent with no context: exact paths, exact commands, expected output.
+- Um cabeçalho `## Step N — <titulo>` por passo com detalhe, para que as linhas do card possam se
+  ancorar a ele.
+- Nada acima da régua é repetido abaixo dela. Se o adendo reafirma a abordagem, corte.
+- Escrito para um agente sem contexto: caminhos exatos, comandos exatos, saída esperada.
 
-## The chat message
+## A mensagem de chat
 
-The plan ships as two artifacts. The file is the document; the chat message is what the
-reviewer replies to. Three shapes, and nothing improvised.
+O plano é entregue como dois artefatos. O arquivo é o documento; a mensagem de chat é o que o
+revisor responde. Três formas, e nada improvisado.
 
-**First post, when the plan is ready.** In this order, nothing else:
+**Primeira postagem, quando o plano está pronto.** Nesta ordem, nada mais:
 
-1. **Verdict line** — one or two sentences, the same ones from the card.
-2. **`## At a glance`** — the seven bullets, verbatim. This is the "is this even the right
-   scope" check, and it saves opening a plan that was going to be redirected anyway.
-3. **`## Decisions`** — the numbered blocks, verbatim. The reviewer answers by number in chat,
-   so they must be readable where they type.
-4. **A workspace-relative markdown link** to the plan file, with a note on how to preview it.
-5. **The closing line**, only where there is no plan mode, exactly: *Reply **build** to
-   proceed, or keep refining.* Under plan mode the message ends at the link.
+1. **Linha de veredito** — uma ou duas frases, as mesmas do card.
+2. **`## Em resumo`** — os sete marcadores, literalmente. Esta é a checagem "isto sequer é o
+   escopo certo", e economiza abrir um plano que ia ser redirecionado de qualquer forma.
+3. **`## Decisões`** — os blocos numerados, literalmente. O revisor responde por número no chat,
+   então precisam ser legíveis onde ele digita.
+4. **Um link markdown relativo ao workspace** para o arquivo do plano, com uma nota de como
+   pré-visualizá-lo.
+5. **A linha de fechamento**, apenas onde não há modo de plano, exatamente: *Responda **build**
+   para prosseguir, ou continue refinando.* Sob o modo de plano a mensagem termina no link.
 
-Deliberately excluded: the diagram (the file holds it), the steps, the
-risks, the addendum. Those are what the file is for. Do not summarize them either.
+Deliberadamente excluído: o diagrama (o arquivo o guarda), os passos, os riscos, o adendo. Isso é
+para o que o arquivo serve. Não os resuma também.
 
-**Under plan mode the file is already the review surface.** Plan mode designates the plan file
-and names it itself — a slug of your opening words plus two random words, fixed before any
-content exists — so you neither choose the name nor rename it while planning. Write the card
-there, post the message, and call `ExitPlanMode`: the native approval is the gate, and asking
-for a typed *build* on top of it is a second gate nothing downstream can read. Once it is
-approved, rename the file to a topic slug — never over a name already taken; take `-2` and say
-so — and hand `/build` that path rather than leaving it to be searched for.
+**Sob o modo de plano o arquivo já é a superfície de revisão.** O modo de plano designa o arquivo
+de plano e o nomeia ele mesmo — um slug das suas palavras de abertura mais duas palavras
+aleatórias, fixado antes de qualquer conteúdo existir — então você nem escolhe o nome nem o
+renomeia enquanto planeja. Escreva o card ali, poste a mensagem, e chame `ExitPlanMode`: a
+aprovação nativa é o gate, e pedir por um *build* digitado em cima disso é um segundo gate que
+nada a jusante consegue ler. Uma vez aprovado, renomeie o arquivo para um slug de tópico — nunca
+sobre um nome já em uso; use `-2` e diga isso — e passe ao `/build` esse caminho em vez de deixar
+que seja procurado.
 
-**Without plan mode, put the file on screen before you post the message.** A link in chat is a
-path, not a rendering: in some clients it is clickable, in others it is dead text, and a plan
-written straight to disk never reaches a native plan view, because nothing registered it as one.
-The reviewer is then asked to approve a document they cannot see. So if the runtime can open a
-file beside the conversation, open the plan there first, and pass an **absolute** path unless you
-have confirmed that relative ones resolve; a rejected path is the common failure and it is
-silent. If the runtime cannot, say in the message how to open the file. The same applies on every
-revision round, since the reviewer is reading a changed file, not the one they opened before.
+**Sem modo de plano, coloque o arquivo na tela antes de postar a mensagem.** Um link no chat é um
+caminho, não uma renderização: em alguns clientes é clicável, em outros é texto morto, e um plano
+escrito direto no disco nunca alcança uma visão nativa de plano, porque nada o registrou como tal.
+O revisor é então convidado a aprovar um documento que não consegue ver. Então se o runtime pode
+abrir um arquivo ao lado da conversa, abra o plano ali primeiro, e passe um caminho **absoluto** a
+menos que você tenha confirmado que caminhos relativos resolvem; um caminho rejeitado é a falha
+comum e ela é silenciosa. Se o runtime não pode, diga na mensagem como abrir o arquivo. O mesmo se
+aplica em toda rodada de revisão, já que o revisor está lendo um arquivo alterado, não o que abriu
+antes.
 
-**Revision round, after feedback.** Much shorter — the reviewer already knows the plan:
+**Rodada de revisão, depois do feedback.** Muito mais curta — o revisor já conhece o plano:
 
-1. **One line naming what changed**, matching the card's **Changed this round** line.
-2. **Only the decisions still open**, renumbered from 1.
-3. **The link, and the closing line only where there is no plan mode.**
+1. **Uma linha nomeando o que mudou**, combinando com a linha **Mudou nesta rodada** do card.
+2. **Apenas as decisões ainda em aberto**, renumeradas a partir de 1.
+3. **O link, e a linha de fechamento apenas onde não há modo de plano.**
 
-Never re-post At a glance on a revision. If the scope moved enough to need re-reading, say so in
-the change line and let the file carry it.
+Nunca reposte Em resumo numa revisão. Se o escopo mudou o suficiente para precisar de releitura,
+diga isso na linha de mudança e deixe o arquivo carregar.
 
-**No decisions outstanding.** Verdict, At a glance, the link, then `ExitPlanMode` — or *Reply
-**build** to proceed* where there is no plan mode.
-Never invent decisions to fill the block — an empty one is a signal, not a gap.
+**Sem decisões pendentes.** Veredito, Em resumo, o link, depois `ExitPlanMode` — ou *Responda
+**build** para prosseguir* onde não há modo de plano.
+Nunca invente decisões para preencher o bloco — um vazio é um sinal, não uma lacuna.
 
-**Why the message is short.** The hook validates files, not messages. Nothing enforces this
-shape, so it has to stay small enough to hold in working memory.
+**Por que a mensagem é curta.** O hook valida arquivos, não mensagens. Nada impõe esta forma,
+então ela precisa ficar pequena o suficiente para caber na memória de trabalho.
 
-## Delegating
+## Delegando
 
-Use `citizen role run planner` with `--runtime`, the explicit session `--model`, `--workspace`,
-a `--prompt-file` brief and `--artifact <new-plan.md>`. The isolated worker receives the shared
-role and resolved stances, and returns plan content; the harness validates and publishes it.
-Read the artifact and post the review message yourself. Existing plans are not overwritten.
-Run the worker before entering plan mode: it writes an artifact, and plan mode permits no write
-but the designated plan file — so inside it, copy the worker's card across rather than delegating.
-See `docs/role-workers.md` for input directories, status and native qualification limits.
+Use `citizen role run planner` com `--runtime`, o `--model` explícito da sessão, `--workspace`,
+um briefing `--prompt-file` e `--artifact <new-plan.md>`. O worker isolado recebe o papel
+compartilhado e as posturas resolvidas, e retorna conteúdo de plano; o harness o valida e publica.
+Leia o artefato e poste a mensagem de revisão você mesmo. Planos existentes não são sobrescritos.
+Rode o worker antes de entrar no modo de plano: ele escreve um artefato, e o modo de plano não
+permite nenhuma escrita além do arquivo de plano designado — então dentro dele, copie o card do
+worker em vez de delegar. Veja `docs/role-workers.md` para diretórios de entrada, status e
+limites de qualificação nativa.
 
-## Self-check before handing it over
+## Autoverificação antes de entregar
 
-Run it, do not eyeball it:
+Rode isto, não estime a olho:
 
 ```bash
 awk '/^---$/{exit} {n++} END{print n" card lines"}' <plan file>
 ```
 
-- [ ] Card ≤ 70 lines, or ≤ 85 with a full decision block
-- [ ] No `## Context` above the rule
-- [ ] First screen answers: what is being built, how, what it touches, what I must decide
-- [ ] No paragraph above the rule runs past three sentences
-- [ ] Every step has a real exit test
-- [ ] Decisions numbered and answerable by number
-- [ ] Nothing above the rule repeated below it
+- [ ] Card ≤ 70 linhas, ou ≤ 85 com um bloco completo de decisão
+- [ ] Sem `## Context` acima da régua
+- [ ] A primeira tela responde: o que está sendo construído, como, o que toca, o que preciso
+  decidir
+- [ ] Nenhum parágrafo acima da régua passa de três frases
+- [ ] Todo passo tem um teste de saída real
+- [ ] Decisões numeradas e respondíveis por número
+- [ ] Nada acima da régua repetido abaixo dela
 
-## Rationale relocated from the resident rules
+## Justificativa realocada das regras residentes
 
-`voice-and-format.md` and `decisions-and-plans.md` were cut to their operative lines when the
-always-loaded context was capped. These are the paragraphs they used to carry, word for word.
+`voice-and-format.md` e `decisions-and-plans.md` foram cortadas até suas linhas operacionais
+quando o contexto sempre carregado recebeu um teto. Estes são os parágrafos que costumavam
+carregar, palavra por palavra.
 
-### Voice and output format
+### Voz e formato de saída
 
-*Replaced on 2026-09-24 by #811.* The paragraphs that stood here described the Scannable style's
-What changed template and status words as the contract for relays and subagent briefs. The
-`voice` stance now owns reply shape and the `brief-guard` hook appends the subagent return shape;
-the earlier text is in this file's git history.
+*Substituído em 24/09/2026 pela #811.* Os parágrafos que estavam aqui descreviam o template "O
+que mudou" do estilo Scannable e as palavras de status como o contrato para retransmissões e
+briefings de subagente. A postura `voice` agora é dona da forma da resposta e o hook
+`brief-guard` acrescenta a forma de retorno do subagente; o texto anterior está no histórico de
+git deste arquivo.
 
-The selected `voice` variant governs the main conversation. On Claude Code, `concise` and
-`scannable` also set an output style, which reaches only the main conversation and its forks;
-other subagents run their own system prompt and inherit no voice. So a relayed report is
-rewritten in the selected voice's shape, a finding that does not change what the reader does is
-cut, and every subagent brief carries its return shape.
+A variante `voice` selecionada rege a conversa principal. No Claude Code, `concise` e
+`scannable` também definem um estilo de saída, que alcança apenas a conversa principal e seus
+forks; outros subagentes rodam seu próprio prompt de sistema e não herdam nenhuma voz. Então um
+relatório retransmitido é reescrito na forma da voz selecionada, um achado que não muda o que o
+leitor faz é cortado, e todo briefing de subagente carrega sua forma de retorno.
 
-The voice files are written in plain prose with few bold labels because a prompt's formatting
-tends to carry into the reply; see Anthropic's prompting guidance on controlling response format
+Os arquivos de voz são escritos em prosa simples com poucos rótulos em negrito porque a
+formatação de um prompt tende a se carregar para a resposta; veja a orientação de prompting da
+Anthropic sobre controlar o formato de resposta
 (https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices).
 
-**Plan files and other markdown deliverables** follow the same rules — the selected voice,
-file paths as workspace-relative markdown links rather than backticks. Anything
-the user reads in order to approve work — plan, proposal, design doc, handoff, research summary —
-opens with the Review Card from the `plan-authoring` skill when the `plan-ceremony` stance is
-`review-card`, with the detail below the rule, and is handed over in that skill's chat-message
-shape.
+**Arquivos de plano e outros entregáveis markdown** seguem as mesmas regras — a voz selecionada,
+caminhos de arquivo como links markdown relativos ao workspace em vez de crases. Qualquer coisa
+que o usuário lê para aprovar trabalho — plano, proposta, doc de design, handoff, resumo de
+pesquisa — abre com o Review Card da skill `plan-authoring` quando a postura `plan-ceremony` é
+`review-card`, com o detalhe abaixo da régua, e é entregue na forma de mensagem de chat daquela
+skill.
 
-**Editors do not always repaint a markdown preview when a file is rewritten out of band.** When
-iterating on something the user is previewing, tell them to close the preview tab, or write the
-next version under a new filename.
+**Editores nem sempre repintam um preview de markdown quando um arquivo é reescrito fora de
+banda.** Ao iterar em algo que o usuário está pré-visualizando, diga a ele para fechar a aba de
+preview, ou escreva a próxima versão sob um novo nome de arquivo.
 
-**Posts published in the user's name.** When drafting comments, tickets or review replies that
-go out under the user's name, keep them to **about three sentences**. No deferential sign-off
-flourishes: no "your call", no "let me know". The reasoning lives in linked docs and tickets,
-not inline in the comment; link out for depth. Longer structure is fine for ticket bodies with
-scope sketches; comments stay terse.
+**Postagens publicadas em nome do usuário.** Ao redigir comentários, tickets ou respostas de
+revisão que saem em nome do usuário, mantenha-os em **cerca de três frases**. Sem floreios de
+despedida deferentes: sem "sua decisão", sem "me avise". O raciocínio vive em docs e tickets
+vinculados, não inline no comentário; vincule para profundidade. Estrutura mais longa está bem
+para corpos de ticket com esboços de escopo; comentários ficam concisos.
 
-Terse is not unformatted. Once a comment carries three or more parallel items — decisions,
-findings — break them into bold-led bullets with blank lines between. Structure is not licence
-to bloat: link the artifact instead of inlining its reasoning.
+Conciso não é sem formatação. Uma vez que um comentário carrega três ou mais itens paralelos —
+decisões, achados — divida-os em marcadores liderados por negrito com linhas em branco entre
+eles. Estrutura não é licença para inchar: vincule o artefato em vez de colocar o raciocínio
+inline.
 
-### Presenting decisions
+### Apresentando decisões
 
-**Do not use a chooser widget for substantive decisions.** Write the decision block in chat as
-the standalone final message of its turn: each question stated unambiguously, the assessment
-behind it, a recommendation with reasoning, and the alternatives with the honest case for each.
-Number them. The user answers in chat ("1 post, 2 comment, 3 issue").
+**Não use um widget de escolha para decisões substantivas.** Escreva o bloco de decisão no chat
+como a mensagem final autônoma do seu turno: cada pergunta declarada sem ambiguidade, a avaliação
+por trás dela, uma recomendação com raciocínio, e as alternativas com o caso honesto de cada uma.
+Numere-as. O usuário responde no chat ("1 postar, 2 comentar, 3 issue").
 
-Two failure modes, both real. A same-turn chooser eats the assessment, because text written
-before a tool call is not reliably displayed. A next-turn chooser wastes a round trip. Chooser
-labels also truncate and cannot carry evidence or trade-offs.
+Dois modos de falha, ambos reais. Um widget de escolha no mesmo turno engole a avaliação, porque
+texto escrito antes de uma chamada de ferramenta não é exibido de forma confiável. Um widget de
+escolha no próximo turno desperdiça uma ida e volta. Rótulos de widget de escolha também truncam e
+não conseguem carregar evidência ou trade-offs.
 
-A chooser is reserved for trivial forks where the option labels alone carry full meaning.
+Um widget de escolha é reservado para bifurcações triviais onde os rótulos das opções sozinhos
+carregam significado completo.
 
-Batch related decisions into one block.
+Agrupe decisões relacionadas num único bloco.
 
-*Amended on 2026-09-24 by #811:* the block may still close the message, but the reply's first two
-lines say that a decision is waiting.
+*Emendado em 24/09/2026 pela #811:* o bloco ainda pode encerrar a mensagem, mas as duas primeiras
+linhas da resposta dizem que uma decisão está esperando.
 
-### Pointing at an option is not a decision
+### Apontar para uma opção não é uma decisão
 
-During design and option reviews, the user saying "this one" or pasting an image of an option
-means **put that in the doc and show me**. It is not approval to implement. Treat
-option-pointing as scope for the review artifact. Build only on an explicit "build" or
-"go with N".
+Durante revisões de design e de opções, o usuário dizendo "esta" ou colando uma imagem de uma
+opção significa **coloque isso no doc e me mostre**. Não é aprovação para implementar. Trate
+apontar-para-opção como escopo para o artefato de revisão. Construa apenas sobre um "construir"
+ou "vá com N" explícito.
 
-### Pre-approved plan execution
+### Execução de plano pré-aprovado
 
-Once the user has explicitly approved a multi-step plan in the current conversation, do not
-re-ask at each step. Execute, log, move to the next.
+Uma vez que o usuário aprovou explicitamente um plano de múltiplos passos na conversa atual, não
+pergunte de novo a cada passo. Execute, registre, avance para o próximo.
 
-**Applies when** they said yes, go ahead, proceed, approved or equivalent to a full plan; no new
-information materially changes the plan; and the action was in the approved plan.
+**Aplica-se quando** ele disse sim, vá em frente, prossiga, aprovado ou equivalente para um plano
+completo; nenhuma informação nova altera materialmente o plano; e a ação estava no plano aprovado.
 
-**Re-surface for confirmation if** an error or unexpected state makes a step unsafe (merge
-conflict, wrong branch, destructive diff not in the plan), a step was not in the original plan,
-or the blast radius has materially increased.
+**Traga de volta para confirmação se** um erro ou estado inesperado torna um passo inseguro
+(conflito de merge, branch errado, diff destrutivo não no plano), um passo não estava no plano
+original, ou o raio de impacto aumentou materialmente.
 
-The plan ceremony itself — whether a plan needs a Review Card and a build gate — is set by the
-`plan-ceremony` stance. Its `review-card` variant carries the four numbered steps; its `light`
-variant asks only for a short chat message and an explicit go-ahead.
+A cerimônia do plano em si — se um plano precisa de um Review Card e um gate de construção — é
+definida pela postura `plan-ceremony`. Sua variante `review-card` carrega os quatro passos
+numerados; sua variante `light` pede apenas uma mensagem curta de chat e um sinal verde explícito.

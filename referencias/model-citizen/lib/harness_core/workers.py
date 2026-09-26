@@ -204,11 +204,12 @@ def text_size(paths):
 
 
 def context_estimate(instructions, skills, docs):
-    """What this worker is shown, in estimated tokens: the policy plus every byte mounted with it.
+    """O que este worker recebe, em tokens estimados: a política mais todo byte montado com ela.
 
-    This counts what is mounted, not what a run reads: a worker opens what its brief needs. Not
-    the workspace and not the brief either, since those are the caller's and vary per run. It is
-    the standing cost the role's own contract fixes, which is what a review round pays four times.
+    Isto conta o que é montado, não o que uma execução lê: um worker abre o que seu brief
+    precisa. Nem o workspace nem o brief também, já que esses são do chamador e variam por
+    execução. É o custo fixo que o próprio contrato do papel determina, que é o que uma rodada
+    de revisão paga quatro vezes.
     """
     reference = text_size(skills) + text_size(docs)
     return {"policy_tokens": est_tokens(len(instructions)), "reference_tokens": est_tokens(reference),
@@ -217,17 +218,18 @@ def context_estimate(instructions, skills, docs):
 
 
 def posture_figures(root, row):
-    """The budget figures the sentence states, as the shared resolver counts them."""
+    """As cifras de orçamento que a frase declara, como o resolvedor compartilhado as conta."""
     module = catalog.posture_module(root)
     return module.budget_figures(row) if hasattr(module, "budget_figures") else {}
 
 
 def budget(root, row, prompt):
-    """The soft-budget sentence this brief is missing, or None; the same one a native brief gets.
+    """A frase de orçamento leve que este brief está sem, ou None; a mesma que um brief nativo recebe.
 
-    The wording and the "already priced" test are `policy/hooks/posture.py`'s, loaded by file the
-    way `lifecycle.py` loads a policy, so a role worker's brief and a native spawn's cannot state
-    a spend two different ways. A resolver this checkout does not carry appends nothing.
+    A redação e o teste de "já precificado" são de `policy/hooks/posture.py`, carregado por
+    arquivo do jeito que `lifecycle.py` carrega uma política, para que o brief de um worker de
+    papel e o de um disparo nativo não possam declarar um gasto de duas formas diferentes. Um
+    resolvedor que este checkout não carrega não acrescenta nada.
     """
     module = catalog.posture_module(root)
     if prompt is None or not hasattr(module, "budget_sentence"):
@@ -236,16 +238,17 @@ def budget(root, row, prompt):
 
 
 def resolve(root, config, runtime, name, model=None):
-    """The contract, native binding and shared instructions of one role worker."""
+    """O contrato, o binding nativo e as instruções compartilhadas de um worker de papel."""
     ready = resolution(root, config, runtime, name, model)
     return ready["fields"], ready["bindings"], ready["instructions"]
 
 
 def passthrough(original):
-    """The caller's variables a worker keeps: authentication, locale, proxies and certificates.
+    """As variáveis do chamador que um worker mantém: autenticação, locale, proxies e certificados.
 
-    Customization and loader overrides are dropped. `environment` builds on this, and an adapter's
-    `refusal` checks the same set, so the preflight sees exactly the credentials the worker gets.
+    Personalização e overrides de loader são descartados. `environment` constrói sobre isto, e o
+    `refusal` de um adaptador checa o mesmo conjunto, então a pré-checagem enxerga exatamente as
+    credenciais que o worker recebe.
     """
     exact = {"PATH", "LANG", "LC_ALL", "TERM", "TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR",
              "REQUESTS_CA_BUNDLE", "NODE_EXTRA_CA_CERTS", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY"}
@@ -271,7 +274,7 @@ def environment(original, work):
 
 @contextlib.contextmanager
 def artifact_slot(workspace, filename):
-    """Anchor the approved output directory with no-follow descriptors; never replace an artifact."""
+    """Ancora o diretório de saída aprovado com descritores no-follow; nunca substitui um artefato."""
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*\.md", filename or ""):
         raise ValueError("--artifact must be a Markdown filename, not a path")
     fds = []
@@ -306,7 +309,7 @@ def publish(slot, content):
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
-        # link() is atomic and refuses a destination created while the worker was running.
+        # link() é atômico e recusa um destino criado enquanto o worker estava rodando.
         os.link(temporary, filename, src_dir_fd=fd, dst_dir_fd=fd, follow_symlinks=False)
         os.fsync(fd)
     finally:
@@ -345,11 +348,11 @@ def execute(command, prompt, env, cwd, run_dir, timeout):
 
 
 def policy_reference(work, docs):
-    """Copy the documents the policy cites into the worker's own directory, and return it.
+    """Copia os documentos que a política cita para o próprio diretório do worker, e o retorna.
 
-    A read root is a directory, and the directory these live in is the 237,000-token `docs/`
-    tree; copying the cited files is how a worker follows `docs/preferences.md` without being
-    handed everything beside it.
+    Uma raiz de leitura é um diretório, e o diretório onde estes vivem é a árvore `docs/` de
+    237.000 tokens; copiar os arquivos citados é como um worker segue `docs/preferences.md` sem
+    receber tudo o mais ao lado.
     """
     reference = Path(work) / "policy-reference"
     reference.mkdir(exist_ok=True)
@@ -359,7 +362,7 @@ def policy_reference(work, docs):
 
 
 def temporary_roots():
-    """The shared temporary directories of this machine, resolved: every run's scratch lands here."""
+    """Os diretórios temporários compartilhados desta máquina, resolvidos: o scratch de toda execução cai aqui."""
     candidates = ["/tmp", "/var/tmp", tempfile.gettempdir(), os.environ.get("TMPDIR") or "/tmp"]
     return {Path(path).resolve() for path in candidates}
 

@@ -110,24 +110,26 @@ def is_harness_hook_entry(entry):
                for command in _commands(entry) for name in HARNESS_HOOK_BASENAMES)
 
 
-# A hook event's list is shared: the harness registers its entries beside the user's own.
-# A record marked with one of these owns only the entries its predicate recognizes, so a
-# user's hook is neither a conflict at sync, nor drift, nor removed at uninstall.
+# A lista de um evento de hook é compartilhada: o harness registra suas entradas ao lado das do
+# usuário. Um registro marcado com um destes só possui as entradas que seu predicado reconhece,
+# então um hook do usuário não é conflito na sincronização, nem drift, nem removido na desinstalação.
 HOOK_ENTRIES = "harness-hooks"
 ENTRY_OWNERS = {HOOK_ENTRIES: is_harness_hook_entry}
 
 
 def entries_of(keys, record):
-    """The entry owner of a record. Journals written before owners were recorded name none, and
-    their hook event lists were shared all the same, so the key's shape decides for them."""
+    """O dono das entradas de um registro. Journals escritos antes de donos serem registrados não
+    nomeiam nenhum, e suas listas de evento de hook eram compartilhadas do mesmo jeito, então a
+    forma da chave decide por eles."""
     if record.get("entries"):
         return record["entries"]
     return HOOK_ENTRIES if len(keys) == 2 and keys[0] == "hooks" else None
 
 
 def owned_part(item, entries):
-    """The part of a looked-up value a record owns: all of it, or its own entries in a list.
-    For a shared list an absent value owns nothing, the same as a list of only user entries."""
+    """A parte de um valor consultado que um registro possui: tudo dele, ou suas próprias entradas
+    numa lista. Para uma lista compartilhada, um valor ausente não possui nada, o mesmo que uma
+    lista só com entradas do usuário."""
     owner = ENTRY_OWNERS.get(entries)
     if owner is None:
         return item
@@ -139,14 +141,14 @@ def owned_part(item, entries):
 
 
 def user_changed(live, record, entries=None):
-    """True when what the record owns is neither what was applied nor what was being applied."""
+    """True quando o que o registro possui não é nem o que foi aplicado nem o que estava sendo aplicado."""
     mine = owned_part(live, entries)
     return mine != owned_part(record["applied"], entries) and (
         "pending_from" not in record or mine != owned_part(record["pending_from"], entries))
 
 
 def restored(live, record, entries=None):
-    """What uninstall leaves: the prior value, or the user's own entries of a shared list."""
+    """O que a desinstalação deixa: o valor anterior, ou as próprias entradas do usuário numa lista compartilhada."""
     owner = ENTRY_OWNERS.get(entries)
     if owner is None or not live["present"] or not isinstance(live["value"], list):
         return record["prior"]
@@ -168,7 +170,7 @@ class Store:
             atomic_text(self.path, json.dumps(self.data, indent=2) + "\n")
 
     def _write(self, path, text, record):
-        # Persist intent first. Recovery accepts either the prior or intended content.
+        # Persiste a intenção primeiro. A recuperação aceita o conteúdo anterior ou o pretendido.
         self.data["files"][str(path)] = record
         self.save()
         if not self.dry:
@@ -179,11 +181,12 @@ class Store:
             self.save()
 
     def generated(self, path, text, adopt=False, over_link=False):
-        """Write a file the harness owns. `over_link` is a link the caller has already claimed.
+        """Escreve um arquivo que o harness possui. `over_link` é um link que o chamador já reivindicou.
 
-        A dry run reports what a real one would do, and a real one unlinks before writing, so a
-        claimed link is treated as an absent file rather than as content to compare against: the
-        alternative is a dry run that reports nothing wherever the previous release left a link.
+        Uma execução simulada reporta o que uma real faria, e uma real remove o link antes de
+        escrever, então um link reivindicado é tratado como um arquivo ausente em vez de como
+        conteúdo a comparar: a alternativa é uma execução simulada que não reporta nada onde o
+        lançamento anterior deixou um link.
         """
         path = Path(path)
         if path.is_symlink() and not over_link:
@@ -217,9 +220,9 @@ class Store:
                 self.conflicts.append(str(path) + ": owned key changed: " + key)
                 continue
             if value is None:
-                # A key the harness wrote and no longer wants — a renamed setting, say. Only one
-                # it owns: a key of the same name the user set themselves has no record here and
-                # is left exactly as it is.
+                # Uma chave que o harness escreveu e não quer mais — uma configuração renomeada,
+                # digamos. Só uma que ele possui: uma chave de mesmo nome que o próprio usuário
+                # definiu não tem registro aqui e é deixada exatamente como está.
                 if old is None:
                     continue
                 if old["prior"]["present"]:

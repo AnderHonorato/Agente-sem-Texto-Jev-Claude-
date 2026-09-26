@@ -1,26 +1,26 @@
-"""Opt-in controls for a decision provider that leaves the machine: modes, a kill switch, an
-allowlist.
+"""Controles de opt-in para um provedor de decisão que sai da máquina: modos, um interruptor de
+emergência, uma allowlist.
 
-Three separate questions, deliberately not one switch:
+Três perguntas separadas, deliberadamente não um único switch:
 
-* **May this point be judged at all, and how far?** `governance.jev.mode` sets a default and
-  `governance.jev.modes` names a decision point: `off` calls nothing, `shadow` calls and logs
-  the answer where only the ledger sees it, `advise` adds a line to the decision, `act` lets a
-  judgment tighten one. Every mode defaults to `off`, so an existing configuration that has
-  never heard of this provider makes no request.
-* **Is anything allowed out right now?** A sentinel file disables every call while it exists,
-  with no configuration change and no restart: `touch ~/.local/state/agent-harness/jev-disabled`
-  is the kill switch, and `mode_for` reads it per decision rather than at construction.
-* **What may leave?** `governance.jev.state_fields` is an allowlist over `STATE_FIELDS`,
-  empty by default. A field not listed is never built into the request, and no key outside
-  `BASE_FIELDS` plus the listed ones can reach the wire — `check_outbound` refuses the request
-  rather than trimming it.
+* **Este ponto pode sequer ser julgado, e até que ponto?** `governance.jev.mode` define um
+  padrão e `governance.jev.modes` nomeia um ponto de decisão: `off` não chama nada, `shadow`
+  chama e registra a resposta onde só o ledger a vê, `advise` acrescenta uma linha à decisão,
+  `act` deixa um julgamento apertá-la. Todo modo tem padrão `off`, então uma configuração
+  existente que nunca ouviu falar deste provedor não faz nenhuma requisição.
+* **Algo pode sair agora mesmo?** Um arquivo sentinela desativa toda chamada enquanto existir,
+  sem mudança de configuração e sem reinício: `touch ~/.local/state/agent-harness/jev-disabled`
+  é o interruptor de emergência, e `mode_for` o lê por decisão em vez de na construção.
+* **O que pode sair?** `governance.jev.state_fields` é uma allowlist sobre `STATE_FIELDS`,
+  vazia por padrão. Um campo não listado nunca é construído dentro da requisição, e nenhuma
+  chave fora de `BASE_FIELDS` mais as listadas pode alcançar a rede — `check_outbound` recusa a
+  requisição em vez de recortá-la.
 
-A live request needs all three to agree and a credential in the environment besides; the
-harness never reads a key file. `SessionSpend` sits alongside them for the budget the provider
-charges: a hook is a new process per event, so counters that live in one bound nothing, and a
-session's spend is kept in the state directory under the lock instead. Nothing here has an
-effect until a configuration asks for one.
+Uma requisição real precisa que as três concordem, além de uma credencial no ambiente; o harness
+nunca lê um arquivo de chave. `SessionSpend` fica ao lado delas para o orçamento que o provedor
+cobra: um hook é um processo novo por evento, então contadores que vivem em um não limitam nada;
+o gasto de uma sessão é mantido no diretório de estado sob o lock em vez disso. Nada aqui tem
+efeito até que uma configuração peça por um.
 """
 import json
 import os
@@ -32,40 +32,43 @@ from typing import Any, Dict, List, Optional, Tuple
 from .. import decision
 from .. import reconcile
 
-# The hook points a mode may name. A copy rather than an import: `policy/hooks/decisions.py`
-# is reached by file from a hook directory, not by module path, and a configuration must
-# validate in a process that never loads it. `test_jev_outbound_controls.py` asserts the two
-# lists agree, so a point added there and forgotten here is a test failure.
+# Os pontos de hook que um modo pode nomear. Uma cópia em vez de um import:
+# `policy/hooks/decisions.py` é alcançado por arquivo a partir de um diretório de hooks, não por
+# caminho de módulo, e uma configuração precisa validar num processo que nunca o carrega.
+# `test_jev_outbound_controls.py` garante que as duas listas concordam, então um ponto
+# adicionado ali e esquecido aqui é uma falha de teste.
 POINTS = ("grade-bash", "stop-gate", "tier-agent-spawns", "brief-guard", "evasion-deny")
 
 MODES = ("off", "shadow", "advise", "act")
 DEFAULT_MODE = "off"
 
-# The state fields a caller's context may contribute, and the ones every request carries
-# whatever the configuration says. Closed on purpose: a decision point that touches
-# permissions may describe the command it is judging and nothing else, so tool output,
-# assistant prose, file contents and environment values have no field to travel in.
+# Os campos de estado que o contexto de um chamador pode contribuir, e os que toda requisição
+# carrega seja o que for que a configuração diga. Fechado de propósito: um ponto de decisão que
+# toca permissões pode descrever o comando que está julgando e nada mais, então saída de
+# ferramenta, prosa do assistente, conteúdo de arquivo e valores de ambiente não têm campo por
+# onde viajar.
 STATE_FIELDS = ("command", "summary")
 BASE_FIELDS = ("action_class", "counterparty", "grade", "grade_scale")
 
 SENTINEL_NAME = "jev-disabled"
-# Where a session's spend is kept, so a ceiling bounds a session rather than a process: every
-# hook is a new process, and a counter that lives in one bounds nothing at all.
+# Onde o gasto de uma sessão é mantido, para que um teto limite uma sessão em vez de um
+# processo: todo hook é um processo novo, e um contador que vive em um não limita nada.
 SPEND_NAME = "jev-spend.json"
-# A session's row is dropped a day after its last request. Long enough that a session cannot
-# outlive its own ceiling, short enough that the file stays a file a person can read.
+# A linha de uma sessão é descartada um dia após sua última requisição. Longo o bastante para
+# que uma sessão não consiga sobreviver ao próprio teto, curto o bastante para que o arquivo
+# continue sendo um arquivo que uma pessoa consegue ler.
 SPEND_RETENTION_SECONDS = 24 * 60 * 60
 SPEND_LOCK_ATTEMPTS = 5
 SPEND_LOCK_PAUSE = 0.01
 SESSION_VARIABLES = ("HARNESS_SESSION_ID", "CLAUDE_SESSION_ID")
-# The bucket a process with no session id spends from. Shared rather than per-process, which
-# is the conservative direction: an unidentified caller may not have a fresh ceiling.
+# O balde do qual um processo sem id de sessão gasta. Compartilhado em vez de por processo, que
+# é a direção conservadora: um chamador não identificado pode não ter um teto recém-atribuído.
 UNKNOWN_SESSION = "unknown-session"
-# Read from the environment only. The harness never reads a key file, and a value is never
-# printed: what a report may say is which of these names is set.
+# Lido apenas do ambiente. O harness nunca lê um arquivo de chave, e um valor nunca é impresso:
+# o que um relatório pode dizer é qual desses nomes está definido.
 KEY_VARIABLES = ("TYPESAFE_API_KEY", "JEV_API_KEY")
-# Two seconds, inside the ten a hook has: a judgment that has not arrived by then is worth
-# less than the turn it is holding up, and the deterministic answer is already in hand.
+# Dois segundos, dentro dos dez que um hook tem: um julgamento que não chegou até lá vale menos
+# que o turno que está segurando, e a resposta determinística já está em mãos.
 DEFAULT_TIMEOUT = 2
 DEFAULT_MAX_REQUESTS = 50
 DEFAULT_MAX_TOKENS = 200000
@@ -73,7 +76,7 @@ KEYS = ("mode", "modes", "state_fields", "sentinel", "timeout", "max_requests", 
 
 
 def state_dir() -> Path:
-    """`~/.local/state/agent-harness`, the directory the ledgers already live in."""
+    """`~/.local/state/agent-harness`, o diretório onde os ledgers já vivem."""
     home = os.environ.get("HARNESS_HOME") or os.environ.get("HOME")
     return (Path(home) if home else Path.home()) / ".local" / "state" / "agent-harness"
 
@@ -84,8 +87,8 @@ def _where(key: str) -> str:
 
 def _mode(value: Any, key: str) -> str:
     if value not in MODES:
-        # The offending value is never quoted back. A configuration value can hold anything a
-        # user pasted, and an error message is printed, logged and scrolled past.
+        # O valor ofensor nunca é citado de volta. Um valor de configuração pode conter qualquer
+        # coisa que um usuário colou, e uma mensagem de erro é impressa, registrada e rolada.
         raise decision.PolicyError(_where(key) + " must be one of " + ", ".join(MODES))
     return value
 
@@ -99,13 +102,13 @@ def _count(value: Any, key: str, fallback: int) -> int:
 
 
 class Controls:
-    """One resolved answer to each of the three questions above.
+    """Uma resposta resolvida para cada uma das três perguntas acima.
 
-    Built from a configuration with `from_config`, which defaults every mode to `off` and the
-    allowlist to empty. `acting()` is the other constructor: every point at `act` and both
-    optional fields allowed, for a caller that has assembled a provider by hand and supplied
-    its own client. Only configured controls may put a client on the network — a provider
-    built in a test or a script is inert however its modes read.
+    Construída a partir de uma configuração com `from_config`, que dá padrão `off` a todo modo e
+    lista vazia à allowlist. `acting()` é o outro construtor: todo ponto em `act` e ambos os
+    campos opcionais permitidos, para um chamador que montou um provedor à mão e forneceu seu
+    próprio cliente. Só controles configurados podem colocar um cliente na rede — um provedor
+    construído num teste ou script é inerte não importa como seus modos leiam.
     """
 
     def __init__(self, default_mode=DEFAULT_MODE, modes=None, state_fields=(), sentinel=None,
@@ -142,7 +145,7 @@ class Controls:
 
     @classmethod
     def from_config(cls, config: Optional[Dict[str, Any]]) -> "Controls":
-        """The `governance.jev` block, validated, or every point `off` when there is none."""
+        """O bloco `governance.jev`, validado, ou todo ponto `off` quando não há nenhum."""
         block = (config or {}).get("governance")
         block = block.get("jev") if isinstance(block, dict) else None
         if block is None:
@@ -175,10 +178,10 @@ class Controls:
                    state_fields=STATE_FIELDS)
 
     def sentinel_path(self) -> Path:
-        """Where the kill switch lives. Relative is resolved against the state directory.
+        """Onde vive o interruptor de emergência. Um caminho relativo é resolvido contra o diretório de estado.
 
-        Never against the working directory: a switch whose meaning depends on where a hook
-        happened to be invoked from is one that is on for some decisions and off for others.
+        Nunca contra o diretório de trabalho: um interruptor cujo significado depende de onde um
+        hook foi invocado é um que fica ligado para algumas decisões e desligado para outras.
         """
         if not self.sentinel:
             return state_dir() / SENTINEL_NAME
@@ -186,18 +189,18 @@ class Controls:
         return path if path.is_absolute() else state_dir() / path
 
     def disabled(self) -> bool:
-        """Whether the kill switch is in place. Read per decision, never cached."""
+        """Se o interruptor de emergência está acionado. Lido por decisão, nunca em cache."""
         try:
             return self.sentinel_path().exists()
         except OSError:
-            # A path that cannot even be stat'd is not a reason to start calling out.
+            # Um caminho que nem sequer pode ser stat'ado não é motivo para começar a chamar.
             return True
 
     def mode_for(self, point: Optional[str] = None) -> str:
-        """The mode for one decision point, the sentinel and an unknown name included.
+        """O modo para um ponto de decisão, o sentinela e um nome desconhecido incluídos.
 
-        A point this harness does not know reads `off`, never the default: a caller naming a
-        point nobody configured is a caller nobody decided about.
+        Um ponto que este harness não conhece lê `off`, nunca o padrão: um chamador que nomeia
+        um ponto que ninguém configurou é um chamador sobre o qual ninguém decidiu.
         """
         if self.disabled():
             return "off"
@@ -208,15 +211,15 @@ class Controls:
         return self.default_mode
 
     def selected(self) -> Dict[str, str]:
-        """Every known point and the mode it resolves to, the sentinel included."""
+        """Todo ponto conhecido e o modo para o qual resolve, o sentinela incluído."""
         return dict((point, self.mode_for(point)) for point in POINTS)
 
     def enabled(self) -> bool:
-        """Whether any configured mode asks for a call, the sentinel left out of it.
+        """Se algum modo configurado pede uma chamada, o interruptor de emergência deixado de fora disso.
 
-        What a client is built with, because the kill switch is answered per decision by
-        `mode_for`: a client built while the sentinel existed must still work the moment it is
-        removed, without a restart.
+        O que um cliente é construído com, porque o interruptor de emergência é respondido por
+        decisão por `mode_for`: um cliente construído enquanto o sentinela existia ainda precisa
+        funcionar no momento em que é removido, sem reinício.
         """
         if not self.configured:
             return False
@@ -224,18 +227,18 @@ class Controls:
         return any(mode != "off" for mode in modes)
 
     def live(self) -> bool:
-        """Whether a call could be made right now: enabled, and not switched off."""
+        """Se uma chamada poderia ser feita agora mesmo: habilitado, e não desligado."""
         return self.enabled() and not self.disabled()
 
     def allowed_fields(self) -> List[str]:
         return list(BASE_FIELDS) + list(self.state_fields)
 
     def outbound(self, context: Optional[Dict[str, Any]]) -> Dict[str, str]:
-        """The listed fields of `context` that are safe to send, and nothing else.
+        """Os campos listados de `context` que são seguros para enviar, e nada mais.
 
-        A field whose text matches a known secret shape is dropped whole rather than masked:
-        the match says where a credential is, not how long it is, and a masked remainder still
-        carries whatever sat beside it.
+        Um campo cujo texto combina com uma forma de segredo conhecida é descartado por
+        inteiro em vez de mascarado: a correspondência diz onde uma credencial está, não quão
+        longa ela é, e um resto mascarado ainda carregaria o que quer que estivesse ao lado dela.
         """
         patterns = secret_patterns()
         out = {}
@@ -249,7 +252,7 @@ class Controls:
         return out
 
     def check_outbound(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """`state`, or a `PolicyError` naming the first key no configuration allowed out."""
+        """`state`, ou um `PolicyError` nomeando a primeira chave que nenhuma configuração permitiu sair."""
         allowed = set(self.allowed_fields())
         extra = sorted(set(state) - allowed)
         if extra:
@@ -259,10 +262,10 @@ class Controls:
         return state
 
     def status(self, env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        """What `harness doctor` prints: modes, the switch, and whether a key exists.
+        """O que `harness doctor` imprime: modos, o interruptor, e se uma chave existe.
 
-        The credential is reported by variable name only. A value is a credential and is never
-        printed, here or anywhere.
+        A credencial é reportada apenas pelo nome da variável. Um valor é uma credencial e nunca
+        é impresso, aqui ou em qualquer lugar.
         """
         try:
             path = str(self.sentinel_path())
@@ -277,16 +280,16 @@ class Controls:
 
 
 class SessionSpend:
-    """One session's requests and tokens, shared by every process that answers for it.
+    """As requisições e tokens de uma sessão, compartilhados por todo processo que responde por ela.
 
-    A hook is a new process per event, so a ceiling counted in memory bounds a single decision
-    and nothing else. The counters live in the state directory keyed by session id, read before
-    each check and added to after each charge, under the same lock the rest of the harness uses
-    for a file two processes may write.
+    Um hook é um processo novo por evento, então um teto contado em memória limita uma única
+    decisão e nada mais. Os contadores vivem no diretório de estado chaveados pelo id de sessão,
+    lidos antes de cada checagem e somados após cada cobrança, sob o mesmo lock que o resto do
+    harness usa para um arquivo que dois processos podem escrever.
 
-    Nothing here may fail a decision. A lock that stays held, an unreadable file or a full disk
-    leaves the process-local count standing, which is the same conservative direction as the
-    rest of this provider: a judgment is never worth a turn.
+    Nada aqui pode falhar uma decisão. Um lock que fica preso, um arquivo ilegível ou um disco
+    cheio deixa a contagem local ao processo como estava, o que é a mesma direção conservadora do
+    resto deste provedor: um julgamento nunca vale mais que um turno.
     """
 
     def __init__(self, session: Optional[str] = None, path=None,
@@ -297,12 +300,12 @@ class SessionSpend:
         self.path = Path(path) if path else state_dir() / SPEND_NAME
 
     def read(self) -> Tuple[int, int]:
-        """`(requests, tokens)` already spent in this session. Unreadable is zero."""
+        """`(requests, tokens)` já gastos nesta sessão. Ilegível é zero."""
         row = self._rows().get(self.session) or {}
         return (_nonnegative(row.get("requests")), _nonnegative(row.get("tokens")))
 
     def add(self, requests: int, tokens: int) -> bool:
-        """Add to this session's spend; says whether the file took it."""
+        """Soma ao gasto desta sessão; diz se o arquivo aceitou."""
         for attempt in range(SPEND_LOCK_ATTEMPTS):
             try:
                 with reconcile.lock(self.path.parent):
@@ -315,7 +318,7 @@ class SessionSpend:
                     reconcile.atomic_text(self.path, json.dumps(rows, sort_keys=True) + "\n")
                 return True
             except ValueError:
-                # Another process holds the lock. It holds it for one small write.
+                # Outro processo segura o lock. Ele o segura por uma escrita pequena.
                 time.sleep(SPEND_LOCK_PAUSE * (attempt + 1))
             except OSError:
                 return False
@@ -336,7 +339,7 @@ class SessionSpend:
 
 
 def _session_key(value: Any) -> bool:
-    """A session id safe to key a row by: ASCII, bounded, no separator and no traversal."""
+    """Um id de sessão seguro para chavear uma linha por ele: ASCII, limitado, sem separador e sem travessia."""
     return (isinstance(value, str) and value.isascii() and 0 < len(value) <= 128
             and value[0].isalnum() and all(c.isalnum() or c in "._-" for c in value))
 
@@ -350,17 +353,17 @@ def credential_variables() -> List[str]:
 
 
 def credential_variable(env: Optional[Dict[str, str]] = None) -> Optional[str]:
-    """The name of the environment variable holding a key, or None. Never the value."""
+    """O nome da variável de ambiente que guarda uma chave, ou None. Nunca o valor."""
     env = os.environ if env is None else env
     return next((name for name in KEY_VARIABLES if env.get(name)), None)
 
 
 def secret_patterns():
-    """The shared secret shapes, compiled, or None when the list cannot be loaded.
+    """As formas de segredo compartilhadas, compiladas, ou None quando a lista não pode ser carregada.
 
-    One list for the lint, the `secret-in-write` detector and this filter. None is not "no
-    secrets": a caller reads it as "scan unavailable" and sends no free text at all, because a
-    redactor that failed to load must not be mistaken for one that found nothing.
+    Uma única lista para o lint, o detector `secret-in-write` e este filtro. None não é "nenhum
+    segredo": um chamador o lê como "varredura indisponível" e não envia texto livre nenhum,
+    porque um redator que falhou ao carregar não deve ser confundido com um que não encontrou nada.
     """
     module = decision._hook_module("rule-detectors")
     patterns = getattr(module, "SECRET_PATTERNS", None) if module else None

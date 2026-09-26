@@ -1,163 +1,177 @@
-# How the shared harness works
+# Como o harness compartilhado funciona
 
-A rule is written, given a detector or a stated reason it cannot have one, held to that by lint,
-and then measured. Everything below serves that loop. Your preferences select behavior from a
-shared primitive catalog, and the Claude Code and Codex adapters project that selection into each
-one's native instructions, skill discovery, roles, workflows, settings and hooks. The agent runtime
-remains responsible for its native permissions and restrictions.
+Uma regra é escrita, recebe um detector ou uma razão declarada de por que não pode tê-lo, é
+mantida sob isso pelo lint, e então medida. Tudo abaixo serve a esse ciclo. Suas preferências
+selecionam comportamento de um catálogo de primitivos compartilhado, e os adaptadores do Claude
+Code e do Codex projetam essa seleção nas instruções nativas, na descoberta de skill, nos papéis,
+nos workflows, nas configurações e nos hooks de cada um. O runtime do agente continua responsável
+por suas próprias permissões e restrições nativas.
 
-## The rule lifecycle
+## O ciclo de vida da regra
 
-Rules are the one primitive with a measurement loop around them, and it runs in five steps.
+Regras são o único primitivo com um ciclo de medição ao redor delas, e ele roda em cinco passos.
 
-1. **Write the rule.** One instruction per line under `primitives/rules/`, in second person, with
-   the reasoning in the skill it points at rather than in the rule file itself.
-2. **Name a detector, or say why there cannot be one.** A detector in
-   `claude/hooks/rule-detectors.py` decides from the transcript alone, deterministically, whether
-   the rule was in play. A rule about tone, altitude or honesty carries a one-line `OPT_OUT` reason
-   instead, and is then dark on purpose rather than by omission.
-3. **Lint enforces the choice.** `check_detectors` in `bin/harness` fails the commit on a rule that
-   has neither, so an unmeasured rule cannot arrive quietly.
-4. **The report says what fired.** `citizen usage --rules` counts hits per rule over the window,
-   `--by repo` per repository and `--by stance` per `dimension=variant`, so a hit rate can be read
-   against the preference variant that was selected at the time. Thresholds, and what the numbers
-   do not support, are in [usage](usage.md).
-5. **Prune what never fires.** A detector the report marks `unobserved` across enough measured
-   sessions is evidence about the rule. Two of this repository's own shipped features were measured
-   doing nothing and filed as bugs on that evidence; [the field scan](field-scan.md) names both,
-   along with the gaps that qualify every figure — detector validity is unmeasured, and per-variant
-   rates are observational rather than an A/B.
+1. **Escreva a regra.** Uma instrução por linha sob `primitives/rules/`, em segunda pessoa, com o
+   raciocínio na skill à qual ela aponta, em vez de no próprio arquivo de regra.
+2. **Nomeie um detector, ou diga por que não pode haver um.** Um detector em
+   `claude/hooks/rule-detectors.py` decide, só a partir da transcrição, de forma determinística,
+   se a regra estava em jogo. Uma regra sobre tom, altitude ou honestidade carrega em vez disso um
+   motivo `OPT_OUT` de uma linha, e fica então no escuro de propósito, não por omissão.
+3. **O lint aplica a escolha.** `check_detectors` em `bin/harness` falha o commit em uma regra que
+   não tem nenhum dos dois, então uma regra não medida não consegue chegar silenciosamente.
+4. **O relatório diz o que disparou.** `citizen usage --rules` conta acertos por regra na janela,
+   `--by repo` por repositório e `--by stance` por `dimension=variant`, então uma taxa de acerto
+   pode ser lida contra a variante de preferência que estava selecionada na hora. Os limiares, e o
+   que os números não sustentam, estão em [usage](usage.md).
+5. **Pode a regra que nunca dispara.** Um detector que o relatório marca como `unobserved` ao
+   longo de sessões medidas o bastante é evidência sobre a regra. Duas funcionalidades lançadas
+   pelo próprio repositório foram medidas não fazendo nada e registradas como bugs sobre essa
+   evidência; [o levantamento de campo](field-scan.md) nomeia as duas, junto com as lacunas que
+   qualificam todo número — a validade do detector não é medida, e as taxas por variante são
+   observacionais, não um teste A/B.
 
-## The authority and its projections
+## A autoridade e suas projeções
 
 ```mermaid
 flowchart TD
-  D[Distribution defaults] --> R[Resolve effective policy]
-  U[User preferences] --> R
-  P[Explicit project overrides] --> R
-  E[Session overrides] --> R
-  S[Shared primitive sources] --> R
-  R --> A[Runtime adapters]
+  D[Padrões de distribuição] --> R[Resolver política efetiva]
+  U[Preferências do usuário] --> R
+  P[Sobrescritas explícitas de projeto] --> R
+  E[Sobrescritas de sessão] --> R
+  S[Fontes de primitivos compartilhadas] --> R
+  R --> A[Adaptadores de runtime]
   A --> C[Claude Code]
   A --> X[Codex]
 ```
 
-Resolution precedence is defaults, user, explicit project, then session. User-level sync projects
-only user defaults; lifecycle hooks resolve invocation overrides without mutating global links.
-`citizen stances --json` shows source, behavior and adapter coverage. Native restrictions always
-win. [Custom stance authoring](primitive-authoring.md) defines naming, roots and conflicts.
+A precedência de resolução é padrões, usuário, projeto explícito, depois sessão. A sincronização
+em nível de usuário projeta só os padrões do usuário; os hooks de ciclo de vida resolvem
+sobrescritas de invocação sem alterar os links globais. `citizen stances --json` mostra a fonte, o
+comportamento e a cobertura de adaptador. Restrições nativas sempre vencem. [A autoria de postura
+personalizada](primitive-authoring.md) define nomenclatura, raízes e conflitos.
 
-Rules hold standing behavior. Stances make personal choices explicit and switchable; they are one
-capability here among several, and three of the nine axes bind to enforcement while the rest are
-prose that swaps cleanly. Skills hold procedures. Roles define responsibility, context and authority; native bindings select tools,
-models and effort. Workflows compose those pieces, while presentation defines output shape.
-All are authored under `primitives/`. The `claude/` compatibility paths are projections, not
-another source. Custom stances belong outside the distribution checkout.
+Regras guardam comportamento permanente. Posturas tornam escolhas pessoais explícitas e trocáveis;
+são uma capacidade aqui entre várias, e três dos nove eixos se ligam a mecanismos de aplicação
+enquanto o resto é prosa que troca de forma limpa. Skills guardam procedimentos. Papéis definem
+responsabilidade, contexto e autoridade; ligações nativas selecionam ferramentas, modelos e
+esforço. Workflows compõem essas peças, enquanto a apresentação define o formato de saída. Tudo é
+escrito sob `primitives/`. Os caminhos de compatibilidade em `claude/` são projeções, não outra
+fonte. Posturas personalizadas pertencem fora do checkout de distribuição.
 
-`policy/hooks/` contains shared classifiers, gates and detectors. `lib/harness_core/lifecycle.py`
-composes decisions; each adapter translates native events. Registration is separate from trust
-and activation. Enforcement gaps belong in [runtime controls](runtime-controls.md) and the
-[compatibility catalog](compatibility.md), not in claims that all hooks always enforce policy.
+`policy/hooks/` contém classificadores, portões e detectores compartilhados. `lib/harness_core/lifecycle.py`
+compõe decisões; cada adaptador traduz eventos nativos. O registro é separado da confiança e da
+ativação. Lacunas de aplicação pertencem a [controles de runtime](runtime-controls.md) e ao
+[catálogo de compatibilidade](compatibility.md), não em alegações de que todo hook sempre aplica a
+política.
 
-Dispatch is single-coordinator. A sync registers exactly one command per lifecycle event the
-runtime raises — the adapter's `hook.py`, which calls `lifecycle.dispatch` — rather than one
-command per policy file, so a `Bash` call spawns one process that consults the read-only
-classifier, the reversibility grader and the output filter in turn instead of three that cannot
-see each other's answers. That also puts precedence in one readable place: which policy speaks
-first, and which one's answer survives, is code in `lifecycle.py` rather than an emergent property
-of registration order. The coordinator fails closed, because a policy that cannot run is
-indistinguishable from one that approves: an exception anywhere inside dispatch denies a
-`PreToolUse` call and blocks a `Stop`, naming itself. Registration is generated, not authored, so
-`claude/settings.template.json` carries no hooks block at all — `runtime_template()` supplies one
-from `lifecycle.registration()` at sync time, and an entry written into that file by hand would be
-discarded unread.
+O despacho é de coordenador único. Uma sincronização registra exatamente um comando por evento de
+ciclo de vida que o runtime dispara — o `hook.py` do adaptador, que chama `lifecycle.dispatch` —
+em vez de um comando por arquivo de política, então uma chamada de `Bash` gera um processo que
+consulta o classificador somente-leitura, o avaliador de reversibilidade e o filtro de saída em
+sequência, em vez de três que não conseguem ver as respostas uns dos outros. Isso também coloca a
+precedência em um único lugar legível: qual política fala primeiro, e qual resposta sobrevive, é
+código em `lifecycle.py`, não uma propriedade emergente da ordem de registro. O coordenador falha
+fechado, porque uma política que não consegue rodar é indistinguível de uma que aprova: uma
+exceção em qualquer ponto dentro do despacho nega uma chamada `PreToolUse` e bloqueia um `Stop`,
+se nomeando. O registro é gerado, não escrito à mão, então `claude/settings.template.json` não
+carrega nenhum bloco de hooks — `runtime_template()` fornece um a partir de
+`lifecycle.registration()` no momento da sincronização, e uma entrada escrita nesse arquivo
+manualmente seria descartada sem ser lida.
 
-The `cost` stance adds a resolved table on top of that selection — switches for the session, and a
-class, an effort and a soft budget for each role and band — which `policy/hooks/posture.py`
-resolves once for the dispatcher and every hook alike. Two facts shaped where it can act. A native
-subagent's reasoning effort exists only in an agent definition and not in the spawn call, so the
-posture reaches a spawn by being written into that definition at sync time, and an unnamed spawn
-is routed to a band worker that carries one — in a session whose agent registry holds that worker,
-because it did at startup or because the runtime has since said it reloaded one, and otherwise not
-at all. And an agent can only budget what it can count, so
-the budget in a brief and the feed that reports against it both come from the same local
-measurements. What each variant sets: [preferences](preferences.md#what-a-session-costs). How it
-is written: [primitive authoring](primitive-authoring.md). What is measured, and what is not:
+A postura `cost` adiciona uma tabela resolvida em cima dessa seleção — switches para a sessão, e
+uma classe, um esforço e um orçamento flexível para cada papel e banda — que `policy/hooks/posture.py`
+resolve uma vez para o dispatcher e para todo hook igualmente. Dois fatos moldaram onde ela
+consegue agir. O esforço de raciocínio de um subagente nativo só existe em uma definição de agente
+e não na chamada de spawn, então a postura alcança um spawn sendo escrita nessa definição no
+momento da sincronização, e um spawn sem nome é roteado para um worker de banda que carrega uma,
+em uma sessão cujo registro de agentes contém esse worker, seja porque já o continha no início ou
+porque o runtime disse desde então que recarregou um, e caso contrário não é roteado de forma
+alguma. E um agente só consegue orçar o que consegue contar, então o orçamento em um brief e o feed
+que relata contra ele vêm ambos das mesmas medições locais. O que cada variante define:
+[preferências](preferences.md#what-a-session-costs). Como é escrita:
+[autoria de primitivo](primitive-authoring.md). O que é medido, e o que não é:
 [usage](usage.md).
 
-One spawn, drawn top to bottom, before and after that layer:
-[delegation before the cost posture layer](diagrams/delegation-before.html)
-([image](diagrams/delegation-before-1440.png)) and
-[delegation with it](diagrams/delegation-with-cost-posture.html)
-([image](diagrams/delegation-with-cost-posture-1440.png)). The example budgets in the second are the shipped
-`balanced` rows, seeded from one machine's measured p75; [re-seed them](usage.md) from your own.
+Um spawn, desenhado de cima para baixo, antes e depois dessa camada:
+[delegação antes da camada de postura de custo](diagrams/delegation-before.html)
+([imagem](diagrams/delegation-before-1440.png)) e
+[delegação com ela](diagrams/delegation-with-cost-posture.html)
+([imagem](diagrams/delegation-with-cost-posture-1440.png)). Os orçamentos de exemplo na segunda
+são as linhas `balanced` distribuídas, semeadas a partir do p75 medido de uma máquina;
+[semeie-as de novo](usage.md) a partir da sua própria.
 
-## Working with installed files
+## Trabalhando com arquivos instalados
 
-[Sync and ownership](sync-model.md) explains links, generated files, structural merges,
-configuration homes and rollback. Keep the shared checkout stable and change it through worktrees.
-`citizen generate --check` detects stale source projections, and `citizen diff` compares installed
-artifacts against their recorded state. Personal data stays outside the repository. Keep a personal
-writing-voice profile in your preserved personal instructions; see [identity](preferences.md#identity).
+[Sincronização e posse](sync-model.md) explica links, arquivos gerados, mesclagens estruturais,
+diretórios de configuração e rollback. Mantenha o checkout compartilhado estável e o altere
+através de worktrees. `citizen generate --check` detecta projeções de fonte desatualizadas, e
+`citizen diff` compara artefatos instalados contra seu estado registrado. Dados pessoais ficam
+fora do repositório. Mantenha um perfil pessoal de voz de escrita nas suas instruções pessoais
+preservadas; veja [identidade](preferences.md#identity).
 
-[Task continuation](task-continuation.md) and the [BMad integration](bmad.md) keep task state and
-framework state independent of runtime transcripts. [Usage](usage.md) records measurements with explicit gaps. [Preferences](preferences.md)
-explains preset choices; [the stance demonstration](stance-demo.md) shows one switch reaching both
-runtimes and a custom extension.
+[Continuação de tarefa](task-continuation.md) e a [integração com o BMad](bmad.md) mantêm o estado
+de tarefa e o estado de framework independentes das transcrições de runtime. [Uso](usage.md)
+registra medições com lacunas explícitas. [Preferências](preferences.md) explica as escolhas de
+predefinição; [a demonstração de postura](stance-demo.md) mostra um switch alcançando ambos os
+runtimes e uma extensão personalizada.
 
-## Context discipline
+## Disciplina de contexto
 
-The core instruction/rule/stance budget remains linted. Skills and detailed presentation load on
-demand. Runtime-generated instructions and native client context still require qualification;
-passing a source budget is not evidence about a model's total context or compliance.
+O orçamento central de instrução/regra/postura continua sendo verificado pelo lint. Skills e
+apresentação detalhada carregam sob demanda. Instruções geradas por runtime e contexto de cliente
+nativo ainda exigem qualificação; passar um orçamento de fonte não é evidência sobre o contexto
+total ou a conformidade de um modelo.
 
-**The cap that binds is tokens, not lines.** No runtime truncates what this layer measures: Claude
-Code loads a CLAUDE.md of up to 4 MiB in full and skips a larger one, its 200-line limit applies
-only to auto-memory `MEMORY.md`, and its "target under 200 lines" is authoring advice for one file
-rather than a sum over many ([memory docs](https://code.claude.com/docs/en/memory)). What the layer
-does cost is measured: issue #430 put the harness's live standing context at 12,607 tokens against
-a bare profile, stable to +/- 15 across eight task pairs. `ALWAYS_LOADED_TOKEN_CAP` is a third of
-that figure plus the 620 tokens of the `concise` voice stance (#811), so instructions, rules and the
-longest variant of every stance may hold about a third of the prefix and no more. The 225-line cap
-stays as a secondary guard, because a layer that is cheap in tokens but sprawls over hundreds of
-short lines is still hard to read and hard to obey. Tokens are
-characters over four, the same tokenizer-free approximation `scripts/cost_bench.py` uses; `harness
-lint` prints both measures against both caps on every run and fails on either.
+**O limite que vale é de tokens, não de linhas.** Nenhum runtime trunca o que esta camada mede: o
+Claude Code carrega um CLAUDE.md de até 4 MiB por completo e pula um maior, seu limite de 200
+linhas se aplica somente ao `MEMORY.md` de memória automática, e seu "alvo abaixo de 200 linhas" é
+um conselho de autoria para um arquivo, não uma soma sobre muitos
+([documentação de memória](https://code.claude.com/docs/en/memory)). O que essa camada de fato
+custa é medido: a issue #430 colocou o contexto permanente ao vivo do harness em 12.607 tokens
+contra um perfil nu, estável a +/- 15 em oito pares de tarefas. `ALWAYS_LOADED_TOKEN_CAP` é um
+terço desse número mais os 620 tokens da postura de voz `concise` (#811), então instruções, regras
+e a variante mais longa de cada postura podem ocupar cerca de um terço do prefixo, e não mais. O
+limite de 225 linhas permanece como uma guarda secundária, porque uma camada que é barata em
+tokens mas se espalha por centenas de linhas curtas ainda é difícil de ler e difícil de obedecer.
+Tokens são caracteres divididos por quatro, a mesma aproximação sem tokenizador que
+`scripts/cost_bench.py` usa; `harness lint` imprime as duas medidas contra os dois limites em toda
+execução e falha em qualquer um dos dois.
 
-## Rationale relocated from the rules
+## Justificativa realocada das regras
 
-The sentences below explain rules that now state only the instruction.
+As frases abaixo explicam regras que agora afirmam apenas a instrução.
 
-- **Never open a PR on unverified work**, because a PR that fails lint burns a reviewer's
-  attention on nothing. Record the expected clean-tree output in the repo's agent instructions the
-  first time you run the gates: the exact "all checks passed" line, the test count, the known
-  benign warning. Then any deviation is yours, and you can tell a pre-existing failure from one
-  you caused. Test auth anonymously, with redirects not followed: a test that follows redirects to
-  a login page and asserts 200 proves nothing.
-- **Reasoned pushback on review comments** means assessing legitimacy against the actual codebase
-  first — actionable, already-resolved, banter, or informational — and, when the analysis disagrees
-  with a reviewer (especially one phrased as suspicion rather than directive), drafting a reasoned
-  rebuttal rather than complying blanket.
-- **Provisioning commands are gated, and that gate is not yours to lift.** When a permission
-  classifier refuses a deploy or apply command, build and validate everything, run the read-only
-  plan or diff, and hand the user the exact commands. Run a wrapper only when the user has named it
-  themselves.
-- **Escalate sparingly in autonomous loops.** Review rounds are capped at two to three per story;
-  the cap is a cap, not a target.
-- **"Should work" is not a status**, and when an error is reported you read the actual error and
-  the logs before the source — never theorize from the code alone.
-- **A secret in a committed file does not become unleaked when you delete it**; history keeps it,
-  which is why the credential must be rotated before anything else happens. Agent rule directories
-  are the case that rule exists for: they feel private and are not. Read credentials from the
-  environment instead:
+- **Nunca abra um PR sobre trabalho não verificado**, porque um PR que falha no lint queima a
+  atenção de um revisor à toa. Registre a saída esperada de árvore limpa nas instruções de agente
+  do repositório na primeira vez que você rodar os gates: a linha exata de "todos os checks
+  passaram", a contagem de testes, o aviso benigno conhecido. Aí qualquer desvio é seu, e você
+  consegue distinguir uma falha pré-existente de uma que você causou. Teste autenticação de forma
+  anônima, sem seguir redirecionamentos: um teste que segue redirecionamentos até uma página de
+  login e afirma 200 não prova nada.
+- **Contra-argumentação fundamentada em comentários de revisão** significa avaliar a legitimidade
+  contra a base de código real primeiro — acionável, já resolvido, brincadeira, ou informativo —
+  e, quando a análise discorda de um revisor (especialmente um formulado como suspeita em vez de
+  diretiva), redigir uma contra-argumentação fundamentada em vez de obedecer cegamente.
+- **Comandos de provisionamento são controlados por portão, e esse portão não é seu para levantar.**
+  Quando um classificador de permissão recusa um comando de deploy ou apply, construa e valide
+  tudo, rode o plano ou diff somente-leitura, e entregue ao usuário os comandos exatos. Rode um
+  wrapper apenas quando o usuário o tiver nomeado ele mesmo.
+- **Escale com parcimônia em loops autônomos.** Rodadas de revisão têm um teto de duas a três por
+  história; o teto é um teto, não uma meta.
+- **"Deveria funcionar" não é um status**, e quando um erro é relatado, você lê o erro real e os
+  logs antes da fonte — nunca teorize só a partir do código.
+- **Um segredo em um arquivo commitado não deixa de estar vazado quando você o apaga**; o
+  histórico o mantém, e é por isso que a credencial precisa ser rotacionada antes de qualquer outra
+  coisa acontecer. Diretórios de regras de agente são o caso para o qual essa regra existe: eles
+  parecem privados e não são. Leia credenciais a partir do ambiente em vez disso:
 
   ```bash
-  # Correct
+  # Correto
   curl -H "Authorization: token $SERVICE_TOKEN" ...
 
-  # Wrong — never do this
+  # Errado — nunca faça isso
   curl -H "Authorization: token abc123def456" ...
   ```
 
-  Cloud CLIs resolve credentials from a profile or a secret store; use `--profile` or an
-  environment variable, never a pasted key.
+  CLIs de nuvem resolvem credenciais a partir de um perfil ou de um cofre de segredos; use
+  `--profile` ou uma variável de ambiente, nunca uma chave colada.

@@ -1,73 +1,75 @@
-# Establishing the target
+# Estabelecendo o alvo
 
-The target is the whole point. A loop without a locked external reference degenerates into the
-agent grading its own taste, which is exactly the failure this skill exists to prevent.
+O alvo é o ponto principal de tudo. Um loop sem uma referência externa travada degenera no agente
+avaliando o próprio gosto, que é exatamente a falha que esta skill existe para prevenir.
 
-**Lock it before round 1 and never regenerate it mid-loop.** If the target turns out to be wrong,
-stop the loop, say so, agree a new one, and restart the round count.
+**Trave-o antes da rodada 1 e nunca o regenere no meio do loop.** Se o alvo acabar se revelando
+errado, pare o loop, diga isso, combine um novo, e reinicie a contagem de rodadas.
 
-## Where a target comes from, best first
+## De onde um alvo vem, do melhor para o pior
 
-### 1. The user supplied one
+### 1. O usuário forneceu um
 
-Use it directly. A mockup, a screenshot they like, a Figma export, a competitor's screen, a prior
-approved render. Do not "improve" it first.
+Use-o diretamente. Uma maquete, um screenshot de que ele gosta, uma exportação do Figma, a tela de
+um concorrente, um render aprovado anteriormente. Não "melhore" primeiro.
 
-### 2. An approved artifact already in the repo
+### 2. Um artefato aprovado já no repositório
 
-A blessed prior render, an existing screen whose quality bar you are matching, a sibling document
-whose styling the new one must match. This is the right default for **anything that must read as
-part of a set** — matching a design system, or an HTML doc that has to look like a sibling of the
-ones shipped before it.
+Um render anterior abençoado, uma tela existente cuja barra de qualidade você está igualando, um
+documento irmão cuja estilização o novo precisa combinar. Este é o padrão certo para **qualquer
+coisa que precise ler como parte de um conjunto** — combinar com um sistema de design, ou um doc
+HTML que precisa parecer irmão dos entregues antes dele.
 
-Cheap and self-bootstrapping, but it can only ratchet toward what already exists. Say so when the
-brief is asking for a genuine step change.
+Barato e autossuficiente, mas só consegue avançar em direção ao que já existe. Diga isso quando o
+briefing está pedindo uma mudança de patamar genuína.
 
-### 3. A human-authored direction plate
+### 3. Uma prancha de direção feita por humano
 
-For a real step change, ask for one rather than inventing it. One plate per asset class or screen
-type sets a far higher ceiling than any generated frame.
+Para uma mudança de patamar real, peça uma em vez de inventá-la. Uma prancha por classe de asset ou
+tipo de tela define um teto muito mais alto do que qualquer frame gerado.
 
-### 4. Generate one
+### 4. Gere um
 
-Last, and mode-dependent. See the constraints below.
+Por último, e dependente do modo. Veja as restrições abaixo.
 
-## Refining rather than diverging
+## Refinar em vez de divergir
 
-If the thing already exists, **capture it first and feed that capture to the image model as the
-base**, asking for a refined version along the user's direction. Generating from the prompt alone
-produces a target that diverges instead of improving, and the loop then spends every round
-fighting to become a different product.
+Se a coisa já existe, **capture-a primeiro e alimente essa captura ao modelo de imagem como base**,
+pedindo uma versão refinada seguindo a direção do usuário. Gerar apenas a partir do prompt produz
+um alvo que diverge em vez de melhorar, e o loop então gasta toda rodada lutando para virar um
+produto diferente.
 
-## Prompting for a generated target
+## Fazendo o prompt para um alvo gerado
 
-Prompt for an **exact, realistic target screenshot** of the finished thing. Not concept art, not
-a cinematic shot, not an artist's interpretation, not a mood board. You are going to try to match
-it closely, so it must depict something buildable.
+Peça um **screenshot alvo exato e realista** da coisa terminada. Não arte conceitual, não uma
+imagem cinematográfica, não uma interpretação de artista, não um mood board. Você vai tentar
+combinar de perto com ele, então precisa retratar algo construível.
 
-Avoid the words "concept art", "artistic", "illustration" and "painting" in the prompt.
+Evite as palavras "arte conceitual", "artístico", "ilustração" e "pintura" no prompt.
 
-## Mode constraints
+## Restrições por modo
 
 ### ui
 
-Generating a target is fine. A mockup is a reference that gets looked at and thrown away — no
-generated pixels ship.
+Gerar um alvo está bem. Uma maquete é uma referência que se olha e se descarta — nenhum pixel
+gerado é entregue.
 
-But the target does not outrank the design system. Where a generated mockup conflicts with the
-project's tokens, primitives or accessibility gates, **the system wins and the target is wrong on
-that point**. Note the conflict in `notes.md` rather than silently following either one.
+Mas o alvo não supera o sistema de design. Onde uma maquete gerada conflita com os tokens,
+primitivos ou gates de acessibilidade do projeto, **o sistema vence e o alvo está errado naquele
+ponto**. Anote o conflito em `notes.md` em vez de seguir silenciosamente um ou outro.
 
 ### scene
 
-**A generated frame may set direction. It may never be a source for shipped geometry or texture.**
-Prefer an approved reference plate or a prior blessed render as the target.
+**Um frame gerado pode definir a direção. Ele nunca pode ser uma fonte para geometria ou textura
+entregue.** Prefira uma prancha de referência aprovada ou um render abençoado anterior como o alvo.
 
-Two reasons, both load-bearing:
+Duas razões, ambas relevantes:
 
-- **Licensing.** Generated image → image-to-3D → shipped asset is a derivation chain on unresolved
-  terms. The chosen `licensing` stance keeps unresolved material out of production.
-- **Correctness.** An image model does not respect real-world scale, LOD budget or readability at
-  playable zoom. Matching its frame produces a beautiful hero shot that is wrong in the game.
+- **Licenciamento.** Imagem gerada → imagem-para-3D → asset entregue é uma cadeia de derivação em
+  termos não resolvidos. A postura `licensing` escolhida mantém material não resolvido fora da
+  produção.
+- **Correção.** Um modelo de imagem não respeita escala do mundo real, orçamento de LOD ou
+  legibilidade no zoom jogável. Combinar com o frame dele produz uma foto hero linda que está
+  errada no jogo.
 
-Where the target and real-world scale disagree, **scale wins**.
+Onde o alvo e a escala do mundo real discordam, **a escala vence**.

@@ -99,7 +99,7 @@ def parse_ts(value):
 
 
 def profile_fingerprint():
-    """The profile in force, from the `posture.py` beside this file, or None; see `decisions.py`."""
+    """O perfil em vigor, a partir do `posture.py` ao lado deste arquivo, ou None; veja `decisions.py`."""
     if not _POSTURE:
         location = Path(os.path.realpath(__file__)).parent / "posture.py"
         try:
@@ -120,7 +120,7 @@ def whole(value):
 
 
 def _append(row, target):
-    """One line, one `write`, to a file only its owner can read."""
+    """Uma linha, um `write`, para um arquivo que só seu dono consegue ler."""
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(target), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
@@ -131,7 +131,7 @@ def _append(row, target):
 
 
 def emission(recommendation, session_id, turn, now=None):
-    """The `emitted` row for one recommendation, or None for a kind or an id this cannot record."""
+    """A linha `emitted` para uma recomendação, ou None para um tipo ou id que isto não consegue registrar."""
     spec = KINDS.get(recommendation)
     if spec is None or not isinstance(session_id, str) or not session_id:
         return None
@@ -143,10 +143,10 @@ def emission(recommendation, session_id, turn, now=None):
 
 
 def emit(recommendation, session_id, turn, env=None, now=None):
-    """Record that a hook emitted `recommendation` on the session's prompt `turn`.
+    """Registra que um hook emitiu `recommendation` no prompt `turn` da sessão.
 
-    Returns None on every path, and never raises: the emitting hook's output must not depend on
-    whether this worked.
+    Retorna None em todo caminho, e nunca levanta exceção: a saída do hook emissor não deve
+    depender de isso ter funcionado.
     """
     try:
         row = emission(recommendation, session_id, turn, now)
@@ -157,7 +157,7 @@ def emit(recommendation, session_id, turn, env=None, now=None):
 
 
 def read_rows(target):
-    """Every object row in a JSONL file, in order; a missing file or a torn line is skipped."""
+    """Toda linha-objeto num arquivo JSONL, em ordem; um arquivo ausente ou uma linha rasgada é pulada."""
     try:
         with open(str(target), "rb") as handle:
             raw = handle.read()

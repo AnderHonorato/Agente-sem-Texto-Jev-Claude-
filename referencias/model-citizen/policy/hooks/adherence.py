@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Adherence events: each recommendation a hook emits, and whether the user followed it (AD-23).
+"""Eventos de aderência: cada recomendação que um hook emite, e se o usuário a seguiu (AD-23).
 
-`~/.local/state/agent-harness/adherence.jsonl`, beside `observation.jsonl`. Two kinds of row,
-joined by `adherence_id` the way the decision log joins a decision to its outcome, and never
-rewritten:
+`~/.local/state/agent-harness/adherence.jsonl`, ao lado de `observation.jsonl`. Dois tipos de
+linha, unidos por `adherence_id` do jeito que o log de decisão une uma decisão ao seu resultado,
+e nunca reescritos:
 
     {"kind": "emitted", "adherence_id": "…", "recommendation": "fresh-session",
      "module": "hooks/usage-feed", "session_id": "…", "turn": 7, "ts": "…",
@@ -14,24 +14,25 @@ rewritten:
      "reason": "SessionEnd", "turns_after": 1, "window": 3, "ts": "…",
      "profile_fingerprint": "…", "schema_version": 1}
 
-Adherence is observation, so an emitting hook's output is the same with recording on, off or
-failing: `emit` returns nothing a caller could print and swallows every error. No row holds a
-prompt, a tool input, a tool result or the recommendation's own text, so the rate per
-recommendation is computed from identifiers alone.
+Aderência é observação, então a saída de um hook emissor é a mesma com o registro ligado,
+desligado ou falhando: `emit` não retorna nada que um chamador pudesse imprimir e engole todo
+erro. Nenhuma linha guarda um prompt, uma entrada de ferramenta, um resultado de ferramenta ou o
+próprio texto da recomendação, então a taxa por recomendação é calculada só a partir de
+identificadores.
 
-**Whether a recommendation was followed is read from the observation ledger**, the
-identifier-only row per hook event `harness_core.observer` writes. `turn` is the emitting hook's
-count of the session's prompts, and the response looks at the session's observation rows after
-its `turn`-th `UserPromptSubmit`, or after the last one stamped no later than the emission when
-that is further on. Followed: one of the recommendation's `follow` events arrives
-before the window of `window` further prompts has passed. Not followed: the session's prompt
-`turn + window + 1` arrives first. Unknown: neither can be read yet. An emission is answered
-`unknown` for good only once it is `UNKNOWN_AFTER` old, with `reason` saying why:
-`unobserved` when the ledger holds no row for its turn, which is every emission until the
-observation entry point is registered in live sessions, and `window_open` otherwise.
+**Se uma recomendação foi seguida é lido do ledger de observação**, a linha só-de-identificador
+por evento de hook que `harness_core.observer` escreve. `turn` é a contagem do hook emissor dos
+prompts da sessão, e a resposta olha as linhas de observação da sessão depois do seu
+`turn`-ésimo `UserPromptSubmit`, ou depois do último carimbado não mais tarde que a emissão
+quando isso está mais à frente. Seguida: um dos eventos `follow` da recomendação chega antes que
+a janela de `window` prompts adicionais tenha passado. Não seguida: o prompt `turn + window + 1`
+da sessão chega primeiro. Desconhecida: nenhum dos dois pode ainda ser lido. Uma emissão só é
+respondida `unknown` definitivamente quando tem `UNKNOWN_AFTER` de idade, com `reason` dizendo
+por quê: `unobserved` quando o ledger não guarda linha nenhuma para seu turno, que é toda
+emissão até o ponto de entrada de observação ser registrado em sessões reais, e `window_open` nos demais casos.
 
-This module sits beside the hooks rather than in `lib/harness_core` for the reason `decisions.py`
-gives: a hook is reached through `~/.claude/hooks/harness` and nothing above that resolves.
+Este módulo fica ao lado dos hooks em vez de em `lib/harness_core` pela razão que `decisions.py`
+dá: um hook é alcançado através de `~/.claude/hooks/harness` e nada acima disso resolve.
 """
 import datetime
 import importlib.util
@@ -47,17 +48,18 @@ LEDGER = "adherence.jsonl"
 OBSERVATION = "observation.jsonl"
 OUTCOMES = ("followed", "not_followed", "unknown")
 PROMPT = "UserPromptSubmit"
-# An emission that neither outcome has reached in a day is not going to be read: a session idle
-# that long was left, and the ledger that would say so is either not written or not complete.
+# Uma emissão que nenhum dos resultados alcançou num dia não vai mais ser lida: uma sessão ociosa
+# por tanto tempo foi abandonada, e o ledger que diria isso ou não foi escrito ou está incompleto.
 UNKNOWN_AFTER = 86400
 
-# Every recommendation a hook emits, the `hooks/<id>` that emits it, the prompts after the
-# emitting one within which acting on it counts, and the observation events that count as
-# acting. A kind not named here is never recorded, so a typo at a call site writes nothing.
+# Toda recomendação que um hook emite, o `hooks/<id>` que a emite, os prompts após o emissor
+# dentro dos quais agir sobre ela conta, e os eventos de observação que contam como ação. Um tipo
+# não nomeado aqui nunca é registrado, então um erro de digitação num ponto de chamada não escreve nada.
 KINDS = {
-    # "Finish the task, write the handoff, start a fresh session": finishing and the handoff are
-    # a turn or two each, so the session has three more prompts to end. `/clear` and an exit
-    # both raise SessionEnd; a compaction does not, and continuing compacted is not following.
+    # "Termine a tarefa, escreva a passagem de bastão, comece uma sessão nova": terminar e a
+    # passagem de bastão são um turno ou dois cada, então a sessão tem mais três prompts para
+    # encerrar. `/clear` e uma saída disparam SessionEnd; uma compactação não, e continuar
+    # compactado não é seguir.
     "fresh-session": {"module": "hooks/usage-feed", "window": 3, "follow": ("SessionEnd",)},
 }
 
@@ -88,7 +90,7 @@ def now_ts(now=None):
 
 
 def parse_ts(value):
-    """Epoch seconds for a row's `ts`, or None for one this cannot read."""
+    """Segundos de epoch para o `ts` de uma linha, ou None para um que não consegue ler."""
     try:
         moment = datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
     except (TypeError, ValueError):

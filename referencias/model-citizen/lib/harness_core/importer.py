@@ -1,16 +1,17 @@
-"""Read an existing CLAUDE.md, AGENTS.md or `.cursorrules` into primitives.
+"""Lê um CLAUDE.md, AGENTS.md ou `.cursorrules` existente para dentro de primitivas.
 
-Adopting the harness should not mean discarding the instructions a repository already carries,
-so the file is split rather than replaced: each top-level `##` section becomes one rule, the
-prose above the first section becomes a preamble rule, a CLAUDE.md `@`-import is followed one
-level and becomes a rule of its own, and `.cursor/rules/*.mdc` front matter is carried through
-unchanged. Nothing is dropped. Anything the splitter cannot place — a heading that yields no
-identifier, a second section claiming a name already taken, a front-matter line that is not a
-field — lands in one `-unsorted` rule with a note saying so, because a silent omission from a
-file of instructions is the one outcome an import must never produce.
+Adotar o harness não deveria significar descartar as instruções que um repositório já carrega,
+então o arquivo é dividido em vez de substituído: cada seção `##` de nível superior vira uma
+regra, a prosa acima da primeira seção vira uma regra de preâmbulo, um `@`-import de CLAUDE.md é
+seguido um nível e vira uma regra própria, e o front matter de `.cursor/rules/*.mdc` é carregado
+inalterado. Nada é descartado. Qualquer coisa que o divisor não consiga posicionar — um
+cabeçalho que não produz identificador, uma segunda seção reivindicando um nome já usado, uma
+linha de front matter que não é um campo — cai numa única regra `-unsorted` com uma nota
+dizendo isso, porque uma omissão silenciosa de um arquivo de instruções é o único resultado que
+uma importação nunca deve produzir.
 
-The splitter is deliberately conservative about what a heading is: a `##` inside a fenced code
-block is text, not structure.
+O divisor é deliberadamente conservador sobre o que conta como um cabeçalho: um `##` dentro de um
+bloco de código cercado é texto, não estrutura.
 """
 import hashlib
 import json
@@ -18,8 +19,8 @@ import re
 from datetime import date
 from pathlib import Path
 
-# The front-matter keys a Cursor `.mdc` rule carries. They decide when a rule applies, so they
-# survive the split verbatim rather than being re-derived from the body.
+# As chaves de front matter que uma regra `.mdc` do Cursor carrega. Elas decidem quando uma
+# regra se aplica, então sobrevivem à divisão literalmente em vez de serem re-derivadas do corpo.
 MDC_KEYS = ("description", "globs", "alwaysApply")
 HEADING = re.compile(r"^##(?!#)\s*(.*?)\s*$")
 IMPORT = re.compile(r"^\s*@(\S+)\s*$")
@@ -29,7 +30,7 @@ UNSORTED_NOTE = ("Imported content the splitter could not place under a heading 
 
 
 def kind_of(path):
-    """Which kind of instruction file this is, from its name and suffix."""
+    """Que tipo de arquivo de instrução é este, a partir do nome e do sufixo."""
     path = Path(path)
     if path.name == "CLAUDE.md":
         return "claude"
@@ -44,7 +45,7 @@ def kind_of(path):
 
 
 def slug(text):
-    """A primitive identifier for a heading, or an empty string when it yields none."""
+    """Um identificador de primitiva para um cabeçalho, ou uma string vazia quando não produz nenhum."""
     flattened = "".join(c.lower() if (c.isascii() and c.isalnum()) else "-" for c in text)
     parts = [part for part in flattened.split("-") if part]
     name = "-".join(parts)
@@ -52,7 +53,7 @@ def slug(text):
 
 
 def default_name(path, kind):
-    """The import's name: the `.mdc` file's own stem, else the directory it was found in."""
+    """O nome da importação: o próprio stem do arquivo `.mdc`, senão o diretório em que foi encontrado."""
     path = Path(path)
     candidates = [path.stem] if kind == "mdc" else [path.parent.name, path.stem]
     for candidate in candidates:
@@ -63,7 +64,7 @@ def default_name(path, kind):
 
 
 def frontmatter(text):
-    """`(fields, unparsed lines, body)` for a leading `---` block; empty fields when there is none."""
+    """`(fields, unparsed lines, body)` para um bloco `---` inicial; campos vazios quando não há nenhum."""
     if not text.startswith("---\n"):
         return {}, [], text
     end = text.find("\n---", 4)
@@ -81,7 +82,7 @@ def frontmatter(text):
 
 
 def _sections(body):
-    """`(preamble lines, [(heading, lines)])`, with fenced blocks left alone."""
+    """`(linhas de preâmbulo, [(cabeçalho, linhas)])`, com blocos cercados deixados intactos."""
     preamble, sections, fence, current = [], [], None, None
     for line in body.splitlines():
         marker = FENCE.match(line)
@@ -98,7 +99,7 @@ def _sections(body):
 
 
 def _imports(body):
-    """Whole-line `@path` imports outside fenced blocks, in order and without duplicates."""
+    """Imports `@path` de linha inteira fora de blocos cercados, em ordem e sem duplicatas."""
     found, fence = [], None
     for line in body.splitlines():
         marker = FENCE.match(line)
@@ -126,11 +127,10 @@ def _heading_of(text):
 
 
 def plan(path, name=None, today=None):
-    """`(files, notices)`: every rule the import would write, and what it could not resolve.
+    """`(files, notices)`: cada regra que a importação escreveria, e o que não conseguiu resolver.
 
-    A file is `{"path": "rules/<slug>.md", "text": ...}` relative to the primitive root the
-    caller has chosen. Nothing is written here; the caller decides whether this plan is printed
-    or applied.
+    Um arquivo é `{"path": "rules/<slug>.md", "text": ...}` relativo à raiz de primitivas que o
+    chamador escolheu. Nada é escrito aqui; o chamador decide se este plano é impresso ou aplicado.
     """
     path = Path(path).expanduser()
     kind = kind_of(path)
@@ -190,7 +190,7 @@ def plan(path, name=None, today=None):
 
 
 def digest(root, files):
-    """A stable fingerprint of one plan, so a second run can recognise the plan it printed."""
+    """Uma impressão digital estável de um plano, para que uma segunda execução reconheça o plano que imprimiu."""
     payload = json.dumps([str(root)] + [[item["path"], item["text"]] for item in files],
                          sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

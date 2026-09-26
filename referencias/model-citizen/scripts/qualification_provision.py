@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Provision one qualification round's scratch directory, once, from this checkout.
+"""Provisiona o diretório de rascunho de uma rodada de qualificação, uma vez, a partir deste checkout.
 
-Every round before this one built the same three things by hand in a per-round scratch copy: a
-frozen clone of the commit under qualification, a BMad framework checkout for the optional
-integration suite,
-and a place to keep each target's record. Hand-built means unreviewed, and a clone taken from the
-wrong commit invalidates the round it is used for, so it is a committed script instead.
+Toda rodada antes desta construiu as mesmas três coisas manualmente numa cópia de rascunho por
+rodada: um clone congelado do commit sob qualificação, um checkout do framework BMad para a suíte
+de integração opcional, e um lugar para guardar o registro de cada alvo. Construído à mão significa
+não revisado, e um clone tirado do commit errado invalida a rodada em que é usado, então isto é um
+script versionado em vez disso.
 
-The clone is taken from this repository's own object store — no network — and it is refused
-unless the tree is clean and the commit is the one the caller named. The BMad step is the only
-one that reaches the network, it is opt-in, and it runs the pinned installer from docs/bmad.md
-rather than a floating version.
+O clone é tirado do próprio object store deste repositório — sem rede — e é recusado a menos que a
+árvore esteja limpa e o commit seja o que o chamador nomeou. O passo do BMad é o único que alcança
+a rede, é opt-in, e roda o instalador fixado de docs/bmad.md em vez de uma versão flutuante.
 
     python3 scripts/qualification_provision.py --out ../round-0.13.0
     python3 scripts/qualification_provision.py --out ../round-0.13.0 --commit <sha> --bmad
@@ -26,13 +25,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = (ROOT / "VERSION").read_text().strip()
-# Split around the `@`, as the runner splits its throwaway committer identity, so the lint's
-# address pattern does not match a pinned npm specifier.
+# Dividido em torno do `@`, assim como o runner divide sua identidade de committer descartável,
+# para que o padrão de endereço do lint não combine com um especificador npm fixado.
 BMAD_INSTALLER = "bmad-method" "@6.12.0"
 BMAD_MODULES = "bmm"
 CLONE = "clone"
-# Written into a clone this script made, and checked before one is ever removed: a directory
-# somebody else put at that path is refused rather than deleted.
+# Escrito num clone que este script fez, e verificado antes de um ser removido: um diretório que
+# outra pessoa colocou nesse caminho é recusado em vez de apagado.
 CLONE_MARKER = ".harness-round-clone"
 RECORDS = "records"
 BMAD = "bmad"
@@ -58,11 +57,11 @@ def clean():
 
 
 def clone(out, commit):
-    """A read-only clone of one commit, taken from the local object store.
+    """Um clone somente leitura de um commit, tirado do object store local.
 
-    The round's evidence names a source commit; a clone that is not at that commit records a
-    claim about source nobody ran. `--no-hardlinks` is deliberate: a hard-linked object store
-    shares a fate with the checkout the operator keeps working in.
+    A evidência da rodada nomeia um commit de origem; um clone que não está nesse commit registra
+    uma alegação sobre uma origem que ninguém rodou. `--no-hardlinks` é deliberado: um object store
+    com hard link compartilha um destino com o checkout em que o operador continua trabalhando.
     """
     target = out / CLONE
     if target.exists():
@@ -70,9 +69,9 @@ def clone(out, commit):
             raise SystemExit("%s exists and was not created by this script; move it aside first"
                              % target)
         shutil.rmtree(str(target))
-    # `--no-shared` is the spelling git accepts: the option takes no value, so passing one makes
-    # every clone exit 129. A shared object store would also give the clone the same fate as the
-    # checkout being worked in, which is the reason the flag is here at all.
+    # `--no-shared` é a grafia que o git aceita: a opção não recebe valor, então passar um faz todo
+    # clone sair com 129. Um object store compartilhado também daria ao clone o mesmo destino do
+    # checkout sendo trabalhado, que é a razão de a flag estar aqui.
     result = run(["git", "clone", "--quiet", "--no-hardlinks", "--no-shared", str(ROOT),
                   str(target)])
     if result.returncode:

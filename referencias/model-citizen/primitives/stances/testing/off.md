@@ -1,4 +1,4 @@
-# Testing stance: off
+# Postura de testes: desligada
 
-No standing testing requirement is in force. Follow the repo's own instructions, and run the
-existing suite before claiming a change works.
+Nenhum requisito de teste permanente está em vigor. Siga as próprias instruções do repositório, e
+rode a suíte existente antes de alegar que uma mudança funciona.

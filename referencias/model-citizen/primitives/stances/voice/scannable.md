@@ -1,7 +1,7 @@
-# Voice: scannable
+# Voz: escaneável (scannable)
 
-The Scannable output style governs the main conversation; its text is in
-`primitives/presentation/scannable.md`, and it does not reach subagents. When you relay what a
-subagent found, rewrite it to that contract: the verdict first, action items under one heading,
-paragraphs of at most three sentences, at most one table, and status in the literal words Fixed,
-Partially fixed, Not fixed or Unverified.
+O estilo de saída Scannable rege a conversa principal; seu texto está em
+`primitives/presentation/scannable.md`, e não alcança subagentes. Quando você retransmite o que
+um subagente encontrou, reescreva-o para esse contrato: o veredito primeiro, itens de ação sob um
+cabeçalho, parágrafos de no máximo três frases, no máximo uma tabela, e status nas palavras
+literais Corrigido, Parcialmente corrigido, Não corrigido ou Não verificado.

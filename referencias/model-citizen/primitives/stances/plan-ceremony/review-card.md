@@ -1,9 +1,11 @@
-# Plan ceremony stance: Review Card and build gate
+# Postura de cerimônia de plano: Review Card e gate de construção
 
-**Invoke the `plan-authoring` skill before writing or revising a plan file.** Non-negotiable even if
-it is skipped: the file opens with a **Review Card** — title, two-sentence verdict, at-a-glance
-bullets, one diagram, numbered steps with exit tests, numbered decisions, risks — capped at 70
-lines, no `## Context`, the rest below a `---` under `# Addendum`. **Plan inside plan mode where it
-exists:** it names the file, its pane is the review surface, its approval is the gate. Post it —
-verdict, bullets, decisions verbatim, a link — then `ExitPlanMode`, rename to a topic slug, hand
-over the path. Refresh **Changed this round**. Elsewhere: *Reply **build** to proceed.*
+**Invoque a skill `plan-authoring` antes de escrever ou revisar um arquivo de plano.** Não
+negociável mesmo se for pulado: o arquivo abre com um **Review Card** — título, veredito de duas
+frases, marcadores de resumo, um diagrama, passos numerados com testes de saída, decisões
+numeradas, riscos — limitado a 70 linhas, sem `## Context`, o resto abaixo de um `---` sob
+`# Addendum`. **Planeje dentro do modo de plano onde ele existe:** ele nomeia o arquivo, seu
+painel é a superfície de revisão, sua aprovação é o gate. Poste-o — veredito, marcadores,
+decisões literalmente, um link — depois `ExitPlanMode`, renomeie para um slug de tópico, entregue
+o caminho. Atualize **Mudou nesta rodada**. Em outros contextos: *Responda **build** para
+prosseguir.*

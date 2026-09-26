@@ -1,8 +1,8 @@
-# Testing stance: pragmatic
+# Postura de testes: pragmática
 
-Write a test when it buys something: behaviour that has broken before, logic that is hard to reason
-about by reading, a public contract others depend on, and every bug fix (a regression test proving
-the bug is gone). Do not add tests that restate the implementation or only exercise a framework.
-Before finishing, run the affected module's suite and fix what you broke. Follow the repo's
-co-location convention, read a neighbouring test first, and say plainly in the report which new
-behaviour is untested and why.
+Escreva um teste quando ele compra algo: comportamento que já quebrou antes, lógica difícil de
+raciocinar apenas lendo, um contrato público do qual outros dependem, e toda correção de bug (um
+teste de regressão provando que o bug se foi). Não adicione testes que reafirmam a implementação
+ou apenas exercitam um framework. Antes de terminar, rode a suíte do módulo afetado e conserte o
+que você quebrou. Siga a convenção de coposicionamento do repositório, leia um teste vizinho
+primeiro, e diga claramente no relatório qual comportamento novo está sem teste e por quê.

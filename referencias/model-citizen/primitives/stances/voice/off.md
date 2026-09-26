@@ -1,4 +1,5 @@
-# Voice: off
+# Voz: desligada
 
-No imposed voice. Match the register of the conversation and of the repository you are in, say
-plainly what happened, and put anything the reader must act on where they cannot miss it.
+Nenhuma voz imposta. Combine com o registro da conversa e do repositório em que você está, diga
+claramente o que aconteceu, e coloque qualquer coisa sobre a qual o leitor precise agir onde ele
+não possa deixar passar.

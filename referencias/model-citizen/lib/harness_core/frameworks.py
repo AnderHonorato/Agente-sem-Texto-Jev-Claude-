@@ -1,59 +1,60 @@
-"""Which framework a native spawn belongs to, read from a declared integration descriptor.
+"""A qual framework um disparo nativo pertence, lido a partir de um descritor de integração declarado.
 
-A framework that drives an agent session spawns subagents of its own, and the name it gives them
-is whatever the client's model writes at the call. Confinement cannot be built on that name: the
-routed instruction to run a constrained role through `harness role run` is a request in a prompt,
-and a client that paraphrases the brief and names no role walks straight past a guard that only
-reads `subagent_type` (#291).
+Um framework que dirige uma sessão de agente dispara subagentes próprios, e o nome que dá a eles
+é seja lá o que o modelo do cliente escrever na chamada. O confinamento não pode ser construído
+sobre esse nome: a instrução roteada para rodar um papel restrito através de `harness role run` é
+um pedido num prompt, e um cliente que parafraseia o brief e não nomeia nenhum papel passa direto
+por uma proteção que só lê `subagent_type` (#291).
 
-So a framework declares itself instead. `policy/integrations/<id>.json` names the framework, the
-version it is pinned to, how its spawns are recognised, which harness role each spawn maps to, and
-the input roots a confined worker needs. The spawn hook classifies from that mapping, and a
-`harness-role:` line in the brief stays what it always was: an optimisation that saves the
-classifier the work, not the thing enforcement depends on.
+Então um framework se declara em vez disso. `policy/integrations/<id>.json` nomeia o framework, a
+versão à qual está fixado, como seus disparos são reconhecidos, para qual papel do harness cada
+disparo mapeia, e as raízes de entrada de que um worker confinado precisa. O hook de disparo
+classifica a partir desse mapeamento, e uma linha `harness-role:` no brief continua sendo o que
+sempre foi: uma otimização que poupa o trabalho do classificador, não aquilo de que a imposição depende.
 
-Recognition is corroborated, because a false refusal is not a smaller mistake than a missed one:
-a brief that is wrongly classified is work the session cannot get done, and the classifier has no
-way to hear that it was wrong.
+O reconhecimento é corroborado, porque uma recusa falsa não é um erro menor do que uma perdida:
+um brief classificado erroneamente é trabalho que a sessão não consegue realizar, e o classificador
+não tem como ouvir que estava errado.
 
-* **agents** — a spawn whose `subagent_type` is one of the framework's own layer names. Nothing but
-  the framework puts that name there, so this alone is enough.
-* **identifiers** — a literal only the framework's routed text carries, such as the path of one of
-  its prompt files. Never enough alone: a brief that edits the override templates, or that asks a
-  worker to read one of those files, quotes the same path. An identifier needs a phrase beside
-  it, or a directive.
-* **directed identifiers** — an identifier in a sentence that tells the subagent to follow or
-  apply it: "read the instructions at <path> and follow them exactly". A client that writes the
-  brief itself keeps the prompt file, because the subagent has to read it, and drops every
-  sentence of the framework's own text (#739). The directive is what separates this from a brief
-  that edits the file or reads it for some other reason, so it is enough alone. It must govern
-  the file: ahead of it and unbroken by a clause, or after it with a pronoun pointing back ("and
-  follow them", "follow it" in a later sentence while the ones between still talk about the
-  file). A negated directive, a directive aimed at
-  something else, and a sentence that edits, updates or rewrites the file itself are not
-  directives; "update your findings" edits something else and leaves the directive standing.
-  The path has to end where the declared one does, so `<path>.bak` is another file, and a
-  trailing "follow the instructions in <other>" names its own file.
-* **phrases** — whole sentences of the framework's own prompt text, distinctive enough that
-  quoting one is a coincidence and quoting `corroboration` of them is not. Single generic nouns
-  are not phrases: "unified diff" and "list of findings" are what an ordinary fix-up brief says
-  after a review, and refusing those was the first thing this classifier got wrong.
+* **agents** — um disparo cujo `subagent_type` é um dos próprios nomes de camada do framework. Só
+  o framework coloca esse nome ali, então isso sozinho já basta.
+* **identifiers** — um literal que só o texto roteado do framework carrega, como o caminho de um
+  dos seus arquivos de prompt. Nunca basta sozinho: um brief que edita os templates de override,
+  ou que pede a um worker para ler um desses arquivos, cita o mesmo caminho. Um identificador
+  precisa de uma frase ao lado, ou de uma diretiva.
+* **directed identifiers** — um identificador numa frase que instrui o subagente a segui-lo ou
+  aplicá-lo: "read the instructions at <path> and follow them exactly". Um cliente que escreve o
+  próprio brief mantém o arquivo de prompt, porque o subagente precisa lê-lo, e descarta toda
+  frase do texto próprio do framework (#739). A diretiva é o que separa isso de um brief que edita
+  o arquivo ou o lê por outro motivo, então basta sozinha. Ela precisa governar o arquivo: antes
+  dele e ininterrupta por uma cláusula, ou depois dele com um pronome apontando de volta ("and
+  follow them", "follow it" numa frase posterior enquanto as intermediárias ainda falam do
+  arquivo). Uma diretiva negada, uma diretiva apontada para outra coisa, e uma frase que edita,
+  atualiza ou reescreve o próprio arquivo não são diretivas; "update your findings" edita outra
+  coisa e deixa a diretiva de pé. O caminho precisa terminar onde o declarado termina, então
+  `<path>.bak` é outro arquivo, e um "follow the instructions in <other>" no final nomeia seu
+  próprio arquivo.
+* **phrases** — frases inteiras do próprio texto de prompt do framework, distintas o bastante para
+  que citar uma seja coincidência e citar `corroboration` delas não seja. Substantivos genéricos
+  isolados não são frases: "unified diff" e "list of findings" são o que um brief comum de
+  correção diz depois de uma revisão, e recusar esses foi o primeiro erro deste classificador.
 
-The `harness-role:` line is not a signal here: it is a standalone line the marker guard already
-reads, and restating it as loose text would refuse prose that merely quotes it.
+A linha `harness-role:` não é um sinal aqui: é uma linha isolada que a proteção de marcador já lê,
+e reafirmá-la como texto solto recusaria prosa que apenas a cita.
 
-Input roots are declaration, never a signal: `_bmad/` names the framework but appears in any brief
-about editing it. They travel into the refusal instead, so the sentence that refuses a spawn also
-says which roots the isolated worker has to be given.
+Raízes de entrada são declaração, nunca um sinal: `_bmad/` nomeia o framework mas aparece em
+qualquer brief sobre editá-lo. Elas viajam para dentro da recusa em vez disso, então a frase que
+recusa um disparo também diz quais raízes o worker isolado precisa receber.
 
-An optional `install` block carries the rest of what a framework costs the harness: where the
-override templates live, where they are installed, which directory says the framework is present,
-and where its skills declare the surface those templates rely on. `harness integration check|apply
-<id>` reads it, so the CLI holds no framework name either, and the session hook's presence probe is
-the block's `detect` path rather than a literal in the hook.
+Um bloco opcional `install` carrega o resto do que um framework custa ao harness: onde os
+templates de override vivem, onde são instalados, qual diretório diz que o framework está
+presente, e onde suas skills declaram a superfície da qual esses templates dependem.
+`harness integration check|apply <id>` o lê, então a CLI também não guarda nome de framework
+nenhum, e a sondagem de presença do hook de sessão é o caminho `detect` do bloco em vez de um
+literal no hook.
 
-A descriptor that will not parse or will not validate is not enforcement that quietly stopped: the
-loader keeps why it was ignored, and the spawn hook says so once per session.
+Um descritor que não vai parsear ou não vai validar não é imposição que silenciosamente parou: o
+carregador guarda por que foi ignorado, e o hook de disparo diz isso uma vez por sessão.
 """
 import json
 import re
@@ -62,20 +63,20 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[2]
 DESCRIPTORS = ROOT / "policy" / "integrations"
 SCHEMA_VERSION = 1
-# A brief is normalised before it is searched, and only its head is searched: the framework's own
-# instructions are at the top of every routed brief, and a hook runs on a tool call.
+# Um brief é normalizado antes de ser pesquisado, e só sua cabeça é pesquisada: as próprias
+# instruções do framework estão no topo de todo brief roteado, e um hook roda numa chamada de ferramenta.
 CLASSIFY_MAX = 20000
 IDENTIFIER = re.compile(r"[a-z][a-z0-9-]*\Z")
-# What a signal has to be before it is allowed to contribute to a refusal. A short or one-word
-# string is something an unrelated brief says by accident, and the descriptor author does not
-# find that out; the loader does, here.
+# O que um sinal precisa ser antes de poder contribuir para uma recusa. Uma string curta ou de
+# uma palavra é algo que um brief não relacionado diz por acidente, e o autor do descritor não
+# descobre isso; o carregador descobre, aqui.
 MIN_IDENTIFIER = (12, 1)
 MIN_PHRASE = (24, 4)
 _CACHE = []
 
 
 def normalise(text):
-    """A brief reduced to what wording variance cannot hide: whitespace, case and length."""
+    """Um brief reduzido ao que a variação de redação não consegue esconder: espaço, caixa e comprimento."""
     return " ".join(text.split()).casefold()[:CLASSIFY_MAX] if isinstance(text, str) else ""
 
 
@@ -85,7 +86,7 @@ def _too_slight(value, limits):
 
 
 def _signal_problems(where, spawn, roots):
-    """What is wrong with one spawn entry's signals: shape, weight, and overlap with input roots."""
+    """O que há de errado com os sinais de uma entrada de disparo: forma, peso, e sobreposição com raízes de entrada."""
     found = []
     for field, limits in (("agents", (2, 1)), ("identifiers", MIN_IDENTIFIER), ("phrases", MIN_PHRASE)):
         values = spawn.get(field, [])
@@ -107,7 +108,7 @@ def _signal_problems(where, spawn, roots):
 
 
 def _covers(root, value):
-    """Whether `value` is an input root, or a bare directory inside one rather than a file in it."""
+    """Se `value` é uma raiz de entrada, ou um diretório puro dentro de uma em vez de um arquivo nela."""
     root, value = root.strip().strip("/").casefold(), value.strip().strip("/").casefold()
     if not root or not value:
         return False
@@ -118,14 +119,15 @@ def _covers(root, value):
 
 
 def problems(data, role_check=None):
-    """Everything wrong with one descriptor, as sentences. Empty means it is usable.
+    """Tudo o que há de errado com um descritor, como frases. Vazio significa que é utilizável.
 
-    Validation lives here rather than in the loader's exception handler so the shipped descriptors
-    can be checked by a test, and so the loader can say which descriptor it ignored and why.
+    A validação vive aqui em vez de no manipulador de exceção do carregador para que os
+    descritores embutidos possam ser conferidos por um teste, e para que o carregador possa dizer
+    qual descritor ignorou e por quê.
 
-    `role_check` answers whether a role is one an isolated worker must run; it defaults to the
-    lifecycle's own answer, because a descriptor mapping a spawn to a role the spawn guard would
-    not constrain is a mapping that can never refuse anything.
+    `role_check` responde se um papel é um que um worker isolado precisa rodar; por padrão é a
+    própria resposta do ciclo de vida, porque um descritor que mapeia um disparo para um papel que
+    a proteção de disparo não restringiria é um mapeamento que nunca pode recusar nada.
     """
     found = []
     if not isinstance(data, dict):
@@ -171,20 +173,20 @@ def problems(data, role_check=None):
 
 
 INSTALL_STRINGS = ("detect", "templates", "destination", "suffix", "skill_surface")
-# The three that are resolved against a repository root or against this checkout. `apply` writes
-# under one of them, so an absolute path or a `..` segment in a descriptor is a write outside the
-# repository the operator named, and the descriptor is the wrong place to discover that.
+# Os três que são resolvidos contra uma raiz de repositório ou contra este checkout. `apply`
+# escreve sob um deles, então um caminho absoluto ou um segmento `..` num descritor é uma escrita
+# fora do repositório que o operador nomeou, e o descritor é o lugar errado para descobrir isso.
 INSTALL_PATHS = ("detect", "templates", "destination")
 
 
 def _outside(value):
-    """Whether a declared path would leave the root it is resolved against."""
+    """Se um caminho declarado sairia da raiz contra a qual é resolvido."""
     parts = PurePosixPath(value.strip()).parts
     return value.strip().startswith("/") or ".." in parts or (parts and parts[0].endswith(":"))
 
 
 def _install_problems(install):
-    """What is wrong with the optional install block `harness integration check|apply` reads."""
+    """O que há de errado com o bloco opcional install que `harness integration check|apply` lê."""
     if not isinstance(install, dict):
         return ["install must be an object"]
     found = []
@@ -206,7 +208,7 @@ def _install_problems(install):
 
 
 def installable(name, directory=None):
-    """The descriptor `name`, or None. Used by the CLI, which also needs its install block."""
+    """O descritor `name`, ou None. Usado pela CLI, que também precisa do seu bloco install."""
     for data in descriptors(directory):
         if data["id"] == name:
             return data
@@ -214,7 +216,7 @@ def installable(name, directory=None):
 
 
 def _constrained(role):
-    """Whether the spawn guard holds `role` to an isolated worker. False when it cannot be asked."""
+    """Se a proteção de disparo restringe `role` a um worker isolado. False quando não pode ser perguntado."""
     try:
         from . import lifecycle
         return lifecycle.constrained_role(role) is not None
@@ -223,7 +225,7 @@ def _constrained(role):
 
 
 def _read(directory):
-    """`(usable, ignored)` for one directory. `ignored` is `(path, reason)` for anything skipped."""
+    """`(usable, ignored)` para um diretório. `ignored` é `(path, reason)` para tudo que foi pulado."""
     try:
         paths = sorted(directory.glob("*.json"))
         stats = [p.stat() for p in paths]
@@ -247,7 +249,7 @@ def _read(directory):
 
 
 def _loaded(directory=None):
-    """The cached `(usable, ignored)` for a directory, reread when any descriptor's bytes change."""
+    """O `(usable, ignored)` em cache para um diretório, relido quando os bytes de algum descritor mudam."""
     directory = Path(directory) if directory else DESCRIPTORS
     usable, ignored, signature = _read(directory)
     if _CACHE and _CACHE[0][0] == signature:
@@ -258,18 +260,18 @@ def _loaded(directory=None):
 
 
 def descriptors(directory=None):
-    """Every usable descriptor. A broken one is left out, and `ignored` says which and why."""
+    """Todo descritor utilizável. Um quebrado é deixado de fora, e `ignored` diz qual e por quê."""
     return _loaded(directory)[0]
 
 
 def ignored(directory=None):
-    """`(file, reason)` for every descriptor the loader could not use."""
+    """`(file, reason)` para todo descritor que o carregador não conseguiu usar."""
     return _loaded(directory)[1]
 
 
-# What a sentence says, ahead of the file, to adopt it as the subagent's own instructions, in the
-# base or -ing form an instruction takes. A third-person "follows" or "applied" describes, it does
-# not direct. It governs the file only across a short gap with no clause break.
+# O que uma frase diz, antes do arquivo, para adotá-lo como as próprias instruções do subagente,
+# na forma base ou -ing que uma instrução assume. Um "follows" ou "applied" na terceira pessoa
+# descreve, não direciona. Ele governa o arquivo só através de uma lacuna curta sem quebra de cláusula.
 DIRECTIVE = re.compile(
     r"\b(?:follow(?:ing)?|apply(?:ing)?|obey(?:ing)?|adher(?:e|ing) to|comply(?:ing)? with"
     r"|abid(?:e|ing) by|carry(?:ing)? out|according to|as (?:instructed|directed|specified|"
@@ -277,16 +279,16 @@ DIRECTIVE = re.compile(
     r"|your (?:\w+ ){0,2}(?:instructions|methodology|guidelines|checklist|rubric|procedure))\b")
 LEAD_GAP = 6
 CLAUSE_BREAK = re.compile(r"[,:()]|\b(?:and|then|but|or|while|after|before)\b")
-# The directive after the file, later in its sentence or in the next one, which counts only when
-# it points back at the file: "read <path> and follow it", not "read <path> and use it as a
+# A diretiva depois do arquivo, mais adiante na mesma frase ou na próxima, que só conta quando
+# aponta de volta para o arquivo: "read <path> and follow it", não "read <path> and use it as a
 # fixture".
 DIRECTIVE_BACK = re.compile(
     r"\b(?:(?:follow(?:ing)?|apply(?:ing)?|obey(?:ing)?) (?:it|them|that file|this file"
     r"|those instructions|these instructions|its instructions|the instructions)"
     r"|use (?:those|these|its|the) instructions|as (?:your |the )?(?:\w+ ){0,2}instructions)\b")
-# Work on the file rather than work under it, when the verb governs the file the way a directive
-# does: "update <path>", or "update it" after it. "Update your findings" edits something else.
-# Negated ("do not edit it") is still a directive.
+# Trabalho no arquivo em vez de trabalho sob ele, quando o verbo governa o arquivo como uma
+# diretiva faria: "update <path>", ou "update it" depois dele. "Update your findings" edita outra
+# coisa. Negado ("do not edit it") ainda é uma diretiva.
 EDIT_VERB = (r"(?:edit(?:s|ed|ing)?|modif(?:y|ies|ied|ying)|updat(?:e|es|ed|ing)"
              r"|rewrit(?:e|es|ing|ten)|rewrote|renam(?:e|es|ed|ing)|delet(?:e|es|ed|ing)"
              r"|remov(?:e|es|ed|ing)|reword(?:s|ed|ing)?|refactor(?:s|ed|ing)?|lint(?:s|ed|ing)?"
@@ -298,13 +300,12 @@ SENTENCE = re.compile(r"(?<=[.!?;])\s+|\s+(?:—|–|-{2})\s+")
 
 
 def _unnegated(pattern, text):
-    """The matches of `pattern` in `text` not cancelled by a "not", "never" or "without" before."""
+    """As correspondências de `pattern` em `text` não anuladas por um "not", "never" ou "without" antes."""
     return [found for found in pattern.finditer(text) if not NEGATION.search(text[:found.start()])]
 
 
 def _governs(pattern, before):
-    """Whether a `pattern` verb ends close enough before the file, unbroken by a clause, to govern
-    it."""
+    """Se um verbo de `pattern` termina perto o bastante antes do arquivo, sem quebra de cláusula, para governá-lo."""
     for found in _unnegated(pattern, before):
         gap = before[found.end():]
         if len(gap.split()) <= LEAD_GAP and not CLAUSE_BREAK.search(gap):
@@ -312,30 +313,31 @@ def _governs(pattern, before):
     return False
 
 
-# A directive in a later sentence still points back at the file while each sentence between keeps
-# talking about it: "Read <path>. These instructions define the layer. Follow them precisely."
+# Uma diretiva numa frase posterior ainda aponta de volta para o arquivo enquanto cada frase
+# intermediária continua falando dele: "Read <path>. These instructions define the layer. Follow
+# them precisely."
 FOLLOW_REACH = 3
 ANAPHOR = re.compile(r"\b(?:(?:these|those|its|the) instructions|(?:that|this|the) file)\b")
-# A trailing "the instructions" followed by where they live names its own file, not this one.
+# Um "the instructions" no final seguido de onde elas vivem nomeia seu próprio arquivo, não este.
 OWN_TARGET = re.compile(r"\s+(?:in|at|from|of|under|inside)\b")
-# The declared path ends where a longer file name would go on: `<path>.bak` is another file.
+# O caminho declarado termina onde um nome de arquivo mais longo continuaria: `<path>.bak` é outro arquivo.
 PATH_END = r"(?![\w/-]|\.\w)"
 
 
 def _points_back(after):
-    """Whether `after` holds an unnegated directive aimed back at the file before it."""
+    """Se `after` contém uma diretiva não negada apontando de volta para o arquivo antes dela."""
     return any(not _names_its_own(found, after) for found in _unnegated(DIRECTIVE_BACK, after))
 
 
 def _names_its_own(found, after):
-    """Whether a trailing "follow the instructions" says where they live, so they are not ours."""
+    """Se um "follow the instructions" no final diz onde elas vivem, então não são as nossas."""
     said = found.group(0)
     return said.endswith("instructions") and not said.startswith("as ") and bool(
         OWN_TARGET.match(after, found.end()))
 
 
 def _directed(value, text):
-    """Whether `text` tells the subagent to follow or apply the file named `value`."""
+    """Se `text` instrui o subagente a seguir ou aplicar o arquivo nomeado `value`."""
     path = re.compile(re.escape(normalise(value)) + PATH_END)
     sentences = SENTENCE.split(text)
     for index, sentence in enumerate(sentences):
@@ -356,7 +358,7 @@ def _directed(value, text):
 
 
 def _score(spawn, text, agent):
-    """`(agents, directed, identifiers, phrases)` this spawn entry matched."""
+    """`(agents, directed, identifiers, phrases)` que esta entrada de disparo combinou."""
     agents = 1 if agent and agent in [a.casefold() for a in spawn.get("agents", [])] else 0
     named = [value for value in spawn.get("identifiers", []) if normalise(value) in text]
     directed = sum(1 for value in named if _directed(value, text))
@@ -365,7 +367,7 @@ def _score(spawn, text, agent):
 
 
 def _recognised(score, corroboration):
-    """Whether this much evidence refuses a spawn. The rule, in one place, for the one caller."""
+    """Se esta quantidade de evidência recusa um disparo. A regra, num único lugar, para o único chamador."""
     agents, directed, identifiers, phrases = score
     if agents or directed:
         return True
@@ -375,12 +377,13 @@ def _recognised(score, corroboration):
 
 
 def classify(prompt, subagent_type=None, directory=None, accept=None):
-    """The framework spawn this call is, or None.
+    """O disparo de framework que esta chamada é, ou None.
 
-    `accept` filters the roles a match may map to, so a spawn the guard would go on to allow
-    anyway cannot outscore one it would refuse. The best-scoring surviving entry wins, which is
-    what classifies a brief carrying both a framework's general review wording and its specific
-    audit wording as the audit.
+    `accept` filtra os papéis para os quais uma correspondência pode mapear, então um disparo que
+    a proteção acabaria permitindo de qualquer forma não pode superar em pontuação um que ela
+    recusaria. A entrada sobrevivente de maior pontuação vence, que é o que classifica um brief
+    que carrega tanto a redação geral de revisão de um framework quanto sua redação específica de
+    auditoria como a auditoria.
     """
     text = normalise(prompt)
     agent = subagent_type.strip().casefold() if isinstance(subagent_type, str) else ""
@@ -401,7 +404,7 @@ def classify(prompt, subagent_type=None, directory=None, accept=None):
 
 
 def origin(match):
-    """The sentences a refusal opens with: what was recognised, and what the worker will need."""
+    """As frases com as quais uma recusa abre: o que foi reconhecido, e do que o worker vai precisar."""
     said = ("This spawn carries the " + match["framework_name"] + " " + match["version"] + " `"
             + match["spawn"] + "` work, which this installation runs as the constrained `"
             + match["role"] + "` role whatever the spawn called itself.")

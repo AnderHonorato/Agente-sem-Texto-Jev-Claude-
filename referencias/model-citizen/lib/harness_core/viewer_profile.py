@@ -1,4 +1,4 @@
-"""Narrow architecture projection; EDN validation and rendering belong to the viewer."""
+"""Projeção de arquitetura restrita; validação e renderização de EDN pertencem ao visualizador."""
 import hashlib
 import json
 import math

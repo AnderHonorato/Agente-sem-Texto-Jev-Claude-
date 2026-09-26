@@ -29,7 +29,7 @@ def fingerprint(root):
                          capture_output=True, text=True, check=True).stdout
     names = set(raw.split("\0"))
     directory = root / ".agent-harness"
-    # Copies of files sent to a Remote Control client are not task inputs: policy/hooks/stage-user-files.py.
+    # Cópias de arquivos enviados a um cliente Remote Control não são entradas da tarefa: policy/hooks/stage-user-files.py.
     outbox = directory / "outbox"
     if directory.is_symlink():
         raise ValueError("task storage cannot be a symlink")
@@ -84,7 +84,7 @@ def save(root, payload, runtime, revision=0):
         record = dict(payload, schema_version=1, revision=revision + 1, runtime=runtime,
                       repository=str(root), branch=git(root, "branch", "--show-current"),
                       head=git(root, "rev-parse", "HEAD"), fingerprint=fingerprint(root))
-        # A caller's claim is not a gate result. Retain it as evidence, never certification.
+        # A alegação de um chamador não é o resultado de um portão. Mantenha-a como evidência, nunca como certificação.
         record["verification"] = {"status": "unverified", "reported": payload.get("verification")}
         reconcile.atomic_text(directory / "task.json", json.dumps(record, indent=2) + "\n")
     return read(root)

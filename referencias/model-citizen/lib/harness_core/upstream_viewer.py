@@ -1,4 +1,4 @@
-"""Thin adapter to the standalone uml-viewer public CLI, without private viewer imports."""
+"""Adaptador fino para a CLI pública standalone do uml-viewer, sem imports privados do visualizador."""
 import hashlib
 import json
 import os

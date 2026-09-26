@@ -1,4 +1,4 @@
-"""Run constrained shared roles through isolated native CLI adapters."""
+"""Roda papéis compartilhados restritos através de adaptadores de CLI nativos isolados."""
 import contextlib
 import hashlib
 import importlib.util
@@ -16,18 +16,20 @@ from . import catalog, keychain, reconcile
 
 LIMIT = 1024 * 1024
 RUNTIMES = {"codex": "codex", "claude-code": "claude"}
-# Characters per token, the tokenizer-free approximation `bin/harness` and `scripts/cost_bench.py`
-# use; the tests assert the three agree. Good for a budget and a trend, never for billing.
+# Caracteres por token, a aproximação sem tokenizador que `bin/harness` e `scripts/cost_bench.py`
+# usam; os testes garantem que os três concordam. Bom para um orçamento e uma tendência, nunca
+# para faturamento.
 CHARS_PER_TOKEN = 4.0
-# What a worker may be shown before it stops being cheap: the policy it carries plus every byte
-# mounted beside it. Recorded per run rather than enforced, because what a worker is shown is a
-# property of its contract and the policy's own pointers, fixed before any brief is read. A review
-# role resolves at about 30,800 of it and the planner, which may read any skill, at 43,800 (#335).
+# O que um worker pode receber antes de deixar de ser barato: a política que carrega mais todo
+# byte montado ao lado dela. Registrado por execução em vez de imposto, porque o que um worker
+# recebe é uma propriedade do seu contrato e dos próprios ponteiros da política, fixados antes de
+# qualquer brief ser lido. Um papel de revisão resolve para cerca de 30.800 disso e o planejador,
+# que pode ler qualquer skill, para 43.800 (#335).
 CONTEXT_BUDGET_TOKENS = 50000
 
 
 def harness_version(root):
-    """The checkout's version, the one string `harness --version` prints, or None."""
+    """A versão do checkout, a única string que `harness --version` imprime, ou None."""
     try:
         return (Path(root) / "VERSION").read_text(encoding="utf-8").strip() or None
     except OSError:
@@ -45,11 +47,12 @@ def adapter(root, runtime):
 
 
 def posture_record(root, runtime, fields, table, row, binding, overrides, model):
-    """What the selected cost variant did to this worker, for `status.json`.
+    """O que a variante de custo selecionada fez a este worker, para `status.json`.
 
-    Where each half came from, never how it was worded: a status record carries no prompt text.
-    `"role"` is the role's own contract and the adapter's entry, `"cost-row"` the variant's row
-    for it, `"role-binding"` the user's `role_bindings`, `"cli"` an explicit `--model`.
+    De onde cada metade veio, nunca como foi redigida: um registro de status não carrega texto
+    de prompt algum. `"role"` é o próprio contrato do papel e a entrada do adaptador, `"cost-row"`
+    a linha da variante para ele, `"role-binding"` os `role_bindings` do usuário, `"cli"` um
+    `--model` explícito.
     """
     effort_key = "model_reasoning_effort" if runtime == "codex" else "effort"
     classed = bool(table.get("class_applies")) and (row or {}).get("class") in catalog.TIER_CLASSES

@@ -3,41 +3,42 @@ name: migration-safety
 description: Write, review or apply a database schema migration without destroying data. Use for any task that creates or modifies a migration file (Alembic, Prisma, Django, Rails, Flyway, raw SQL), and before applying one to a shared environment.
 ---
 
-# Migration safety
+# Segurança de migração
 
-## Treat every environment as production
+## Trate todo ambiente como produção
 
-Staging and demo environments hold real data more often than anyone admits, and a migration
-that destroys data in staging demonstrates that the same operation would run in production.
-There is no "it's just staging" exception. **Never write a migration that could silently
-destroy existing data.**
+Ambientes de staging e demo carregam dados reais mais frequentemente do que qualquer um admite, e
+uma migração que destrói dados no staging demonstra que a mesma operação rodaria em produção. Não
+existe exceção "é só staging". **Nunca escreva uma migração que possa destruir silenciosamente
+dados existentes.**
 
-## Destructive operations — stop and surface to the human
+## Operações destrutivas — pare e leve ao humano
 
-Do not generate these autonomously. Describe what you intend and why, and wait for
-confirmation before writing the file:
+Não gere estas autonomamente. Descreva o que você pretende e por quê, e espere confirmação antes
+de escrever o arquivo:
 
-- `DROP TABLE`, `DROP COLUMN`, `TRUNCATE` — destroys rows or values permanently.
-- `ALTER COLUMN … TYPE` with a lossy cast — the database rewrites the column; values that
-  cannot be cast are lost.
-- Removing `NOT NULL` and then dropping the column — same as above.
-- `DELETE FROM` inside a migration — data loss with no recovery short of a backup.
+- `DROP TABLE`, `DROP COLUMN`, `TRUNCATE` — destrói linhas ou valores permanentemente.
+- `ALTER COLUMN … TYPE` com um cast com perda — o banco de dados reescreve a coluna; valores que
+  não podem ser convertidos são perdidos.
+- Remover `NOT NULL` e depois apagar a coluna — mesmo que acima.
+- `DELETE FROM` dentro de uma migração — perda de dados sem recuperação a não ser por um backup.
 
-## Safe patterns
+## Padrões seguros
 
-**Adding a column.** Add it nullable first, even if the final intent is `NOT NULL`. Backfill in
-a separate migration or deploy step. Add the constraint only after the backfill is confirmed.
-Three small migrations beat one that rewrites data and adds a constraint at once.
+**Adicionando uma coluna.** Adicione-a anulável primeiro, mesmo se a intenção final for `NOT
+NULL`. Preencha retroativamente numa migração separada ou passo de deploy. Adicione a restrição
+apenas depois que o preenchimento retroativo for confirmado. Três migrações pequenas superam uma
+que reescreve dados e adiciona uma restrição de uma vez.
 
-**Renaming a column.** Never rename in a single deploy. Expand-contract: add the new column
-nullable; write to both; backfill new from old; switch reads; drop the old column in a later
-release once confirmed safe.
+**Renomeando uma coluna.** Nunca renomeie num único deploy. Expandir-contrair: adicione a nova
+coluna anulável; escreva em ambas; preencha retroativamente a nova a partir da antiga; troque as
+leituras; apague a coluna antiga num release posterior uma vez confirmada a segurança.
 
-**Changing a type.** Lossless (`VARCHAR` → `TEXT`) may proceed with a note in the migration
-comment. Lossy (`TEXT` → `INTEGER`, shrinking a `VARCHAR`) stops and asks.
+**Mudando um tipo.** Sem perda (`VARCHAR` → `TEXT`) pode prosseguir com uma nota no comentário da
+migração. Com perda (`TEXT` → `INTEGER`, encolhendo um `VARCHAR`) para e pergunta.
 
-**Removing a column.** Only after confirming no deployed code reads or writes it, and a backup
-exists or the column is confirmed empty. Archive before dropping in the downgrade path:
+**Removendo uma coluna.** Apenas depois de confirmar que nenhum código implantado a lê ou escreve,
+e existe um backup ou a coluna é confirmada vazia. Arquive antes de apagar no caminho de downgrade:
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS archive;
@@ -45,35 +46,35 @@ CREATE TABLE IF NOT EXISTS archive.<table>_<revision>_downgrade AS
   SELECT id, <dropped_column> FROM <table>;
 ```
 
-The archive is retained indefinitely; nobody drops it without explicit sign-off.
+O arquivo é retido indefinidamente; ninguém o apaga sem aprovação explícita.
 
-**Additive first.** Adding a column or table is always safer than modifying one. If the goal
-can be reached by adding, add.
+**Aditivo primeiro.** Adicionar uma coluna ou tabela é sempre mais seguro do que modificar uma. Se
+o objetivo pode ser alcançado adicionando, adicione.
 
-## Checklist before committing a migration file
+## Checklist antes de commitar um arquivo de migração
 
-- `upgrade()` contains no `DROP TABLE`, `DROP COLUMN`, `TRUNCATE` or `DELETE FROM` without
-  explicit human sign-off recorded in the PR.
-- Any new `NOT NULL` column either has a server default or is added nullable with a separate
-  backfill.
-- You read the generated file. Never rely on autogenerate output alone.
-- `downgrade()` is implemented, or is an explicit no-op with a comment saying why rollback is
-  impossible for this change.
+- `upgrade()` não contém `DROP TABLE`, `DROP COLUMN`, `TRUNCATE` ou `DELETE FROM` sem aprovação
+  humana explícita registrada no PR.
+- Toda nova coluna `NOT NULL` tem um valor padrão do servidor ou é adicionada anulável com um
+  preenchimento retroativo separado.
+- Você leu o arquivo gerado. Nunca confie apenas na saída de autogeração.
+- `downgrade()` está implementado, ou é um no-op explícito com um comentário dizendo por que o
+  rollback é impossível para esta mudança.
 
-## Never edit an applied migration
+## Nunca edite uma migração já aplicada
 
-Once a migration has been applied to any shared environment, it is immutable. Create a new
-migration to correct mistakes.
+Uma vez que uma migração foi aplicada a qualquer ambiente compartilhado, ela é imutável. Crie uma
+nova migração para corrigir erros.
 
-## Collapse work-in-progress migrations before review
+## Colapse migrações de trabalho em progresso antes da revisão
 
-If iterating on one logical change produced several files, collapse them into one before
-opening the PR — delete and regenerate, which is safe while nothing has been applied to a
-shared environment. This is different from the deliberate add-nullable → backfill → constrain
-sequence, which stays as separate migrations by design.
+Se iterar numa mudança lógica produziu vários arquivos, colapse-os em um antes de abrir o PR —
+apague e regenere, o que é seguro enquanto nada foi aplicado a um ambiente compartilhado. Isso é
+diferente da sequência deliberada adicionar-anulável → preencher-retroativamente → restringir, que
+permanece como migrações separadas por design.
 
-## After merging the main branch into a feature branch
+## Depois de mesclar o branch principal num branch de feature
 
-Long-lived branches frequently produce two divergent heads even without a content conflict.
-Check immediately after merging (`alembic heads`, or the equivalent for the tool) and reconcile
-with a no-op merge revision before running tests or committing.
+Branches de longa duração frequentemente produzem duas cabeças divergentes mesmo sem um conflito
+de conteúdo. Verifique imediatamente depois de mesclar (`alembic heads`, ou o equivalente para a
+ferramenta) e reconcilie com uma revisão de merge no-op antes de rodar testes ou fazer commit.

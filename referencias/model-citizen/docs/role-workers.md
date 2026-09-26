@@ -1,34 +1,38 @@
-# Run a shared role with constrained authority
+# Rode um papel compartilhado com autoridade restrita
 
-Read-only and planner roles run as separate native CLI processes. They use the same definitions
-under `primitives/roles/`, selected stances and runtime model bindings. They do not appear as
-native subagent threads. Native role projections remain discoverable, but the lifecycle adapter
-rejects direct native launches of constrained harness roles when its hooks are active.
+Papéis somente-leitura e de planejamento rodam como processos de CLI nativa separados. Eles usam
+as mesmas definições sob `primitives/roles/`, posturas selecionadas e ligações de modelo de
+runtime. Não aparecem como threads nativas de subagente. Projeções nativas de papel continuam
+descobríveis, mas o adaptador de ciclo de vida rejeita lançamentos nativos diretos de papéis do
+harness restritos quando seus hooks estão ativos.
 
-That rejection does not depend on the name a spawn chose. When the guard refuses a spawn that
-named a constrained role, it remembers the role and a normalised fingerprint of the brief in the
-session's record (the newest 32); a later spawn in the same session that names no constrained role
-but carries the same brief — identical, containing its first 400 normalised characters, or 85
-percent similar — is refused too, and told that dropping the role name changed nothing. Separately,
-a brief may declare its own role with a line of the exact form `harness-role: <role>`, standing
-alone, naming a role under `primitives/roles/` with read-only or artifact-write authority. A spawn
-whose prompt carries such a line is refused whatever `subagent_type` it names or omits, and
-`citizen role run` accepts the line in a `--prompt-file` unchanged. A marker naming anything else
-is ignored. Both guards are best effort: session state that cannot be read or written means no new
-refusal, never a failed hook, and `delegation: off` keeps its own single refusal.
+Essa rejeição não depende do nome que um spawn escolheu. Quando a guarda recusa um spawn que
+nomeou um papel restrito, ela guarda o papel e uma impressão digital normalizada do brief no
+registro da sessão (os 32 mais recentes); um spawn posterior na mesma sessão que não nomeia
+nenhum papel restrito mas carrega o mesmo brief — idêntico, contendo seus primeiros 400 caracteres
+normalizados, ou 85 por cento semelhante — também é recusado, e informado de que remover o nome do
+papel não mudou nada. Separadamente, um brief pode declarar seu próprio papel com uma linha da
+forma exata `harness-role: <role>`, sozinha, nomeando um papel sob `primitives/roles/` com
+autoridade de somente-leitura ou escrita de artefato. Um spawn cujo prompt carrega tal linha é
+recusado seja qual for o `subagent_type` que nomeia ou omite, e `citizen role run` aceita a linha
+em um `--prompt-file` sem alteração. Um marcador nomeando qualquer outra coisa é ignorado. As duas
+guardas são de melhor esforço: um estado de sessão que não pode ser lido ou escrito significa
+nenhuma recusa nova, nunca um hook falho, e `delegation: off` mantém sua própria recusa única.
 
-A Claude Code `Workflow` script's `agent()` calls never reach the spawn hooks, so the guard reads
-the launch instead: the script sent inline, the file at `scriptPath`, or a named workflow under
-`.claude/workflows/` in the working directory or the home directory. A script that names a
-constrained role as a quoted `agentType`, carries a `harness-role:` marker for one, or computes
-`agentType` beside a string literal naming one is refused with the same instruction, and so is a
-script file longer than the 1 MiB the guard reads; `delegation: off` refuses every launch. Each launch is a `workflow-launch` row in the decision log. The guard
-cannot route a script's other agents to a band, and a built-in workflow or a resumed run carries
-no script for it to read.
+As chamadas `agent()` de um script `Workflow` do Claude Code nunca alcançam os hooks de spawn,
+então a guarda lê o lançamento em vez disso: o script enviado inline, o arquivo em `scriptPath`,
+ou um workflow nomeado sob `.claude/workflows/` no diretório de trabalho ou no diretório home. Um
+script que nomeia um papel restrito como um `agentType` entre aspas, carrega um marcador
+`harness-role:` para um, ou calcula `agentType` ao lado de um literal de string que nomeia um é
+recusado com a mesma instrução, e o mesmo vale para um arquivo de script maior que o 1 MiB que a
+guarda lê; `delegation: off` recusa todo lançamento. Cada lançamento é uma linha `workflow-launch`
+no log de decisões. A guarda não consegue rotear os outros agentes de um script para uma banda, e
+um workflow embutido ou uma execução retomada não carrega nenhum script para ela ler.
 
-## Run and inspect
+## Rode e inspecione
 
-Write a bounded brief naming the input files, required result shape and allowed scope, then run:
+Escreva um brief limitado nomeando os arquivos de entrada, o formato de resultado exigido e o
+escopo permitido, depois rode:
 
 ```sh
 citizen role run reviewer --runtime codex \
@@ -39,139 +43,157 @@ citizen role status
 citizen role status <worker-id>
 ```
 
-`--prompt-file -` reads the brief from stdin. `--read-dir /path/to/artifacts` grants access to
-additional input directories, such as the framework checkout or review artifacts outside the
-implementation worktree. It never grants writes, and it refuses `/`, the home directory, a system
-temporary root such as `/tmp`, and any directory above one of them, because each holds other
-runs' files; grant a dedicated subdirectory, such as one made by `mktemp -d`, instead. Input
-prompts and results are capped at 1 MiB.
-These are declared input roots, not a confidentiality boundary: Codex's read-only sandbox can
-read other native-permitted paths. Claude's restricted file tools use the supplied directories.
-The default deadline is 300 seconds; `--timeout` accepts 1–3600 seconds. Interrupting the runner
-or reaching its deadline terminates its process group and prevents artifact publication.
+`--prompt-file -` lê o brief da stdin. `--read-dir /path/to/artifacts` concede acesso a diretórios
+de entrada adicionais, como o checkout do framework ou artefatos de revisão fora da worktree de
+implementação. Nunca concede escrita, e recusa `/`, o diretório home, uma raiz temporária de
+sistema como `/tmp`, e qualquer diretório acima de um deles, porque cada um guarda arquivos de
+outras execuções; conceda um subdiretório dedicado, como um feito por `mktemp -d`, em vez disso.
+Prompts de entrada e resultados têm um teto de 1 MiB.
+Essas são raízes de entrada declaradas, não um limite de confidencialidade: o sandbox somente-
+leitura do Codex consegue ler outros caminhos permitidos nativamente. As ferramentas de arquivo
+restritas do Claude usam os diretórios fornecidos. O prazo padrão é 300 segundos; `--timeout`
+aceita de 1 a 3600 segundos. Interromper o executor ou atingir seu prazo termina seu grupo de
+processo e impede a publicação de artefato.
 
-## What a worker loads
+## O que um worker carrega
 
-A worker carries the shared instructions, the rules, the resolved stances and its own role body
-as its system text — about 4,200 estimated tokens for a review role. Beside that it is mounted
-only what the policy it was just given tells it to open: the skill directories that text names,
-and copies of the `docs/*.md` files it cites, taken from the resolved text itself so a stance
-that stops citing a skill stops paying for it. A role may add what its body assumes but the
-shared text never names, with a `skills:` line in its contract — `design-loop` for
-`design-judge`, and `all` for `planner`, whose body tells it to read the skills the plan will
-name. A `skills:` name that resolves to no shipped skill fails the run.
+Um worker carrega as instruções compartilhadas, as regras, as posturas resolvidas e o corpo do
+seu próprio papel como seu texto de sistema — cerca de 4.200 tokens estimados para um papel de
+revisão. Além disso, só é montado o que a política que acabou de receber diz para abrir: os
+diretórios de skill que esse texto nomeia, e cópias dos arquivos `docs/*.md` que ele cita,
+retiradas do próprio texto resolvido, para que uma postura que deixa de citar uma skill deixe de
+pagar por ela. Um papel pode adicionar o que seu corpo assume mas o texto compartilhado nunca
+nomeia, com uma linha `skills:` em seu contrato — `design-loop` para `design-judge`, e `all` para
+`planner`, cujo corpo diz para ler as skills que o plano vai nomear. Um nome em `skills:` que não
+resolve para nenhuma skill distribuída falha a execução.
 
-The harness checkout itself is no longer one of those roots. How much that is worth depends on
-the runtime, in the sense the compatibility table's tier-restriction row uses:
+O próprio checkout do harness não é mais uma dessas raízes. Quanto isso vale depende do runtime,
+no sentido em que a linha de restrição de camada da tabela de compatibilidade usa:
 
-- **Claude Code — enforced.** The restricted `Read`, `Grep` and `Glob` tools resolve against the
-  supplied `--add-dir` roots, and the checkout is not among them.
-- **Codex — advisory.** Its read-only sandbox can read any native-permitted path, so the narrowing
-  is instruction text, as the declared input roots above already are.
+- **Claude Code — aplicado.** As ferramentas restritas `Read`, `Grep` e `Glob` resolvem contra as
+  raízes `--add-dir` fornecidas, e o checkout não está entre elas.
+- **Codex — consultivo.** Seu sandbox somente-leitura consegue ler qualquer caminho permitido
+  nativamente, então o estreitamento é texto de instrução, como as raízes de entrada declaradas
+  acima já são.
 
-`status.json` records the estimate under `context`: policy tokens, reference tokens and their
-total against a 50,000-token budget, counted with the same characters-per-token approximation
-`citizen lint` uses on always-loaded context. A review role resolves at about 30,800 and the
-planner, which may read any skill, at about 43,800. The budget is recorded, not enforced: what a
-worker is shown is fixed by its contract and the policy's own pointers before any brief is read.
+`status.json` registra a estimativa sob `context`: tokens de política, tokens de referência e seu
+total contra um orçamento de 50.000 tokens, contados com a mesma aproximação de
+caracteres-por-token que `citizen lint` usa no contexto sempre carregado. Um papel de revisão
+resolve em cerca de 30.800 e o planner, que pode ler qualquer skill, em cerca de 43.800. O
+orçamento é registrado, não aplicado: o que um worker vê é fixado pelo seu contrato e pelos
+próprios ponteiros da política antes de qualquer brief ser lido.
 
-Every figure here measures what is **mounted**, not what a run reads; a worker opens what its
-brief needs and usually far less. On that measure a review role went from the whole checkout —
-about 1,073,900 tokens of text, since `--add-dir` took the repository root — to about 30,800, and
-the skill corpus it was pointed at as authority went from all 31,600 tokens of it to the 26,600
-the policy actually cites.
+Todo número aqui mede o que está **montado**, não o que uma execução lê; um worker abre o que seu
+brief precisa e geralmente bem menos. Nessa medida, um papel de revisão foi do checkout inteiro —
+cerca de 1.073.900 tokens de texto, já que `--add-dir` tomava a raiz do repositório — para cerca
+de 30.800, e o corpus de skills para o qual foi apontado como autoridade foi dos 31.600 tokens
+inteiros dele para os 26.600 que a política realmente cita.
 
-A role's class (`tier:` in its contract) resolves through the adapter's `tiers` table in
-`bindings.json`, so omit `--model` unless you mean to override it. An adapter that maps no model
-for the class requires the caller's actual session model; the worker does not resolve downward
-or silently substitute the CLI default.
+A classe de um papel (`tier:` em seu contrato) resolve através da tabela `tiers` do adaptador em
+`bindings.json`, então omita `--model` a menos que queira sobrescrevê-la. Um adaptador que não
+mapeia nenhum modelo para a classe exige o modelo de sessão real de quem chamou; o worker não
+resolve para baixo nem substitui silenciosamente o padrão da CLI.
 
-The selected cost variant's row for the role is applied first, with the same precedence a synced
-agent definition is rendered with: the role's own class and effort, then the row (whose class
-applies only under a tiered `delegation`, and never to a `posture: fixed` role), then
-`role_bindings.<runtime>.<role>`, then `--model`. The brief the worker receives ends with the
-row's `Expected spend` sentence unless the row prices nothing or the brief already states a
-budget, and `status.json` records the variant, the resolved class and where each of model and
-effort came from.
+A linha da variante de custo selecionada para o papel é aplicada primeiro, com a mesma precedência
+com que uma definição de agente sincronizada é renderizada: a própria classe e esforço do papel,
+depois a linha (cuja classe se aplica somente sob um `delegation` em camadas, e nunca a um papel
+`posture: fixed`), depois `role_bindings.<runtime>.<role>`, depois `--model`. O brief que o worker
+recebe termina com a frase `Expected spend` da linha, a menos que a linha não precifique nada ou o
+brief já declare um orçamento, e `status.json` registra a variante, a classe resolvida e de onde
+vieram o modelo e o esforço.
 
-Two keys in `~/.config/agent-harness/config.json` change the mapping without a harness release.
-`tiers.<runtime>.<class>` remaps a class for every role that names it, which is the one-line fix
-when a provider's lineup turns over; `role_bindings.<runtime>.<role>` sets `model` or effort for
-one role and wins over the class. Both reach workers and both runtimes' agent definitions, which
-sync renders from the adapter's table and the resolved cost variant.
+Duas chaves em `~/.config/agent-harness/config.json` mudam o mapeamento sem um lançamento do
+harness. `tiers.<runtime>.<class>` remapeia uma classe para todo papel que a nomeia, que é a
+correção de uma linha quando a linha de modelos de um provedor se renova; `role_bindings.<runtime>.<role>`
+define `model` ou esforço para um papel e vence sobre a classe. Ambas alcançam workers e as
+definições de agente dos dois runtimes, que a sincronização renderiza a partir da tabela do
+adaptador e da variante de custo resolvida.
 
-`citizen tiers check` compares the Codex table with the model catalog Codex fetches from its
-provider (`models_cache.json` in the Codex home), offline. It fails on a mapped model the catalog
-no longer lists, one the catalog names a successor for, or a class the catalog ranks above a
-stronger one, and reports *unverified* rather than passing when there is no catalog to read.
-Codex model ids carry a version and keep resolving after a successor ships, so this is what
-notices. Claude Code's table uses version-free aliases and has nothing to check. Native provider connection settings remain separate from
-shared role semantics. Codex copies only the selected provider's supported connection settings;
-provider credentials must use environment references. Unsupported connection settings fail
-instead of being dropped. Interactive parent overrides are not inferred.
+`citizen tiers check` compara a tabela do Codex com o catálogo de modelo que o Codex busca do seu
+provedor (`models_cache.json` no diretório home do Codex), offline. Falha em um modelo mapeado que
+o catálogo não lista mais, um para o qual o catálogo nomeia um sucessor, ou uma classe que o
+catálogo classifica acima de uma mais forte, e relata *não verificado* em vez de passar quando não
+há catálogo para ler. IDs de modelo do Codex carregam uma versão e continuam resolvendo depois que
+um sucessor é lançado, então é isso que ele percebe. A tabela do Claude Code usa aliases sem
+versão e não tem nada para verificar. Configurações nativas de conexão de provedor permanecem
+separadas da semântica de papel compartilhada. O Codex copia apenas as configurações de conexão
+suportadas do provedor selecionado; credenciais de provedor devem usar referências de ambiente.
+Configurações de conexão não suportadas falham em vez de serem descartadas. Sobrescritas de pai
+interativo não são inferidas.
 
-The command returns a JSON status record, including the native version, resolved model/effort,
-selected stances, policy digest, input roots and result path. Private logs and result content live
-under the harness state home's `workers/<id>/` directory. `completed` means the native process
-returned a usable result envelope; it does not certify its findings or qualify the client.
-A run records the pid supervising it and that process's start time, so `citizen role status`
-reports a worker whose process is gone with no result written as `orphaned` — the run ended
-without reporting — instead of leaving it `running` forever. The start time guards against a
-recycled pid, a status record from a release that stored no pid still reads as `running`, and
-reading status rewrites only `status.json`.
-Treat worker output as data. Verify referenced facts before taking consequential actions.
+O comando retorna um registro de status JSON, incluindo a versão nativa, modelo/esforço
+resolvidos, posturas selecionadas, digest de política, raízes de entrada e caminho de resultado.
+Logs privados e conteúdo de resultado vivem sob o diretório `workers/<id>/` do diretório de estado
+do harness. `completed` significa que o processo nativo retornou um envelope de resultado
+utilizável; não certifica seus achados nem qualifica o cliente. Uma execução registra o pid que a
+supervisiona e o horário de início desse processo, então `citizen role status` relata um worker
+cujo processo desapareceu sem nenhum resultado escrito como `orphaned` — a execução terminou sem
+relatar — em vez de deixá-lo `running` para sempre. O horário de início protege contra um pid
+reciclado, um registro de status de um lançamento que não guardava nenhum pid ainda lê como
+`running`, e ler o status reescreve apenas `status.json`.
+Trate a saída do worker como dado. Verifique fatos referenciados antes de tomar ações
+consequentes.
 
-## Boundaries and publication
+## Limites e publicação
 
-The Codex adapter uses a fresh configuration home and working directory, read-only sandbox,
-no approvals, no inherited shell environment, and no login shell. It disables delegation,
-apps, remote plugins, image generation, memory, hosted search and local automation. Existing
-authentication is reused without copying credentials into source. User/project hooks, plugins,
-skills and permission overrides are not imported into the worker configuration.
+O adaptador do Codex usa um diretório home e diretório de trabalho novos, sandbox somente-leitura,
+sem aprovações, sem ambiente de shell herdado, e sem shell de login. Ele desativa delegação, apps,
+plugins remotos, geração de imagem, memória, busca hospedada e automação local. A autenticação
+existente é reaproveitada sem copiar credenciais para a fonte. Hooks, plugins, skills e
+sobrescritas de permissão de usuário/projeto não são importados para a configuração do worker.
 
-The Claude adapter preserves native authentication and uses safe/restricted mode, an empty MCP
-configuration, no automatic permission approvals, and only `Read`, `Grep`, and `Glob` tools.
-It supplies shared instructions explicitly; ambient user/project customization is disabled.
-Managed native policies still apply. The worker has no shell, write, external-connector or
-delegation tools. If its brief needs a diff or online evidence, the caller supplies those as files.
+O adaptador do Claude preserva a autenticação nativa e usa modo seguro/restrito, uma configuração
+MCP vazia, nenhuma aprovação automática de permissão, e apenas as ferramentas `Read`, `Grep` e
+`Glob`. Ele fornece as instruções compartilhadas explicitamente; a personalização ambiente de
+usuário/projeto é desativada. Políticas nativas gerenciadas ainda se aplicam. O worker não tem
+shell, escrita, conector externo ou ferramentas de delegação. Se o brief precisar de um diff ou de
+evidência online, quem chama fornece isso como arquivos.
 
-Run from inside a Claude Code session, where `CLAUDECODE` is set, a Claude worker is checked
-before launch: the client's own `claude auth status` runs under the worker's environment from an
-empty directory, and a failed or unconfirmed login refuses the run with no worker state written.
-Claude Code strips `CLAUDE_CODE_OAUTH_TOKEN` from its tool subprocesses, so a session logged in
-with that token alone hands a worker nothing. Run `citizen role run` from a shell that exports the token, or log
-the client in with `claude auth login`. The harness never writes the token anywhere to work
-around it. Workers on Bedrock, Vertex or Foundry are launched unchecked.
+Rodado de dentro de uma sessão do Claude Code, onde `CLAUDECODE` está definida, um worker do Claude
+é verificado antes do lançamento: o próprio `claude auth status` do cliente roda sob o ambiente do
+worker a partir de um diretório vazio, e um login falho ou não confirmado recusa a execução sem
+nenhum estado de worker escrito. O Claude Code remove `CLAUDE_CODE_OAUTH_TOKEN` de seus
+subprocessos de ferramenta, então uma sessão logada só com esse token não entrega nada a um worker.
+Rode `citizen role run` a partir de um shell que exporta o token, ou faça login no cliente com
+`claude auth login`. O harness nunca escreve o token em lugar nenhum para contornar isso. Workers
+no Bedrock, Vertex ou Foundry são lançados sem essa verificação.
 
-No isolated worker reaches the network, whatever its role declares: the Codex adapter disables
-hosted search under a read-only sandbox and the Claude adapter grants `Read`, `Grep` and `Glob`
-only. A worker that can both read a workspace and fetch is a worker that can carry what it read
-back out, and a fetched page is untrusted input arriving inside a confined process. `gatherer` is
-the role this is felt in, so its definition and `/research` say it: a file or repository dimension
-runs here, a dimension that needs the live web goes to an in-session band worker, which is subject
-to the session's own permission prompts and search budget. The refusal that routes a native
-`gatherer` spawn to `citizen role run` says the same thing in one sentence.
+Nenhum worker isolado alcança a rede, seja o que for que seu papel declare: o adaptador do Codex
+desativa busca hospedada sob um sandbox somente-leitura e o adaptador do Claude concede apenas
+`Read`, `Grep` e `Glob`. Um worker que consegue tanto ler um workspace quanto buscar (fetch) é um
+worker que consegue carregar o que leu para fora, e uma página buscada é entrada não confiável
+chegando dentro de um processo confinado. `gatherer` é o papel em que isso se sente, então sua
+definição e `/research` dizem isso: uma dimensão de arquivo ou repositório roda aqui, uma dimensão
+que precisa da web ao vivo vai para um worker de banda dentro da sessão, que fica sujeito aos
+próprios prompts de permissão e orçamento de busca da sessão. A recusa que roteia um spawn nativo
+de `gatherer` para `citizen role run` diz a mesma coisa em uma frase.
 
-Both adapters enforce a narrower execution surface than the ordinary interactive client.
-Native configuration restrictions take precedence; unsupported flags or required settings fail
-the run. These boundaries do not promise confidentiality against the native model provider.
-See the [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
-and [Claude CLI reference](https://code.claude.com/docs/en/cli-reference) for the native controls.
+Ambos os adaptadores aplicam uma superfície de execução mais estreita que o cliente interativo
+comum. Restrições nativas de configuração têm precedência; flags não suportadas ou configurações
+obrigatórias falham a execução. Esses limites não prometem confidencialidade contra o provedor de
+modelo nativo. Veja a
+[referência de configuração do Codex](https://learn.chatgpt.com/docs/config-file/config-reference)
+e a [referência da CLI do Claude](https://code.claude.com/docs/en/cli-reference) para os controles
+nativos.
 
-Planner workers return Markdown only. The harness runs the shared Review Card validator and
-publishes only a caller-selected **new filename** under `.agent-harness/plans/`. Directory
-descriptors reject symlinked storage; traversal and existing destinations are refused. Atomic
-publication also refuses a file created while the worker was running. Failed, interrupted,
-empty or invalid output never publishes a plan. The caller retains the review/build decision.
+Workers de planner retornam apenas Markdown. O harness roda o validador de Review Card
+compartilhado e publica apenas um **novo nome de arquivo** selecionado por quem chama sob
+`.agent-harness/plans/`. Descritores de diretório rejeitam armazenamento com symlink; travessia e
+destinos existentes são recusados. A publicação atômica também recusa um arquivo criado enquanto o
+worker estava rodando. Saída falha, interrompida, vazia ou inválida nunca publica um plano. Quem
+chama mantém a decisão de revisão/build.
 
-Delegation-off blocks the runner before launch. Workspace-write roles continue to use their
-existing workflow; this command does not grant them a new execution path. Planning and review
-framework recipes use this same role runner, not a second framework or runtime role catalog.
+Delegação desligada bloqueia o executor antes do lançamento. Papéis de escrita em workspace
+continuam usando seu workflow existente; este comando não lhes concede um novo caminho de
+execução. Receitas de framework de planejamento e revisão usam este mesmo executor de papel, não
+um segundo framework ou catálogo de papel de runtime.
 
-## Qualification
+## Qualificação
 
-Source tests and a successful worker result are not client qualification. Native acceptance must
-prove a permitted read actually runs, prohibited shell and patch writes do not, and external
-tools and redelegation cannot widen access. A sandbox that prevents every command from starting
-is a blocked test. Keep results tied to the exact CLI, platform and harness source versions in
-the [compatibility catalog](compatibility.md); editor and desktop behavior requires its own checks.
+Testes de fonte e um resultado de worker bem-sucedido não são qualificação de cliente. A aceitação
+nativa precisa provar que uma leitura permitida de fato roda, que escritas de shell e patch
+proibidas não rodam, e que ferramentas externas e reddelegação não conseguem ampliar o acesso. Um
+sandbox que impede todo comando de iniciar é um teste bloqueado. Mantenha os resultados atrelados
+às versões exatas de CLI, plataforma e fonte do harness no
+[catálogo de compatibilidade](compatibility.md); comportamento de editor e desktop exige suas
+próprias verificações.

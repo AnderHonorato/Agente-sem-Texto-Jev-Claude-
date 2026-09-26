@@ -231,7 +231,7 @@ def pointer_path(projects_root, folder):
 
 
 def read_pointer(path):
-    """The pointer as a dict, or None when it is missing, unreadable or not an object."""
+    """O ponteiro como um dict, ou None quando está ausente, ilegível ou não é um objeto."""
     try:
         value = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -240,14 +240,14 @@ def read_pointer(path):
 
 
 def pointer_payload(environment_id, pid, proc_start, previous=None):
-    """What the host itself writes, with the previous file's carried session ids kept.
+    """O que o próprio host escreve, com os ids de sessão carregados do arquivo anterior mantidos.
 
-    Only keys the reader validates survive: it rejects the whole file on an unknown one. Ids
-    from a different environment are dropped, as the client drops them — a session id is only
-    meaningful to the environment it was created on, and `bridge/reconnect` refuses the rest.
+    Só sobrevivem as chaves que o leitor valida: ele rejeita o arquivo inteiro numa desconhecida.
+    Ids de um ambiente diferente são descartados, como o cliente os descarta — um id de sessão só
+    tem significado para o ambiente em que foi criado, e `bridge/reconnect` recusa o resto.
 
-    A `pid` of None writes no `pid` and no `procStart`: the pointer `install` leaves for a host
-    it is about to replace, which the next host reads as belonging to no live process.
+    Um `pid` de None não escreve `pid` nem `procStart`: o ponteiro que `install` deixa para um
+    host que está prestes a substituir, que o próximo host lê como pertencente a nenhum processo vivo.
     """
     previous = previous if isinstance(previous, dict) else {}
     if previous.get("environmentId") != environment_id:
@@ -265,13 +265,13 @@ def pointer_payload(environment_id, pid, proc_start, previous=None):
 
 
 def install_step(loaded, unchanged, pid, environment):
-    """What `install` does with one folder's agent: `unchanged`, `adopt` or `load`.
+    """O que `install` faz com o agente de uma pasta: `unchanged`, `adopt` ou `load`.
 
-    An unchanged, loaded agent is left alone: reloading it would cut off its sessions. A changed
-    one whose host is running on a known environment is adopted — the pointer is written for
-    that environment and the host is SIGKILLed before the reload, because a host that did not
-    reuse an environment at start archives its sessions and deregisters on SIGTERM, and
-    `launchctl bootout` sends exactly that. Anything else is a plain load.
+    Um agente inalterado e carregado é deixado em paz: recarregá-lo cortaria suas sessões. Um
+    alterado cujo host está rodando num ambiente conhecido é adotado — o ponteiro é escrito para
+    aquele ambiente e o host recebe SIGKILL antes da recarga, porque um host que não reutilizou um
+    ambiente no início arquiva suas sessões e cancela o registro no SIGTERM, e
+    `launchctl bootout` envia exatamente isso. Qualquer outro caso é um load simples.
     """
     if loaded and unchanged:
         return "unchanged"
@@ -281,19 +281,19 @@ def install_step(loaded, unchanged, pid, environment):
 
 
 def environment_id(log_text):
-    """The environment the host most recently registered: the last one its log names."""
+    """O ambiente que o host mais recentemente registrou: o último que seu log nomeia."""
     found = ENV_ID.findall(log_text or "")
     return found[-1] if found else None
 
 
 def unreachable_seconds(log_text):
-    """How long the host has been failing to reach the server, from the trailing run of
-    `Connection error, retrying` lines.
+    """Há quanto tempo o host está falhando ao alcançar o servidor, a partir da sequência final de
+    linhas `Connection error, retrying`.
 
-    The `(Ns elapsed)` figure is the host's own error budget and wins; a log without one falls
-    back to the `[HH:MM:SS]` span, which reads a run crossing midnight as a wrap rather than as
-    a negative gap. Any other line ends the run, so a reconnect and the system-sleep reset both
-    put the budget back to zero — as they do inside the host.
+    A cifra `(Ns elapsed)` é o próprio orçamento de erro do host e vence; um log sem uma recai
+    para o intervalo `[HH:MM:SS]`, que lê uma sequência que cruza a meia-noite como uma volta em
+    vez de uma lacuna negativa. Qualquer outra linha encerra a sequência, então uma reconexão e o
+    reset de sono do sistema zeram o orçamento de volta — como fazem dentro do host.
     """
     elapsed, stamps = 0, []
     for line in (log_text or "").splitlines():

@@ -1,5 +1,5 @@
 ---
-description: Close a finished session: sweep for unfinished work, ask once, land, file the follow-ups, hand off, tell the sessions that depend on this one, then archive.
+description: Close a finished session: sweep for unfinished work, ask once, land, file the follow-ups, hand off, tell the sessions that depend on this one, then archive. (Fecha uma sessão terminada: varre por trabalho inacabado, pergunta uma vez, finaliza, registra os follow-ups, faz o handoff, avisa as sessões que dependem desta, depois arquiva.)
 argument-hint: [what is finishing, and "archive" if it should archive without asking again]
 ---
 

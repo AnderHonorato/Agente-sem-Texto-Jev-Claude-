@@ -1,5 +1,5 @@
 ---
-description: Implement an approved plan or issue in its own worktree, run the gate, open the pull request.
+description: Implement an approved plan or issue in its own worktree, run the gate, open the pull request. (Implementa um plano ou issue aprovado em sua própria worktree, roda o gate, abre o pull request.)
 argument-hint: <plan path or issue number>
 ---
 

@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
-"""Drive one qualification round across its targets, from a provisioned round directory.
+"""Conduz uma rodada de qualificação por seus alvos, a partir de um diretório de rodada provisionado.
 
-The driver that ran each round lived only in a per-round scratch copy, so every round rewrote it
-and no two rounds were driven quite the same way. This is that driver, committed: it runs the
-deterministic smoke tier once, then `scripts/native_acceptance.py` per target from the frozen
-clone, and writes one record per target beside a summary an operator reads.
+O driver que rodava cada rodada vivia só numa cópia de rascunho por rodada, então toda rodada o
+reescrevia e nenhuma duas rodadas eram conduzidas exatamente da mesma forma. Este é esse driver,
+versionado: ele roda o nível determinístico de fumaça (smoke) uma vez, depois
+`scripts/native_acceptance.py` por alvo a partir do clone congelado, e escreve um registro por
+alvo ao lado de um resumo que um operador lê.
 
-A smoke tier that does not pass, failed or timed out, stops the round before any target runs:
-the tier spends no model turn, so a round it would have failed is refused before one is spent.
-The round record names the tier's result and why nothing ran. `--skip-smoke`, for a tier already
-run green at this commit, is recorded as `skipped` and runs every target.
+Um nível de fumaça que não passa, falhou ou expirou, para a rodada antes de qualquer alvo rodar:
+o nível não gasta nenhum turno de modelo, então uma rodada que teria falhado é recusada antes de
+um ser gasto. O registro da rodada nomeia o resultado do nível e por que nada rodou.
+`--skip-smoke`, para um nível já rodado verde neste commit, é registrado como `skipped` e roda
+todo alvo.
 
-Past the tier it decides nothing. A target's verdict is the runner's, a failed target does not
-stop the others — a round collects every target's defects before any of them is fixed, which is
-the rule in docs/releasing.md — and the exit status is 0 only when the tier passed or was skipped
-and every case of every target passed.
+Além do nível ele não decide nada. O veredito de um alvo é o do runner, um alvo que falha não para
+os outros — uma rodada coleta os defeitos de todo alvo antes de qualquer um deles ser corrigido,
+que é a regra em docs/releasing.md — e o status de saída é 0 só quando o nível passou ou foi
+pulado e todo caso de todo alvo passou.
 
     python3 scripts/qualification_round.py --round ../round-0.13.0 --targets claude-code-cli-macos
     python3 scripts/qualification_round.py --round ../round-0.13.0 --plan
     python3 scripts/qualification_round.py --round ../round-0.13.0 --execution-class light
 
-Each target carries an execution class and an assessment class, resolved before anything is
-launched and recorded with the round; `harness_core.qualification` holds the rules and the two
-refusals.
+Cada alvo carrega uma classe de execução e uma classe de avaliação, resolvidas antes de qualquer
+coisa ser lançada e registradas com a rodada; `harness_core.qualification` guarda as regras e as
+duas recusas.
 """
 import argparse
 import json
@@ -54,20 +56,21 @@ def provision_record(round_dir):
 
 
 def environment(report):
-    """The operator's environment, unchanged: no required case reads anything the round adds.
+    """O ambiente do operador, inalterado: nenhum caso obrigatório lê nada que a rodada adiciona.
 
-    The credentials a client uses are the operator's and are passed through by name by the runner
-    itself. A provisioned BMad checkout is for the optional integration suite, run by hand.
+    As credenciais que um cliente usa são as do operador e são repassadas pelo nome pelo próprio
+    runner. Um checkout do BMad provisionado é para a suíte de integração opcional, rodada
+    manualmente.
     """
     import os
     return dict(os.environ)
 
 
 def smoke(clone, env, targets=()):
-    """The deterministic tier, or `None` when it ran past the round's own deadline.
+    """O nível determinístico, ou `None` quando ele passa do próprio prazo da rodada.
 
-    The tier checks the preconditions of the targets this round runs and no others, so a round
-    that leaves a target out is not failed for that target's missing login or daemon.
+    O nível verifica as precondições dos alvos que esta rodada roda e nenhum outro, então uma
+    rodada que deixa um alvo de fora não falha pelo login ou daemon ausente daquele alvo.
     """
     argv = [sys.executable, str(Path(clone) / "scripts" / SMOKE)]
     if targets:
@@ -79,11 +82,11 @@ def smoke(clone, env, targets=()):
 
 
 def nothing_observed(reason):
-    """A target's record when the runner wrote none: every required case, unobserved.
+    """O registro de um alvo quando o runner não escreveu nenhum: todo caso obrigatório, não observado.
 
-    An absent `--out` is the one shape that must never be read as the previous run's: a runner
-    that died before writing left no reading at all, and reporting the stale file would publish
-    an old pass as this round's.
+    Um `--out` ausente é o único formato que nunca pode ser lido como o de uma execução anterior:
+    um runner que morreu antes de escrever não deixou nenhuma leitura, e relatar o arquivo
+    desatualizado publicaria uma aprovação antiga como sendo desta rodada.
     """
     cases = dict((name, "unverified") for name in catalog()["required_cases"])
     return {"cases": cases, "observations": [reason]}

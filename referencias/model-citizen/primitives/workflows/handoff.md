@@ -1,5 +1,5 @@
 ---
-description: Write the repository handoff file for the next session, and record any durable learning.
+description: Write the repository handoff file for the next session, and record any durable learning. (Escreve o arquivo de handoff do repositório para a próxima sessão, e registra qualquer aprendizado durável.)
 argument-hint: [note to carry into the next session]
 ---
 

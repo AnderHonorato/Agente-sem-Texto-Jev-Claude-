@@ -1,5 +1,5 @@
 ---
-description: Answer a research question with parallel read-only gatherers and one synthesized digest.
+description: Answer a research question with parallel read-only gatherers and one synthesized digest. (Responde a uma pergunta de pesquisa com coletores somente-leitura paralelos e um resumo sintetizado.)
 argument-hint: <question>
 ---
 

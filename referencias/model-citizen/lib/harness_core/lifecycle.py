@@ -359,14 +359,15 @@ def workflow_role(script):
 
 
 def workflow_role_in(script):
-    """The constrained role one reading of a workflow script names, as `workflow_role` returns it.
+    """O papel restrito que uma leitura de um script de workflow nomeia, como `workflow_role` o retorna.
 
-    A quoted `agentType` value is read directly. Any other mention of `agentType` — a computed
-    value, a shorthand property — cannot be, so then any whole string literal naming a
-    constrained role counts: a script that picks its agent type at run time from a list holding
-    `'reviewer'` names that role as surely as one that writes it inline. That errs towards
-    refusing, as `constrained_role` does for a contract it cannot load. A marker is matched as `marker_role` matches one, a standalone
-    declaration naming a constrained shared role.
+    Um valor `agentType` entre aspas é lido diretamente. Qualquer outra menção a `agentType` — um
+    valor computado, uma propriedade abreviada — não pode ser, então qualquer literal de string
+    inteiro nomeando um papel restrito conta: um script que escolhe seu tipo de agente em tempo
+    de execução a partir de uma lista contendo `'reviewer'` nomeia esse papel tão certamente
+    quanto um que o escreve inline. Isso erra a favor da recusa, como `constrained_role` faz para
+    um contrato que não consegue carregar. Um marcador é comparado como `marker_role` compara um,
+    uma declaração isolada nomeando um papel compartilhado restrito.
     """
     computed = False
     for mention in WORKFLOW_AGENT_TYPE.finditer(script):
@@ -393,11 +394,11 @@ def workflow_role_in(script):
 
 
 def workflow_results(runtime, event):
-    """The answers to a `Workflow` launch, with its decision row written.
+    """As respostas a um lançamento `Workflow`, com sua linha de decisão escrita.
 
-    Every launch is a row, allowed ones included, because a launch is a batch of spawns no other
-    row accounts for. The row's input is the script as judged, or the tool input when the script
-    could not be read.
+    Todo lançamento é uma linha, os permitidos incluídos, porque um lançamento é um lote de
+    disparos que nenhuma outra linha contabiliza. A entrada da linha é o script como foi julgado,
+    ou a entrada da ferramenta quando o script não pôde ser lido.
     """
     results = []
     script = workflow_script(event)
@@ -430,16 +431,16 @@ def workflow_results(runtime, event):
 
 
 def framework_deny(runtime, session_id, prompt, subagent_type):
-    """The refusal a declared integration's spawn gets, or None when this call is not one.
+    """A recusa que o disparo de uma integração declarada recebe, ou None quando esta chamada não é uma.
 
-    The classification is the descriptor's, not the model's: `subagent_type` is one signal among
-    several and carries no more weight than the rest. Only a role the guard would constrain is
-    ever matched, so a mapping cannot be used to refuse work the harness does not confine.
+    A classificação é do descritor, não do modelo: `subagent_type` é um sinal entre vários e não
+    carrega mais peso que os demais. Só um papel que a proteção restringiria é comparado, então
+    um mapeamento não pode ser usado para recusar trabalho que o harness não confina.
 
-    This refusal is deliberately not remembered. A remembered one is matched by prefix or
-    similarity for the rest of the session, so one wrong classification would go on refusing the
-    corrected brief too; the descriptor answers each spawn on its own evidence instead. See
-    `frameworks.py`.
+    Esta recusa deliberadamente não é lembrada. Uma lembrada é comparada por prefixo ou
+    similaridade pelo resto da sessão, então uma classificação errada continuaria recusando o
+    brief corrigido também; o descritor responde a cada disparo pela sua própria evidência em vez
+    disso. Veja `frameworks.py`.
     """
     try:
         from . import frameworks
@@ -460,10 +461,10 @@ def framework_deny(runtime, session_id, prompt, subagent_type):
 
 
 def descriptor_notice(session_id):
-    """One `systemMessage` naming every integration descriptor the loader could not use.
+    """Um único `systemMessage` nomeando cada descritor de integração que o carregador não conseguiu usar.
 
-    Said once per session, because a descriptor nobody can load is enforcement that stopped, and
-    the only place a user would otherwise see that is a refusal that never came.
+    Dito uma vez por sessão, porque um descritor que ninguém consegue carregar é imposição que
+    parou, e o único lugar onde um usuário de outra forma veria isso é numa recusa que nunca veio.
     """
     try:
         from . import frameworks
@@ -483,7 +484,7 @@ def descriptor_notice(session_id):
 
 
 def notice_once(session_id, key):
-    """Whether this session has yet to be told `key`. Records that it now has. Never raises."""
+    """Se esta sessão ainda não recebeu o aviso `key`. Registra que agora recebeu. Nunca levanta exceção."""
     try:
         posture = load("posture")
         record = posture.read_session_record(session_id) or {}
@@ -497,16 +498,16 @@ def notice_once(session_id, key):
 
 
 def fingerprint(prompt):
-    """A brief reduced to what a re-spawn cannot vary: whitespace, case and length all removed."""
+    """Um brief reduzido ao que um re-disparo não consegue variar: espaço, caixa e comprimento removidos."""
     return " ".join(prompt.split()).casefold()[:FINGERPRINT_MAX] if isinstance(prompt, str) else ""
 
 
 def same_work(left, right):
-    """Whether two fingerprints are the same brief. Equality, containment, then similarity.
+    """Se duas fingerprints são o mesmo brief. Igualdade, contenção, depois similaridade.
 
-    Containment is tested only on a prefix long enough to be evidence; a short brief that happens
-    to appear inside a longer unrelated one is a false refusal, and a refusal nobody can explain
-    is worse than the evasion it prevents.
+    A contenção só é testada num prefixo longo o bastante para ser evidência; um brief curto que
+    por acaso aparece dentro de um mais longo e não relacionado é uma recusa falsa, e uma recusa
+    que ninguém consegue explicar é pior que a evasão que ela previne.
     """
     if not left or not right:
         return False
@@ -519,10 +520,11 @@ def same_work(left, right):
 
 
 def denied_spawns(session_id):
-    """What this session has already refused as a constrained-role spawn; `[]` for anything else.
+    """O que esta sessão já recusou como disparo de papel restrito; `[]` para qualquer outra coisa.
 
-    State a hook cannot read is state that does not exist. The guard then behaves exactly as it
-    did before it was written, because a spawn hook that raises is worse than one that forgets.
+    Um estado que um hook não consegue ler é um estado que não existe. A proteção então se
+    comporta exatamente como se comportava antes de ser escrita, porque um hook de disparo que
+    levanta exceção é pior que um que esquece.
     """
     try:
         record = load("posture").read_session_record(session_id)
@@ -534,7 +536,7 @@ def denied_spawns(session_id):
 
 
 def remember_denial(session_id, name, prompt):
-    """Add one refusal to the session's memory, newest last. Best effort, never raises."""
+    """Adiciona uma recusa à memória da sessão, a mais nova por último. Melhor esforço, nunca levanta exceção."""
     text = fingerprint(prompt)
     if not text:
         return False
@@ -549,7 +551,7 @@ def remember_denial(session_id, name, prompt):
 
 
 def evasion_deny(runtime, session_id, prompt):
-    """The refusal a re-spawn of already-refused work gets, or None when this is not that."""
+    """A recusa que um re-disparo de trabalho já recusado recebe, ou None quando não é esse o caso."""
     text = fingerprint(prompt)
     for entry in reversed(denied_spawns(session_id)):
         if same_work(text, entry["prompt"]):

@@ -1,5 +1,5 @@
 ---
-description: Turn a topic or issue into a plan the reviewer approves in the native plan pane.
+description: Turn a topic or issue into a plan the reviewer approves in the native plan pane. (Transforma um tópico ou issue num plano que o revisor aprova no painel de plano nativo.)
 argument-hint: <topic or issue number>
 ---
 

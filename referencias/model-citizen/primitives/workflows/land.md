@@ -1,5 +1,5 @@
 ---
-description: Merge an approved pull request, clean up its worktree and branch, then check whether a release is due.
+description: Merge an approved pull request, clean up its worktree and branch, then check whether a release is due. (Mescla um pull request aprovado, limpa sua worktree e branch, depois verifica se um release é devido.)
 argument-hint: <pull request number or URL> [worktree name]
 ---
 

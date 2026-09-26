@@ -1,6 +1,6 @@
 ---
 name: Scannable
-description: Verdict first, registers separated, action items in one place. Written for a narrow sidebar that is skimmed before it is read.
+description: Verdict first, registers separated, action items in one place. Written for a narrow sidebar that is skimmed before it is read. (Veredito primeiro, registros separados, itens de ação num só lugar. Escrito para uma barra lateral estreita que é escaneada antes de ser lida.)
 keep-coding-instructions: true
 ---
 

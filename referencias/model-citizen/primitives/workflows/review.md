@@ -1,5 +1,5 @@
 ---
-description: Review the branch's diff in two fresh contexts — scope against the spec, then quality — and report findings only.
+description: Review the branch's diff in two fresh contexts — scope against the spec, then quality — and report findings only. (Revisa o diff do branch em dois contextos novos — escopo contra a especificação, depois qualidade — e relata apenas achados.)
 argument-hint: [base ref, default main] [optional spec: issue number, plan path or PR number]
 ---
 

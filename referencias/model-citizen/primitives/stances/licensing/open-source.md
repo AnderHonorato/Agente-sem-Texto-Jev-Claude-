@@ -1,8 +1,9 @@
-# Licensing stance: open-source project
+# Postura de licenciamento: projeto open-source
 
-**Invoke the `licensing-review` skill before incorporating or upgrading any third-party material** —
-code, models, fonts, audio, images and datasets alike. It must permit use, modification and
-redistribution under a licence compatible with the project's own; copyleft qualifies only when that
-holds and the obligations are recorded in the manifest. Noncommercial, no-derivatives, field-of-use,
-time-limited, revocable and paid proprietary licences are excluded, as is anything with suspect
-rights. A marketplace tag is not proof, and no licence clears trademark risk. `docs/preferences.md`.
+**Invoque a skill `licensing-review` antes de incorporar ou atualizar qualquer material de
+terceiros** — código, modelos, fontes, áudio, imagens e datasets igualmente. Precisa permitir
+uso, modificação e redistribuição sob uma licença compatível com a do próprio projeto; copyleft
+se qualifica apenas quando isso vale e as obrigações são registradas no manifesto. Licenças não
+comerciais, sem derivativos, de campo de uso limitado, com prazo, revogáveis e proprietárias pagas
+estão excluídas, assim como qualquer coisa com direitos suspeitos. Uma tag de marketplace não é
+prova, e nenhuma licença resolve risco de marca registrada. `docs/preferences.md`.

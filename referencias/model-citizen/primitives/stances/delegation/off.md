@@ -1,5 +1,6 @@
-# Delegation stance: off
+# Postura de delegação: desligada
 
-Do not spawn subagents unless the user asks. Do the work inline. If a task genuinely exceeds one
-context window, say so and propose a fan-out rather than starting one. A spawn attempted under
-this stance is denied outright, so changing the selected stance is the only way to delegate.
+Não gere subagentes a menos que o usuário peça. Faça o trabalho inline. Se uma tarefa
+genuinamente excede uma janela de contexto, diga isso e proponha um fan-out em vez de iniciar um.
+Um spawn tentado sob esta postura é negado de imediato, então mudar a postura selecionada é a
+única forma de delegar.

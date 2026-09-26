@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Run the deterministic pre-qualification checks as one tier: no model turn, no client, no cost.
+"""Roda as verificações determinísticas de pré-qualificação como um único nível: sem turno de modelo, sem cliente, sem custo.
 
-Every check here already exists in this repository; the tier is the single command that runs
-them before a qualification round is paid for — the acceptance runner's self-tests against
-recorded transcripts, the documentation-link check, the credential and host precondition probe
-for each target the round will run, and the disposable-home sync, projection-drift and lifecycle
-checks.
+Toda verificação aqui já existe neste repositório; o nível é o único comando que as roda
+antes de uma rodada de qualificação ser paga — os autotestes do runner de aceitação contra
+transcrições registradas, a verificação de links de documentação, a sonda de precondição de
+credencial e host para cada alvo que a rodada vai rodar, e as verificações de sync de home
+descartável, desvio de projeção e ciclo de vida.
 
-A green tier is never native client qualification. It observes no client behaviour, writes
-nothing under `compatibility/evidence/` and appears in no catalog record; the run fails if
-either of those is touched. What a client must be observed doing, and what evidence must
-contain, is in docs/compatibility.md.
+Um nível verde nunca é qualificação de cliente nativo. Ele não observa nenhum comportamento de
+cliente, não escreve nada sob `compatibility/evidence/` e não aparece em nenhum registro de
+catálogo; a execução falha se qualquer um dos dois for tocado. O que um cliente precisa ser
+observado fazendo, e o que a evidência precisa conter, está em docs/compatibility.md.
 
     python3 scripts/smoke_tier.py --list
     python3 scripts/smoke_tier.py
@@ -33,8 +33,8 @@ from native_acceptance import CLIENTS, redact
 
 NOT_QUALIFICATION = ("smoke tier: deterministic pre-qualification checks, no model turn; "
                      "a green run is not native client qualification")
-# What no check may touch: an evidence record is a claim about an observed client, and this tier
-# observes none.
+# O que nenhuma verificação pode tocar: um registro de evidência é uma alegação sobre um cliente
+# observado, e este nível não observa nenhum.
 GUARDED = (Path("compatibility") / "evidence", Path("compatibility") / "catalog.json")
 TAIL = 600
 GIT_TIMEOUT = 30
@@ -45,12 +45,12 @@ def unittest_argv(pattern):
 
 
 def steps(work, targets=None):
-    """Each check, in the order a failing one is cheapest to read: fastest and narrowest first.
+    """Cada verificação, na ordem em que uma que falhar é mais barata de ler: mais rápida e mais estreita primeiro.
 
-    `credentials` checks, for each target, what docs/qualification-runbook.md says must exist
-    before it starts: its client and login here, or a Docker daemon for a Linux target this host
-    runs in a container. With no targets named it checks every CLI target this host can run and
-    reports the rest as skipped.
+    `credentials` verifica, para cada alvo, o que docs/qualification-runbook.md diz que precisa
+    existir antes de começar: seu cliente e login aqui, ou um daemon Docker para um alvo Linux que
+    este host roda em um container. Sem nenhum alvo nomeado, ela verifica todo alvo de CLI que
+    este host consegue rodar e relata o resto como pulado.
     """
     return [
         {"name": "credentials",
@@ -77,11 +77,11 @@ def steps(work, targets=None):
 
 
 def dirty(root=ROOT):
-    """What the working tree has changed, or `None` when its state could not be read at all.
+    """O que a árvore de trabalho mudou, ou `None` quando seu estado não pôde ser lido de forma alguma.
 
-    Outside a git checkout `git status` exits 128 and prints nothing, which is indistinguishable
-    from a clean tree if only standard output is read; a check that needs a clean tree is
-    `unverified` there rather than run against an unknown one.
+    Fora de um checkout git, `git status` sai com 128 e não imprime nada, o que é
+    indistinguível de uma árvore limpa se só a saída padrão for lida; uma verificação que precisa
+    de uma árvore limpa fica `unverified` nesse caso em vez de rodar contra uma desconhecida.
     """
     try:
         result = subprocess.run(["git", "-C", str(root), "status", "--porcelain"],
@@ -94,7 +94,7 @@ def dirty(root=ROOT):
 
 
 def digest(root=ROOT):
-    """One digest over everything this tier must not write, so a write is caught rather than trusted."""
+    """Um único digest sobre tudo que este nível não pode escrever, para que uma escrita seja pega em vez de confiada."""
     sha = hashlib.sha256()
     for relative in GUARDED:
         path = root / relative
@@ -110,7 +110,7 @@ def outcome(step, result, seconds, detail):
 
 
 def kill_group(process):
-    """Kill the check and everything it started; a surviving grandchild holds the run open."""
+    """Mata a verificação e tudo que ela iniciou; um neto sobrevivente mantém a execução aberta."""
     try:
         os.killpg(os.getpgid(process.pid), signal.SIGKILL)
     except OSError:
@@ -118,16 +118,16 @@ def kill_group(process):
 
 
 def tail(output, code):
-    """The end of a failing check's output, redacted whole before it is cut.
+    """O fim da saída de uma verificação que falhou, redigida inteira antes de ser cortada.
 
-    Cutting first can leave the second half of a home path or a token standing on its own, so
-    the redaction runs over everything the check printed and the cut is taken from the result.
+    Cortar primeiro pode deixar a segunda metade de um caminho de home ou um token isolada, então
+    a redação roda sobre tudo que a verificação imprimiu e o corte é tirado do resultado.
     """
     return redact(output)[-TAIL:] or "exit %s with no output" % code
 
 
 def run_step(step, root=ROOT):
-    """Run one check under a bounded timeout and classify it, never inferring a pass."""
+    """Roda uma verificação sob um timeout limitado e a classifica, nunca inferindo uma aprovação."""
     started = time.time()
     if step.get("clean_tree"):
         state = dirty(root)
@@ -148,8 +148,8 @@ def run_step(step, root=ROOT):
     try:
         out, err = process.communicate(timeout=step["timeout"])
     except subprocess.TimeoutExpired:
-        # A check that never answered observed nothing, so it is unverified rather than failed —
-        # and it is killed with its children, which is the hang this tier exists to replace.
+        # Uma verificação que nunca respondeu não observou nada, então ela é unverified em vez de
+        # failed — e é morta com seus filhos, que é a travada que este nível existe para substituir.
         kill_group(process)
         process.communicate()
         return outcome(step, "unverified", float(step["timeout"]),
@@ -203,13 +203,13 @@ def tier(plan, root=ROOT, runner=run_step):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--only", help="comma-separated subset of the checks to run")
-    parser.add_argument("--skip", help="comma-separated checks to leave out of this run")
+    parser.add_argument("--only", help="subconjunto separado por vírgulas das verificações a rodar")
+    parser.add_argument("--skip", help="verificações separadas por vírgulas a deixar fora desta execução")
     parser.add_argument("--targets",
-                        help="comma-separated targets the round will run; default every CLI "
-                             "target this host can run")
+                        help="alvos separados por vírgulas que a rodada vai rodar; por padrão todo "
+                             "alvo de CLI que este host consegue rodar")
     parser.add_argument("--list", action="store_true", dest="listing",
-                        help="print what would run, running nothing")
+                        help="imprime o que rodaria, sem rodar nada")
     args = parser.parse_args(argv)
     with tempfile.TemporaryDirectory(prefix="harness-smoke-") as work:
         targets = [name.strip() for name in (args.targets or "").split(",") if name.strip()]

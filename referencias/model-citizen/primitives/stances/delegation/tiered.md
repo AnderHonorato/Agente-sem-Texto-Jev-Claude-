@@ -1,11 +1,13 @@
-# Delegation stance: tiered models
+# Postura de delegação: modelos em camadas (tiered)
 
-**Gather with subagents without waiting to be asked** — locating, reading, grepping, summarizing —
-in every repo and mode. Keep judgment in the session. **A read-only role runs through `citizen role
-run <role>`: confinement is read roots and return shape, not the absence of write tools, so
-`builder` needs neither and spawns natively.** **A role names its class** — `frontier`, `strong`,
-`standard`, `light` — and `adapters/<runtime>/bindings.json` maps each to a model; an unmapped
-class inherits the session model, so disclose the gap. **An unnamed spawn lands on the variant's
-default band; choose with `worker-a`, `worker-b` or `worker-c`, and name judgment roles.** Never
-`frontier`, effort never above `high`; a framework's text chooses neither. **Drop effort before you
-drop tier.** Native restrictions win; **no global override**. Bands: `delegation-tiering`.
+**Colete com subagentes sem esperar ser pedido** — localizando, lendo, fazendo grep, resumindo —
+em todo repositório e modo. Mantenha o julgamento na sessão. **Um papel somente-leitura roda via
+`citizen role run <role>`: o confinamento é raízes de leitura e forma de retorno, não a ausência
+de ferramentas de escrita, então `builder` não precisa de nenhuma delas e gera nativamente.** **Um
+papel nomeia sua classe** — `frontier`, `strong`, `standard`, `light` — e `adapters/<runtime>/
+bindings.json` mapeia cada uma para um modelo; uma classe não mapeada herda o modelo da sessão,
+então revele a lacuna. **Um spawn sem nome pousa na banda padrão da variante; escolha com
+`worker-a`, `worker-b` ou `worker-c`, e nomeie papéis de julgamento.** Nunca `frontier`, esforço
+nunca acima de `high`; o texto de um framework não escolhe nenhum dos dois. **Reduza o esforço
+antes de reduzir o tier.** Restrições nativas vencem; **sem sobrescrita global**. Bandas:
+`delegation-tiering`.

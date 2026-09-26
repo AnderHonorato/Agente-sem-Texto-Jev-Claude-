@@ -1,7 +1,9 @@
-# Cost stance: balanced
+# Postura de custo: equilibrada
 
-Session effort runs **medium**, fan-out stays at six subagents or fewer, fast mode is off unless asked, and a task
-ends with `/clear`, not `/compact`. Past 120,000 then 160,000 tokens of context the feed says to hand off and start
-fresh — starting points chosen against a 200k window, not measured figures. Spend the effort dial on judgment work
-and keep gathering cheap. The table also prices each role and band: class, effort, soft budget. Tier comes from the
-`delegation` stance; this one sets how much. Cache rules: `cache-hygiene.md`.
+O esforço da sessão roda em **médio**, o fan-out fica em seis subagentes ou menos, o modo rápido
+está desligado a menos que pedido, e uma tarefa termina com `/clear`, não `/compact`. Passando
+120.000 e depois 160.000 tokens de contexto, o feed diz para fazer handoff e começar do zero —
+pontos de partida escolhidos contra uma janela de 200k, não figuras medidas. Gaste o dial de
+esforço em trabalho de julgamento e mantenha a coleta barata. A tabela também precifica cada papel
+e banda: classe, esforço, orçamento suave. O tier vem da postura `delegation`; esta define quanto.
+Regras de cache: `cache-hygiene.md`.

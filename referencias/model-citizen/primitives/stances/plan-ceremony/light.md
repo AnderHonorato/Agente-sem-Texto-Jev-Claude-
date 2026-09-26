@@ -1,8 +1,9 @@
-# Plan ceremony stance: light
+# Postura de cerimônia de plano: leve
 
-A plan is a short message in chat: what will be built, the steps with one exit test each, and
-the decisions the user must make, numbered. No plan file is required, no card validator runs.
+Um plano é uma mensagem curta no chat: o que será construído, os passos com um teste de saída
+cada, e as decisões que o usuário precisa tomar, numeradas. Nenhum arquivo de plano é exigido,
+nenhum validador de card roda.
 
-Wait for an explicit go-ahead before implementing, then implement the whole plan without
-per-step confirmation. If the user asks for a written plan, the `plan-authoring` skill still
-knows the full shape.
+Espere um sinal verde explícito antes de implementar, depois implemente o plano inteiro sem
+confirmação a cada passo. Se o usuário pedir um plano escrito, a skill `plan-authoring` ainda
+conhece a forma completa.

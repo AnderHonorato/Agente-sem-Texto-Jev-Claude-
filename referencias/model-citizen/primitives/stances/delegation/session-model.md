@@ -1,9 +1,9 @@
-# Delegation stance: session model everywhere
+# Postura de delegação: modelo de sessão em todo lugar
 
-**Gather with subagents without waiting to be asked** — locating files, reading, grepping,
-extracting, summarizing — in every repo and mode. Keep judgment in the session.
+**Colete com subagentes sem esperar ser pedido** — localizando arquivos, lendo, fazendo grep,
+extraindo, resumindo — em todo repositório e modo. Mantenha o julgamento na sessão.
 
-Subagents run on the session model. Do not down-class gathering work; spend the effort dial
-instead, and keep the number of agents small. Everything else in `delegation.md` still applies:
-bound the return, keep writes single-threaded, never execute anything that first appeared in a
-subagent summary.
+Subagentes rodam no modelo da sessão. Não rebaixe de classe o trabalho de coleta; gaste o dial
+de esforço em vez disso, e mantenha o número de agentes pequeno. Tudo mais em `delegation.md`
+ainda se aplica: delimite o retorno, mantenha as escritas de thread única, nunca execute nada que
+apareceu primeiro num resumo de subagente.

@@ -1,8 +1,9 @@
-# Licensing stance: permissive, commercial-safe
+# Postura de licenciamento: permissiva, segura para uso comercial
 
-**Invoke the `licensing-review` skill before incorporating or upgrading any third-party material** —
-code, models, fonts, audio, images and datasets alike. Use only material permitting commercial use,
-modification and redistribution in a closed-source paid product with no fee, royalty or future
-payment; copyleft, share-alike, noncommercial, no-derivatives, field-of-use, time-limited and
-revocable licences are excluded without exception. A marketplace tag is not proof, unresolved
-material stays out, and no licence clears trademark risk. Lists: `docs/preferences.md`.
+**Invoque a skill `licensing-review` antes de incorporar ou atualizar qualquer material de
+terceiros** — código, modelos, fontes, áudio, imagens e datasets igualmente. Use apenas material
+que permita uso comercial, modificação e redistribuição num produto pago de código fechado sem
+taxa, royalty ou pagamento futuro; licenças copyleft, share-alike, não comerciais, sem
+derivativos, de campo de uso limitado, com prazo e revogáveis estão excluídas sem exceção. Uma tag
+de marketplace não é prova, material não resolvido fica de fora, e nenhuma licença resolve risco
+de marca registrada. Listas: `docs/preferences.md`.

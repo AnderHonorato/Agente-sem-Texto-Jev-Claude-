@@ -1,4 +1,5 @@
-# Licensing stance: off
+# Postura de licenciamento: desligada
 
-No standing licensing policy is in force. Still read the licence of anything you incorporate,
-record it where the project keeps such records, and say so when it is unclear.
+Nenhuma política de licenciamento permanente está em vigor. Ainda assim leia a licença de
+qualquer coisa que você incorporar, registre-a onde o projeto guarda esses registros, e diga isso
+quando não estiver claro.

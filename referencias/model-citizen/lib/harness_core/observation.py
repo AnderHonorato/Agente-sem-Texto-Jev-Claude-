@@ -37,11 +37,11 @@ def registration(root, runtime):
 
 
 def bare_install(dest, runtime="claude-code"):
-    """Write the bare arm's whole harness footprint into `dest` and return the settings path.
+    """Escreve toda a pegada do harness do braço nu em `dest` e retorna o caminho das settings.
 
-    The footprint is the recorder, copied alone as `observe.py`, and the runtime's hook file
-    registering it with `--profile bare`. Nothing else from the harness is present: no dispatcher,
-    no policy, no rule, stance or skill.
+    A pegada é o registrador, copiado sozinho como `observe.py`, e o arquivo de hook do runtime
+    registrando-o com `--profile bare`. Nada mais do harness está presente: nenhum dispatcher,
+    nenhuma política, regra, stance ou skill.
     """
     if runtime not in SETTINGS_FILE:
         raise ValueError("unknown runtime")
@@ -56,6 +56,6 @@ def bare_install(dest, runtime="claude-code"):
 
 
 def install_files(dest):
-    """Every file under `dest`, relative to it, sorted."""
+    """Todo arquivo sob `dest`, relativo a ele, ordenado."""
     dest = Path(dest)
     return sorted(str(p.relative_to(dest)) for p in dest.rglob("*") if p.is_file())

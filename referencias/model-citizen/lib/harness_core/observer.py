@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""The observation-only hook path: one ledger row per hook event, and nothing else (AD-23).
+"""O caminho de hook somente-observação: uma linha de ledger por evento de hook, e nada mais (AD-23).
 
-Observation runs in every arm of a comparison, the bare one included, so it must never change what
-the model or the user sees. This path therefore prints nothing, adds no context, returns no
-decision and exits 0 on every input. Any failure, an unwritable ledger included, goes to a local
-error log beside the ledger, and a failure to write that log is dropped.
+A observação roda em todo braço de uma comparação, o nu incluído, então nunca deve mudar o que o
+modelo ou o usuário veem. Este caminho, portanto, não imprime nada, não adiciona contexto, não
+retorna decisão alguma e sai com 0 em toda entrada. Qualquer falha, incluindo um ledger que não
+pode ser escrito, vai para um log de erro local ao lado do ledger, e uma falha ao escrever esse
+log é descartada.
 
-A row carries the event's name, the runtime, the session id, the tool name where the event has
-one, and the profile fingerprint. It never carries a prompt, a tool input, a tool result or any
-other message body.
+Uma linha carrega o nome do evento, o runtime, o id de sessão, o nome da ferramenta onde o evento
+tem um, e a fingerprint do perfil. Nunca carrega um prompt, uma entrada de ferramenta, um
+resultado de ferramenta ou qualquer outro corpo de mensagem.
 
-The file is standard library only and imports nothing from the harness, because a bare-arm install
-copies it alone (`harness_core.observation.bare_install`). Run as a script it takes
-`--runtime <name>` and `--profile <fingerprint>`; a bare install passes `--profile bare`, which is
-the name the bare arm's rows carry, since it loads no profile to digest.
+O arquivo é só biblioteca padrão e não importa nada do harness, porque uma instalação de braço nu
+o copia sozinho (`harness_core.observation.bare_install`). Rodado como script, recebe
+`--runtime <name>` e `--profile <fingerprint>`; uma instalação nua passa `--profile bare`, que é
+o nome que as linhas do braço nu carregam, já que ele não carrega perfil algum para resumir.
 """
 import datetime
 import importlib.util
@@ -48,10 +49,10 @@ def now():
 
 
 def profile_fingerprint(profile=None):
-    """The named profile, else the digest of the `posture.py` in this checkout, else None.
+    """O perfil nomeado, senão o digest do `posture.py` neste checkout, senão None.
 
-    None is the answer whenever the resolver is absent or fails: a guessed fingerprint would
-    attribute a row to a profile that did not produce it.
+    None é a resposta sempre que o resolvedor está ausente ou falha: uma fingerprint adivinhada
+    atribuiria uma linha a um perfil que não a produziu.
     """
     if profile:
         return profile
@@ -66,7 +67,7 @@ def profile_fingerprint(profile=None):
 
 
 def row_for(payload, runtime, profile=None):
-    """The ledger row for one event: identifiers only, never a body."""
+    """A linha de ledger para um evento: só identificadores, nunca um corpo."""
     row = {"ts": now(), "runtime": runtime,
            "event": payload.get("hook_event_name") if isinstance(payload, dict) else None,
            "session_id": payload.get("session_id") if isinstance(payload, dict) else None}
@@ -79,7 +80,7 @@ def row_for(payload, runtime, profile=None):
 
 
 def append(row, target):
-    """One line, one `write`, to a ledger only its owner can read."""
+    """Uma linha, um `write`, para um ledger que só seu dono consegue ler."""
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
     try:

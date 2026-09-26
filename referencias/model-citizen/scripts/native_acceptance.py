@@ -150,15 +150,16 @@ def keychain(home, host=None):
     if created.returncode:
         raise Unverified("no keychain for the disposable home, so a client turn would raise a "
                          "system dialog: " + (created.stderr or "").strip()[-200:])
-    run(["security", "set-keychain-settings", path], env=env)  # no lock timeout
+    run(["security", "set-keychain-settings", path], env=env)  # sem timeout de bloqueio
     return path
 
 
 class Home:
-    """A disposable configuration home: its own HOME, client config directory and state.
+    """Um home de configuração descartável: seu próprio HOME, diretório de config do cliente e estado.
 
-    The class attributes are the Claude Code reading, so a caller that builds a Home without
-    running `__init__` — the self-tests do, to read a recorded transcript tree — keeps it.
+    Os atributos de classe são a leitura do Claude Code, então um chamador que constrói um Home
+    sem rodar `__init__` — os autotestes fazem isso, para ler uma árvore de transcrição registrada
+    — a mantém.
     """
 
     runtime = "claude-code"
@@ -236,7 +237,7 @@ class Home:
         return output
 
     def session(self, prompt, tools=("Agent",), resume=None, timeout=TURN_TIMEOUT):
-        """One short headless turn of the real client, in this home. Returns its JSON result."""
+        """Um turno curto sem interface do cliente real, neste home. Retorna seu resultado JSON."""
         args = [self.command, "-p", prompt, "--model", self.model, "--output-format", "json"]
         if tools:
             args += ["--allowedTools", ",".join(tools)]
@@ -263,7 +264,7 @@ class Home:
         return str(data.get("result", ""))
 
     def permission_mode(self):
-        """The default permission mode the synced settings put this home's client in."""
+        """O modo de permissão padrão que as configurações sincronizadas colocam no cliente deste home."""
         path = self.client_dir / "settings.json"
         try:
             data = json.loads(path.read_text())
@@ -278,7 +279,7 @@ class Home:
         return None
 
     def subagents(self, session_id):
-        """Every subagent this session wrote, as (meta, transcript records) pairs."""
+        """Todo subagente que esta sessão escreveu, como pares (meta, registros de transcrição)."""
         found = []
         directory = self.transcript_dir(session_id)
         if directory is None:
@@ -297,17 +298,18 @@ class Home:
         return found
 
     def transcript_path(self, session_id):
-        """The orchestrator's own transcript file, or None when the client wrote none."""
+        """O próprio arquivo de transcrição do orquestrador, ou None quando o cliente não escreveu nenhum."""
         paths = sorted((self.client_dir / "projects").glob("*/" + session_id + ".jsonl"))
         return paths[0] if paths else None
 
     def orchestrator_text(self, session_id):
-        """The orchestrator's own transcript, whether or not the session spawned a subagent.
+        """A própria transcrição do orquestrador, tenha a sessão disparado um subagente ou não.
 
-        The per-session directory exists only once a subagent has been written, so reading it
-        alone returns nothing for a session that spawned none — and an assertion about what the
-        orchestrator's context did *not* carry would then hold vacuously. `""` means the client
-        wrote no transcript this runner can read, which a caller must treat as unobserved.
+        O diretório por sessão só existe depois que um subagente foi escrito, então lê-lo sozinho
+        retorna nada para uma sessão que não disparou nenhum — e uma verificação sobre o que o
+        contexto do orquestrador *não* carregou então valeria vacuamente. `""` significa que o
+        cliente não escreveu nenhuma transcrição que este runner consiga ler, o que um chamador
+        precisa tratar como não observado.
         """
         paths = sorted((self.client_dir / "projects").glob("*/" + session_id + ".jsonl"))
         directory = self.transcript_dir(session_id)

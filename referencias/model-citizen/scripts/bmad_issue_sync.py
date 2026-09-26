@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Maintain the public BMad-to-GitHub issue mapping.
+"""Mantém o mapeamento público de issues do BMad para o GitHub.
 
-GitHub owns delivery state. This tool owns only the idempotent planning block,
-exact BMad type label, primary parent relationship, and native issue type when
-the repository supports that organization-managed field. In each story file it
-owns the frontmatter, the H1 and the managed block; the rest is the design, and
-the tool never rewrites it. The format is described in docs/bmad.md.
+O GitHub é dono do estado de entrega. Esta ferramenta é dona só do bloco de planejamento
+idempotente, do rótulo exato de tipo do BMad, da relação de pai primário, e do tipo de issue
+nativo quando o repositório suporta esse campo gerenciado pela organização. Em cada arquivo de
+história ela é dona do frontmatter, do H1 e do bloco gerenciado; o resto é o design, e a
+ferramenta nunca o reescreve. O formato é descrito em docs/bmad.md.
 """
 
 import argparse

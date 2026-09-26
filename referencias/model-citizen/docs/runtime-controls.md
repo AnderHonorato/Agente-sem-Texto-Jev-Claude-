@@ -1,141 +1,155 @@
-# Runtime controls
+# Controles de runtime
 
-One shared policy engine (`lib/harness_core/lifecycle.py`) consumes normalized events. Native
-adapters register one coordinator per lifecycle event and translate decisions. A deny wins over
-an allow or rewrite; independent rewrites compose. Codex cannot pause with Claude's hook `ask`
-decision, so a request requiring confirmation is denied with its reason. Output filtering never
-grants an otherwise unapproved shell command merely to rewrite it.
+Um único motor de política compartilhado (`lib/harness_core/lifecycle.py`) consome eventos
+normalizados. Adaptadores nativos registram um coordenador por evento de ciclo de vida e traduzem
+decisões. Uma negação vence sobre uma permissão ou reescrita; reescritas independentes se compõem.
+O Codex não consegue pausar com a decisão de hook `ask` do Claude, então uma requisição que exige
+confirmação é negada com seu motivo. A filtragem de saída nunca concede um comando de shell não
+aprovado só para reescrevê-lo.
 
-Hook registration is not activation. Codex requires native trust for the current hooks content;
-accept it in the client. `citizen trust` separately authorizes running a repository's gate and
-does not manufacture native hook trust. Native permission restrictions always take precedence.
-Hosted search and continuation through an already running shell are not universally intercepted.
-Hooks assist workflow policy; they are not a substitute for the runtime sandbox.
+O registro de hook não é ativação. O Codex exige confiança nativa para o conteúdo atual de hooks;
+aceite-a no cliente. `citizen trust` autoriza separadamente rodar o gate de um repositório e não
+fabrica confiança de hook nativa. Restrições nativas de permissão sempre têm precedência. Busca
+hospedada e continuação através de um shell já em execução não são universalmente interceptadas.
+Hooks auxiliam a política de fluxo de trabalho; não são um substituto para o sandbox de runtime.
 
-The stop gate hashes HEAD, staged and unstaged binary differences, untracked file contents,
-repository identity, and gate definition. Commands share a shell so `cd` and `export` persist.
-A gate that changes the tree, times out, or exhausts its retry budget is unverified, never green.
-The retry budget is counted per session, so sessions sharing a checkout do not reset each other.
-Unexpected gate errors block. State writes are atomic.
+O gate de parada faz hash do HEAD, das diferenças binárias preparadas e não preparadas, do conteúdo
+de arquivos não rastreados, da identidade do repositório e da definição do gate. Comandos
+compartilham um shell, então `cd` e `export` persistem. Um gate que muda a árvore, expira, ou
+esgota seu orçamento de novas tentativas fica não verificado, nunca verde. O orçamento de novas
+tentativas é contado por sessão, então sessões compartilhando um checkout não se resetam
+mutuamente. Erros inesperados de gate bloqueiam. Escritas de estado são atômicas.
 
-Constrained roles use [isolated CLI workers](role-workers.md), with shared role/stance resolution
-and fixed native tool controls. The harness validates and publishes planner content to a new
-approved artifact path. Direct native role defaults are not confinement: Codex can reapply parent
-permission overrides. Active lifecycle hooks route constrained role launches to the worker
-command. Native qualification is still required; do not treat a projection or unit test as certification.
+Papéis restritos usam [workers de CLI isolados](role-workers.md), com resolução de papel/postura
+compartilhada e controles de ferramenta nativa fixos. O harness valida e publica conteúdo de
+planner em um novo caminho de artefato aprovado. Padrões diretos de papel nativo não são
+confinamento: o Codex consegue reaplicar sobrescritas de permissão do pai. Hooks de ciclo de vida
+ativos roteiam lançamentos de papel restrito para o comando de worker. Qualificação nativa ainda é
+exigida; não trate uma projeção ou teste unitário como certificação.
 
-Native agent definitions are resolved at sync from the cost variant in force. A role the selected
-posture does not move stays a symlink to the committed projection, exactly as before; a role it
-moves is rendered into the Claude home, so the class and effort it runs with are written into the
-file on disk rather than decided per session. A
-session-scoped `HARNESS_STANCE_COST`, like any `HARNESS_STANCE_*`, stays in that session and does
-not move them until the next `citizen sync`; an isolated [role worker](role-workers.md) resolves
-its class, effort and soft budget per run, from the same table and the same precedence, so it
-follows that session selection and a constrained role cannot run one way as a worker and another
-as a definition. A `role_bindings.<runtime>.<role>` entry still wins over the variant's row.
-Routing of spawns that name no agent definition turns itself off in a workspace that ships its own
-`.claude/agents/worker-*.md`, since a project definition outranks the user's and routing to it
-would put that repository's instructions on every unnamed spawn; the spawn runs as written and the
-hook says so.
-Before downgrading to a release that only links these definitions, either select `balanced` with
-no role bindings and sync once, which restores the links, or run `citizen uninstall`. Syncing a
-home back with the older release is not enough on its own: role files the older release does not
-ship stay in `~/.claude/agents` and `~/.codex/agents`, and its `citizen diff` reports no drift,
-because code that never knew those roles cannot miss them. `citizen uninstall` before the
-downgrade is the remedy; it removes what the newer release wrote.
+Definições de agente nativas são resolvidas na sincronização a partir da variante de custo em
+vigor. Um papel que a postura selecionada não move continua como um symlink para a projeção
+commitada, exatamente como antes; um papel que ela move é renderizado no diretório home do Claude,
+então a classe e o esforço com que roda são escritos no arquivo em disco em vez de decididos por
+sessão. Um `HARNESS_STANCE_COST` com escopo de sessão, como qualquer `HARNESS_STANCE_*`, fica
+naquela sessão e não os move até o próximo `citizen sync`; um [worker de papel](role-workers.md)
+isolado resolve sua classe, esforço e orçamento flexível por execução, a partir da mesma tabela e
+da mesma precedência, então ele segue essa seleção de sessão e um papel restrito não consegue
+rodar de um jeito como worker e de outro como definição. Uma entrada de
+`role_bindings.<runtime>.<role>` ainda vence sobre a linha da variante. O roteamento de spawns que
+não nomeiam nenhuma definição de agente se desliga sozinho em um workspace que distribui seus
+próprios `.claude/agents/worker-*.md`, já que uma definição de projeto supera a do usuário e rotear
+para ela colocaria as instruções desse repositório em todo spawn sem nome; o spawn roda como
+escrito e o hook diz isso.
+Antes de rebaixar para um lançamento que só linka essas definições, ou selecione `balanced` sem
+nenhuma vinculação de papel e sincronize uma vez, o que restaura os links, ou rode
+`citizen uninstall`. Sincronizar um diretório home de volta com o lançamento mais antigo não é
+suficiente por si só: arquivos de papel que o lançamento mais antigo não distribui permanecem em
+`~/.claude/agents` e `~/.codex/agents`, e seu `citizen diff` não relata nenhum desvio, porque
+código que nunca conheceu esses papéis não consegue sentir falta deles. `citizen uninstall` antes
+do rebaixamento é o remédio; ele remove o que o lançamento mais novo escreveu.
 
-Routing is session-scoped for the same reason that effort is sync-scoped: what a native agent is
-comes from files read at a moment, not from a live lookup. Session start records which definitions
-the session's registry held, and an unnamed spawn is routed only to a worker that session can
-resolve. A `startup` writes the record, a `resume` may only narrow an existing one, and `clear` and
-`compact` leave it alone. A session that reloads a definition installed after it started is told
-so by the runtime, on its own transcript, and routes to that worker from the turn it hears it;
-a session that is told nothing — a headless one never reloads — keeps the previous behaviour and
-is asked once to start a new session, which is still the certain remedy after a sync.
-Any failure to answer the routing question leaves the spawn unrouted and silent, never refused.
+O roteamento tem escopo de sessão pela mesma razão que o esforço tem escopo de sincronização: o que
+um agente nativo é vem de arquivos lidos em um momento, não de uma busca ao vivo. O início de
+sessão registra quais definições o registro da sessão continha, e um spawn sem nome só é roteado
+para um worker que essa sessão consegue resolver. Um `startup` escreve o registro, um `resume`
+só pode estreitar um existente, e `clear` e `compact` o deixam intacto. Uma sessão que recarrega
+uma definição instalada depois de ela ter começado é informada disso pelo runtime, na própria
+transcrição, e roteia para esse worker a partir do turno em que ouve isso; uma sessão que não é
+informada de nada — uma headless nunca recarrega — mantém o comportamento anterior e é pedida uma
+vez para iniciar uma nova sessão, que continua sendo o remédio certo depois de uma sincronização.
+Qualquer falha em responder à pergunta de roteamento deixa o spawn sem rota e silencioso, nunca
+recusado.
 
-Usage records identify the runtime and available runtime version. Codex cumulative token snapshots
-are counted once; missing measurements remain null and reports label partial totals. Detector
-failures are reported separately and excluded from clean-session denominators. Lock contention
-refuses an overwrite; detached worker failures go to `usage.errors.jsonl` beside the usage ledger.
-Transcript adapters cannot observe nested tool calls absent from the transcript and do not prove
-that a stance caused a behavior.
+Registros de uso identificam o runtime e a versão de runtime disponível. Snapshots cumulativos de
+token do Codex são contados uma vez; medições ausentes permanecem nulas e relatórios rotulam
+totais parciais. Falhas de detector são relatadas separadamente e excluídas dos denominadores de
+sessão limpa. Contenção de lock recusa uma sobrescrita; falhas de worker desacoplado vão para
+`usage.errors.jsonl` ao lado do ledger de uso. Adaptadores de transcrição não conseguem observar
+chamadas de ferramenta aninhadas ausentes da transcrição e não provam que uma postura causou um
+comportamento.
 
-A cap on a multi-item read is a budget: ask the source for newest-first where it can be asked,
-check the order that actually arrives, refuse the page when it is not descending, and record at
-the declaration which end is dropped — when several sources compete for one budget, drop the
-least authoritative first. The Remote Control sessions page (`remote_control.fetch_sessions`) and
-the usage feed's `OPEN_TAIL` both keep the newest, because a correction that arrives last is the
-one a trimmed history must not lose. The sessions endpoint takes no sort parameter and is ordered
-by `last_event_at`, so that read asserts the order rather than requesting it, and a refusal is
-reported as not checked, never as nothing found. A count over a page that carries a cursor names
-the page it counted rather than the account.
+Um limite em uma leitura de vários itens é um orçamento: peça à fonte para do mais novo ao mais
+antigo onde puder ser pedido, verifique a ordem que de fato chega, recuse a página quando não
+estiver decrescente, e registre na declaração qual extremidade é descartada — quando várias fontes
+competem por um orçamento, descarte a menos autoritativa primeiro. A página de sessões do Remote
+Control (`remote_control.fetch_sessions`) e o `OPEN_TAIL` do feed de uso ambos mantêm o mais novo,
+porque uma correção que chega por último é a que um histórico aparado não pode perder. O endpoint
+de sessões não recebe parâmetro de ordenação e é ordenado por `last_event_at`, então essa leitura
+afirma a ordem em vez de pedi-la, e uma recusa é relatada como não verificada, nunca como nada
+encontrado. Uma contagem sobre uma página que carrega um cursor nomeia a página que contou, não a
+conta.
 
-## Hook ids
+## IDs de hook
 
-Every policy module that answers a lifecycle event has an id, its basename under `policy/hooks/`,
-and each id is a unit of the `hooks` switch kind in the [selection document](preferences.md#the-selection-document):
+Todo módulo de política que responde a um evento de ciclo de vida tem um id, seu nome-base sob
+`policy/hooks/`, e cada id é uma unidade do tipo de switch `hooks` no
+[documento de seleção](preferences.md#the-selection-document):
 
-| Id | Answers |
+| Id | Responde |
 | --- | --- |
-| `allow-plan-webfetch` | PreToolUse on WebFetch in plan mode |
-| `allow-readonly-bash` | the read-only Bash allow, plan-mode allows and `plan_allow_tools` |
-| `approvals` | UserPromptSubmit: records a prompt that is only `approve <code>` tokens, for `grade-bash` in auto mode, Claude Code only |
-| `brief-guard` (core) | PreToolUse on a spawn |
-| `filter-output` | PreToolUse on Bash |
-| `grade-bash` (core) | Bash grading, its ask or deny, consuming an approval in auto mode, guarding the approvals store, and the decision log's Bash rows |
+| `allow-plan-webfetch` | PreToolUse em WebFetch no modo plano |
+| `allow-readonly-bash` | a permissão de Bash somente-leitura, as permissões do modo plano e `plan_allow_tools` |
+| `approvals` | UserPromptSubmit: registra um prompt que é só tokens `approve <code>`, para `grade-bash` em modo auto, só Claude Code |
+| `brief-guard` (core) | PreToolUse em um spawn |
+| `filter-output` | PreToolUse em Bash |
+| `grade-bash` (core) | classificação de Bash, seu ask ou deny, consumindo uma aprovação em modo auto, guardando o armazenamento de aprovações, e as linhas de Bash no log de decisões |
 | `harness-session` | SessionStart |
 | `neutralize-tool-output` (core) | PostToolUse |
-| `stage-user-files` | PreToolUse on SendUserFile, Claude Code only |
+| `stage-user-files` | PreToolUse em SendUserFile, só Claude Code |
 | `stop-gate` (core) | Stop |
-| `tier-agent-spawns` | band routing of a spawn, and the integration descriptor notice |
-| `usage-feed` | UserPromptSubmit, SubagentStart, SubagentStop and PostToolUse on a spawn, Claude Code only |
+| `tier-agent-spawns` | roteamento de banda de um spawn, e o aviso de descritor de integração |
+| `usage-feed` | UserPromptSubmit, SubagentStart, SubagentStop e PostToolUse em um spawn, só Claude Code |
 | `usage-log` | SessionEnd |
-| `validate-plan-card` | PostToolUse on a plan file |
+| `validate-plan-card` | PostToolUse em um arquivo de plano |
 
-`citizen config set hooks.<id> off` switches one off, and it applies from the next event with no
-sync: the dispatcher resolves the selection at each event and neither loads nor runs a module
-whose id is `off`. The libraries those modules load (`decisions`, `posture`, `pricing`,
-`telemetry`, `rule-detectors`, `otel-headers`, `filter-lines`) have no id and no switch. Denying
-every spawn under `delegation: off` is the stance's own answer and stays with any id off.
-Role confinement has no id either: the constrained-role, `harness-role:` marker, framework and
-evasion denials and the Workflow launch guard run with every hook off, so switching
-`tier-agent-spawns` off stops band routing and never lets a constrained role run in session.
+`citizen config set hooks.<id> off` desliga um, e se aplica a partir do próximo evento sem
+sincronização: o dispatcher resolve a seleção a cada evento e não carrega nem roda um módulo cujo
+id é `off`. As bibliotecas que esses módulos carregam (`decisions`, `posture`, `pricing`,
+`telemetry`, `rule-detectors`, `otel-headers`, `filter-lines`) não têm id nem switch. Negar todo
+spawn sob `delegation: off` é a própria resposta da postura e permanece com qualquer id
+desligado. O confinamento de papel também não tem id: as recusas de papel restrito,
+`harness-role:`, framework e evasão, e a guarda de lançamento de Workflow rodam com todo hook
+desligado, então desligar `tier-agent-spawns` para o roteamento de banda e nunca deixa um papel
+restrito rodar na sessão.
 
-The four core ids enforce rather than assist. A layer may switch one off only when the user
-configuration sets `"core_switches_acknowledged": true`; `config set`, `sync` and
-`citizen selection` refuse it otherwise, before anything is written, and so does withdrawing the
-acknowledgement while a core hook is off. The acknowledgement is read from the user configuration
-alone, because a project, session or mode file may carry selection keys only. A hook that meets an
-unacknowledged `off` keeps running, and so does every hook when the selection will not resolve.
+Os quatro ids centrais aplicam em vez de auxiliar. Uma camada só pode desligar um quando a
+configuração de usuário define `"core_switches_acknowledged": true`; `config set`, `sync` e
+`citizen selection` o recusam caso contrário, antes de qualquer escrita, e o mesmo vale para
+retirar o reconhecimento enquanto um hook central está desligado. O reconhecimento é lido só da
+configuração de usuário, porque um arquivo de projeto, sessão ou modo só pode carregar chaves de
+seleção. Um hook que encontra um `off` não reconhecido continua rodando, e o mesmo vale para todo
+hook quando a seleção não resolver.
 
-Codex's adapter dispatches through the same `lifecycle.py` and reads the same id map. There is no
-Codex-only id; an id whose event Codex does not raise, such as `usage-feed`, simply never runs
-there. `citizen catalog` lists each id with kind `hooks`, its source and whether it is core.
+O adaptador do Codex despacha através do mesmo `lifecycle.py` e lê o mesmo mapa de id. Não há
+nenhum id só do Codex; um id cujo evento o Codex não dispara, como `usage-feed`, simplesmente
+nunca roda ali. `citizen catalog` lista cada id com o tipo `hooks`, sua fonte e se é central.
 
-## Decision providers
+## Provedores de decisão
 
-`lib/harness_core/decision.py` holds one transport-agnostic contract for the question "may this
-action proceed, and how": `decide(action, counterparty, context)` returns a `Decision` carrying an
-outcome of `allow`, `ask` or `deny`, an autonomy level of 1 to 3, the provider name, a reason, and
-an `injected_cognition` block of rule matches and optional agent and user messages;
-`record(action_outcome)` notes how an action turned out; `learn(approval_stream)` takes past
-approvals and may be a no-op. The shape deliberately mirrors the `decide`/`record`/`learn` surface
-of an external control plane, so a hosted provider can be added later without a second contract.
-An action names a class — `coding.shell_exec`, `coding.git_commit`, `coding.git_push`,
-`coding.deploy`, `coding.file_write`, `coding.pr_merge` — and the command grade where one is known. A counterparty is
-a `repo:<name>/<branch>` slug. `<name>` is the repository's, read from its common git directory, so
-a linked worktree in a directory named for its task names the repository it belongs to; the usage
-ledger's `repo` field keeps the worktree directory's name.
+`lib/harness_core/decision.py` guarda um contrato agnóstico de transporte para a pergunta "esta
+ação pode prosseguir, e como": `decide(action, counterparty, context)` retorna uma `Decision`
+carregando um resultado de `allow`, `ask` ou `deny`, um nível de autonomia de 1 a 3, o nome do
+provedor, um motivo, e um bloco `injected_cognition` de correspondências de regra e mensagens
+opcionais de agente e usuário; `record(action_outcome)` anota como uma ação se resolveu;
+`learn(approval_stream)` recebe aprovações passadas e pode ser um no-op. A forma
+deliberadamente espelha a superfície `decide`/`record`/`learn` de um plano de controle externo,
+para que um provedor hospedado possa ser adicionado depois sem um segundo contrato. Uma ação
+nomeia uma classe — `coding.shell_exec`, `coding.git_commit`, `coding.git_push`, `coding.deploy`,
+`coding.file_write`, `coding.pr_merge` — e a classe de comando onde uma é conhecida. Uma
+contraparte é um slug `repo:<name>/<branch>`. `<name>` é o do repositório, lido do seu diretório
+git comum, então uma worktree linkada em um diretório nomeado por sua tarefa nomeia o repositório
+ao qual pertence; o campo `repo` do ledger de uso mantém o nome do diretório da worktree.
 
-Two providers ship. `none` is the default: every action is allowed at level 3 with the reason
-`governance: none`, and no policy file is read. `local` reads two policy files in one schema
-(`defaults`, `pairs`, `caps`): a user-level `governance.json` beside `config.json`
-(`~/.config/agent-harness/governance.json`, under `HARNESS_HOME` when that is set), and
-`.agent-harness/governance.json` in the repository. It merges them before resolving anything.
-The repository file wins for a class default and for each class inside a pair; caps combine by the
-lower value, so neither file can lift a ceiling the other set. The user file holds levels that apply
-everywhere, and levels for repositories that carry no file of their own.
+Dois provedores são distribuídos. `none` é o padrão: toda ação é permitida no nível 3 com o motivo
+`governance: none`, e nenhum arquivo de política é lido. `local` lê dois arquivos de política em
+um schema (`defaults`, `pairs`, `caps`): um `governance.json` em nível de usuário ao lado de
+`config.json` (`~/.config/agent-harness/governance.json`, sob `HARNESS_HOME` quando definido), e
+`.agent-harness/governance.json` no repositório. Ele os mescla antes de resolver qualquer coisa.
+O arquivo do repositório vence para um padrão de classe e para cada classe dentro de um par;
+limites (caps) se combinam pelo valor menor, então nenhum dos dois arquivos consegue levantar um
+teto que o outro definiu. O arquivo do usuário guarda níveis que se aplicam em toda parte, e
+níveis para repositórios que não carregam nenhum arquivo próprio.
 
 ```json
 {"defaults": {"coding.git_push": 2},
@@ -144,206 +158,218 @@ everywhere, and levels for repositories that carry no file of their own.
  "caps": {"coding.deploy": 2}}
 ```
 
-A level is then resolved in this order: the exact `repo:<name>/<branch>` pair, then the
-whole-repository `repo:<name>` pair, then the action class default, then the level the autonomy
-stance implies (`execute` 3, `confirm-writes` 2, `ask` 1, and 1 when nothing resolves). The
-repository name in a slug ends at the first `/`, so a branch such as `feat/x` still reaches
-`repo:<name>`. A cap is a ceiling the resolved level never exceeds; `coding.deploy` carries a
-built-in cap of 2 that a policy file may lower and may not raise, and `coding.pr_merge` has no
-built-in cap. The reason and each rule match name the file that supplied the level or the cap, or
-say `autonomy stance` or `built-in`. Level 3 allows every grade, level 2 asks at grade 2 and up, level 1 asks at grade 1 and up,
-and an unknown grade is judged as 1. A policy file at either level that cannot be honoured as
-written is an error naming that file, never a silent "no policy". Both providers write to the existing
-`decisions.jsonl` ledger and neither reaches the network.
+Um nível é então resolvido nesta ordem: o par exato `repo:<name>/<branch>`, depois o par de
+repositório inteiro `repo:<name>`, depois o padrão da classe de ação, depois o nível que a postura
+autonomy implica (`execute` 3, `confirm-writes` 2, `ask` 1, e 1 quando nada resolve). O nome de
+repositório em um slug termina no primeiro `/`, então uma branch como `feat/x` ainda alcança
+`repo:<name>`. Um limite é um teto que o nível resolvido nunca ultrapassa; `coding.deploy` carrega
+um limite embutido de 2 que um arquivo de política pode baixar e não pode levantar, e
+`coding.pr_merge` não tem nenhum limite embutido. O motivo e cada correspondência de regra nomeiam
+o arquivo que forneceu o nível ou o limite, ou dizem `autonomy stance` ou `built-in`. O nível 3
+permite toda classe, o nível 2 pergunta na classe 2 e acima, o nível 1 pergunta na classe 1 e
+acima, e uma classe desconhecida é julgada como 1. Um arquivo de política em qualquer nível que
+não possa ser honrado como escrito é um erro nomeando esse arquivo, nunca uma "sem política"
+silenciosa. Ambos os provedores escrevem no ledger `decisions.jsonl` existente e nenhum alcança a
+rede.
 
-A third provider, `jev`, lives in `lib/harness_core/decisions/jev.py` and answers over the
-network. It asks a validated question pack — a `choice` judgment and a `score` severity — about
-the action class, the counterparty, the command grade and at most a command string and a summary,
-and it carries the deterministic `local` provider underneath. The service has no abstention
-outcome, so every `choice` question must offer an explicit `unknown` option and a pack without one
-is refused before anything is sent; `unknown` and an answer below the confidence threshold both
-mean "use the deterministic answer". A judgment may turn an `allow` into an `ask` and may never
-widen a decision or produce a `deny`. Every other outcome fails open to the deterministic
-decision: no key, a timeout, an exhausted budget, a malformed response, an unexpected exception.
-Each call writes one `event` row carrying the status, the requested and returned model ids, the
-pack and request hashes, the usage and the latency, and never the state; `citizen decide`
-suppresses that row, because a reporting command changes nothing. The endpoint must be `https`
-and the opener can reach no other scheme, since a bearer key goes with every request, and a
-request is charged to its budget as it is sent rather than when it succeeds, so a failing
-endpoint cannot be retried without limit. The token ceilings, the endpoint, the response shape
-and the status mapping come from the vendor's documentation and have not been checked against
-the live service from this repository. Answers are not
-deterministic across identical requests, so nothing promises a repeated request answers the same
-way — only that the same request hashes the same. Credentials come from `TYPESAFE_API_KEY` or
-`JEV_API_KEY` in the environment; no key file is ever read.
+Um terceiro provedor, `jev`, vive em `lib/harness_core/decisions/jev.py` e responde pela rede. Ele
+pergunta um pacote de perguntas validado — um julgamento de `choice` e uma severidade de `score` —
+sobre a classe de ação, a contraparte, a classe de comando e no máximo uma string de comando e um
+resumo, e carrega o provedor determinístico `local` por baixo. O serviço não tem nenhum resultado
+de abstenção, então toda pergunta de `choice` precisa oferecer uma opção `unknown` explícita e um
+pacote sem uma é recusado antes de qualquer coisa ser enviada; `unknown` e uma resposta abaixo do
+limiar de confiança significam ambos "use a resposta determinística". Um julgamento pode
+transformar um `allow` em um `ask` e nunca pode ampliar uma decisão ou produzir um `deny`. Todo
+outro resultado falha aberto para a decisão determinística: nenhuma chave, um timeout, um
+orçamento esgotado, uma resposta malformada, uma exceção inesperada. Cada chamada escreve uma
+linha `event` carregando o status, os ids de modelo requisitado e retornado, os hashes de pacote e
+requisição, o uso e a latência, e nunca o estado; `citizen decide` suprime essa linha, porque um
+comando de relatório não muda nada. O endpoint precisa ser `https` e o que o abre não consegue
+alcançar nenhum outro esquema, já que uma chave bearer vai com toda requisição, e uma requisição é
+cobrada contra seu orçamento assim que é enviada em vez de quando tem sucesso, então um endpoint
+que falha não pode ter novas tentativas sem limite. Os tetos de token, o endpoint, o formato de
+resposta e o mapeamento de status vêm da documentação do fornecedor e não foram verificados contra
+o serviço ao vivo a partir deste repositório. Respostas não são determinísticas entre requisições
+idênticas, então nada promete que uma requisição repetida responde da mesma forma — só que a mesma
+requisição faz o mesmo hash. Credenciais vêm de `TYPESAFE_API_KEY` ou `JEV_API_KEY` no ambiente;
+nenhum arquivo de chave é lido.
 
-## What a provider that leaves the machine may do, and send
+## O que um provedor que sai da máquina pode fazer, e enviar
 
-Selecting `jev` is not consent to a request. `lib/harness_core/decisions/controls.py` resolves
-three separate questions per decision, and all three must agree before anything is sent.
+Selecionar `jev` não é consentimento para uma requisição. `lib/harness_core/decisions/controls.py`
+resolve três perguntas separadas por decisão, e as três precisam concordar antes de qualquer coisa
+ser enviada.
 
-**How far this point may be judged.** `governance.jev.mode` sets the default and
-`governance.jev.modes.<point>` overrides it for one of the decision points the ledger already
-names — `grade-bash`, `stop-gate`, `tier-agent-spawns`, `brief-guard`, `evasion-deny`. `off`
-calls nothing. `shadow` calls, writes the ledger row and returns the deterministic decision
-untouched, so an answer can be measured before it is trusted: nothing reaches the model or the
-user. `advise` puts the judgment in `rule_matches`, says what `act` would have done, and changes
-no outcome. `act` lets a judgment turn an `allow` into an `ask`, and nothing else. Every mode
-defaults to `off`, so a configuration written before this existed makes no request; a mode, a
-point or a field the harness does not know fails at `citizen config set`, not at the first call,
-and a point name this harness does not know reads `off` rather than the default. Each call
-writes one ledger row carrying the mode, the judgment label, the severity level, the
-deterministic outcome and the outcome acting on the judgment would have reached, so a `shadow`
-answer can be compared against the decision it did not change. Labels only: never the state.
+**Até onde este ponto pode ser julgado.** `governance.jev.mode` define o padrão e
+`governance.jev.modes.<point>` o sobrescreve para um dos pontos de decisão que o ledger já nomeia
+— `grade-bash`, `stop-gate`, `tier-agent-spawns`, `brief-guard`, `evasion-deny`. `off` não chama
+nada. `shadow` chama, escreve a linha do ledger e retorna a decisão determinística intocada, então
+uma resposta pode ser medida antes de ser confiada: nada alcança o modelo ou o usuário. `advise`
+coloca o julgamento em `rule_matches`, diz o que `act` teria feito, e não muda nenhum resultado.
+`act` deixa um julgamento transformar um `allow` em um `ask`, e nada mais. Todo modo tem `off` como
+padrão, então uma configuração escrita antes de isso existir não faz nenhuma requisição; um modo,
+um ponto ou um campo que o harness não conhece falha em `citizen config set`, não na primeira
+chamada, e um nome de ponto que este harness não conhece lê `off` em vez do padrão. Cada chamada
+escreve uma linha de ledger carregando o modo, o rótulo de julgamento, o nível de severidade, o
+resultado determinístico e o resultado que agir sobre o julgamento teria alcançado, então uma
+resposta `shadow` pode ser comparada contra a decisão que não mudou. Só rótulos: nunca o estado.
 
-**Whether anything may go out at all.** `~/.local/state/agent-harness/jev-disabled` is the kill
-switch: while that file exists every mode reads `off`, with no configuration change and no
-restart, because the sentinel is read per decision rather than at construction.
-`governance.jev.sentinel` moves it, absolute or resolved against the state directory, never
-against the working directory. A session that was running when the file appeared stops calling,
-and starts again when it is removed, with no restart and no edit. A live request also needs a
-key in the environment; without one the call fails open to the deterministic answer like any
-other failure.
+**Se algo pode sair de qualquer forma.** `~/.local/state/agent-harness/jev-disabled` é o
+interruptor de emergência: enquanto esse arquivo existir, todo modo lê `off`, sem nenhuma mudança
+de configuração e nenhuma reinicialização, porque a sentinela é lida por decisão em vez de na
+construção. `governance.jev.sentinel` a move, absoluta ou resolvida contra o diretório de estado,
+nunca contra o diretório de trabalho. Uma sessão que estava rodando quando o arquivo apareceu para
+de chamar, e começa de novo quando é removido, sem reinicialização e sem edição. Uma requisição ao
+vivo também precisa de uma chave no ambiente; sem uma, a chamada falha aberta para a resposta
+determinística como qualquer outra falha.
 
-**What may leave.** `governance.jev.state_fields` is an allowlist, empty by default, over
-exactly two fields: `command` and `summary`. Everything else in a caller's context — a file
-path, a prompt, an environment value, tool output, assistant prose — has no field to travel in
-and is never built into the request, which carries the action class, the counterparty, the grade
-and the grade scale besides. A listed field whose text matches one of the shared secret shapes
-is dropped whole rather than masked, and if that pattern list cannot be loaded no free text is
-sent at all. Redaction recognises the shapes it knows; a credential that reads like ordinary
-prose still travels, which is why the allowlist is two fields and not a free vocabulary.
+**O que pode sair.** `governance.jev.state_fields` é uma lista de permissões, vazia por padrão,
+sobre exatamente dois campos: `command` e `summary`. Tudo mais no contexto de quem chama — um
+caminho de arquivo, um prompt, um valor de ambiente, saída de ferramenta, prosa de assistente —
+não tem nenhum campo em que viajar e nunca é construído na requisição, que carrega a classe de
+ação, a contraparte, a classe e a escala de classe além disso. Um campo listado cujo texto combina
+com um dos formatos de segredo compartilhados é descartado por inteiro em vez de mascarado, e se
+essa lista de padrões não puder ser carregada, nenhum texto livre é enviado de forma alguma. A
+redação reconhece os formatos que conhece; uma credencial que se parece com prosa comum ainda
+viaja, e é por isso que a lista de permissões é de dois campos e não um vocabulário livre.
 
-`governance.jev.timeout` (2 seconds by default, inside the hook budget),
-`governance.jev.max_requests` and `governance.jev.max_tokens` bound the rest, and they bound a
-session rather than a process: a hook is a new process per event, so the counters live in
-`~/.local/state/agent-harness/jev-spend.json` keyed by session id, under the lock, read before
-each check and added to as each request is charged. A spend file that cannot be read or written
-leaves the in-process count standing rather than failing a decision. `citizen doctor`
-prints the mode per point, the allowlist, where the kill switch lives, the model every request
-pins, what the last call returned, and whether a credential variable is set — by name, never its
-value.
+`governance.jev.timeout` (2 segundos por padrão, dentro do orçamento do hook),
+`governance.jev.max_requests` e `governance.jev.max_tokens` limitam o resto, e limitam uma sessão
+em vez de um processo: um hook é um processo novo por evento, então os contadores vivem em
+`~/.local/state/agent-harness/jev-spend.json` indexados pelo id de sessão, sob o lock, lidos antes
+de cada verificação e acrescidos conforme cada requisição é cobrada. Um arquivo de gasto que não
+consegue ser lido ou escrito deixa a contagem em processo intacta em vez de falhar uma decisão.
+`citizen doctor` imprime o modo por ponto, a lista de permissões, onde vive o interruptor de
+emergência, o modelo que toda requisição fixa, o que a última chamada retornou, e se uma variável
+de credencial está definida — pelo nome, nunca pelo valor.
 
-**What each call cost.** Every call also writes one `kind: "decision"` row to the usage ledger:
-the point, the mode, the status, the model ids, the pack and request hashes, the judgment and
-severity labels, the deterministic outcome and the one an `act` mode would have reached, the
-tokens, the latency and the session that asked — and none of the state it sent. `citizen usage
---by provider` prices those rows from `policy/prices.json` like any other. A mode of `shadow` is
-measurable for exactly this reason: the row exists, priced and labelled, before anything the
-provider says can change an answer. Both rows stop when `telemetry.decisions` is `false`; see
-[usage telemetry](usage.md).
+**O que cada chamada custou.** Toda chamada também escreve uma linha `kind: "decision"` no ledger
+de uso: o ponto, o modo, o status, os ids de modelo, os hashes de pacote e requisição, os rótulos
+de julgamento e severidade, o resultado determinístico e o que um modo `act` teria alcançado, os
+tokens, a latência e a sessão que perguntou — e nada do estado que enviou.
+`citizen usage --by provider` precifica essas linhas a partir de `policy/prices.json` como
+qualquer outra. Um modo de `shadow` é mensurável exatamente por essa razão: a linha existe,
+precificada e rotulada, antes de qualquer coisa que o provedor diga poder mudar uma resposta. As
+duas linhas param quando `telemetry.decisions` é `false`; veja [telemetria de uso](usage.md).
 
-## Measuring a provider before trusting it
+## Medindo um provedor antes de confiar nele
 
-A typed answer is not evidence that it was the right one. `citizen decisions eval` replays the
-labelled rows of the [decision log](usage.md) — real inputs, the answer the deterministic hook
-gave, and the outcome the session later showed — through a question pack in `shadow` mode, and
-writes a report to `~/.local/state/agent-harness/jev-eval.json` or wherever `--out` says.
+Uma resposta tipada não é evidência de que era a correta. `citizen decisions eval` reproduz as
+linhas rotuladas do [log de decisões](usage.md) — entradas reais, a resposta que o hook
+determinístico deu, e o resultado que a sessão mostrou depois — através de um pacote de perguntas
+em modo `shadow`, e escreve um relatório em `~/.local/state/agent-harness/jev-eval.json` ou onde
+`--out` disser.
 
 ```sh
-bin/harness decisions eval --replay tests/fixtures/jev/eval/responses.json   # no socket
+bin/harness decisions eval --replay tests/fixtures/jev/eval/responses.json   # sem socket
 bin/harness decisions eval --point grade-bash --split heldout --out report.json
 bin/harness decisions eval --live --max-requests 50 --usd-per-mtok 3 --budget-usd 2
 ```
 
-A **pack is versioned**. `lib/harness_core/decisions/packs.py` holds each one as an id, a
-`major.minor.patch` version and the hash of its content, frozen at construction so nothing that
-holds a pack can rewrite a criterion between the hash being taken and the request being built.
-The provider puts the id and the version on every ledger row beside the request hash, so a row
-resolves to the words that were asked. A threshold fitted against one version says nothing
-about another, and `Pack.verify` refuses the mismatch rather than carrying the number across.
+Um **pacote é versionado**. `lib/harness_core/decisions/packs.py` guarda cada um como um id, uma
+versão `major.minor.patch` e o hash do seu conteúdo, congelado na construção para que nada que
+guarde um pacote consiga reescrever um critério entre o hash ser tirado e a requisição ser
+construída. O provedor coloca o id e a versão em toda linha de ledger ao lado do hash de
+requisição, então uma linha resolve para as palavras que foram perguntadas. Um limiar ajustado
+contra uma versão não diz nada sobre outra, e `Pack.verify` recusa a discrepância em vez de
+carregar o número adiante.
 
-The **split is seeded by content**: a case lands in `dev` or `heldout` by the hash of the
-decision point and the capped input a request would actually carry — not the row's
-`input_sha256`, which is over the uncapped text and would put one identical request on both
-sides — never by `random` and never by position, so a re-run reproduces the split and adding
-rows does not reshuffle the old ones. A request hash found on both sides is a refusal, not a
-warning. Thresholds are fitted on `dev` alone; **only the held-out block is evidence**, and the
-dev block is in the file so a reader can see how far the fitted split flatters the fit.
-`--split dev` prints it with a line saying as much. There is no global default, and a point
-with no labelled dev case is reported **unfitted** rather than given the shipped 0.8 as though
-it had been measured.
+A **divisão é semeada por conteúdo**: um caso cai em `dev` ou `heldout` pelo hash do ponto de
+decisão e da entrada limitada que uma requisição de fato carregaria — não o `input_sha256` da
+linha, que é sobre o texto sem limite e colocaria uma requisição idêntica nos dois lados — nunca
+por `random` e nunca por posição, então uma nova execução reproduz a divisão e adicionar linhas
+não reembaralha as antigas. Um hash de requisição encontrado nos dois lados é uma recusa, não um
+aviso. Limiares são ajustados só em `dev`; **só o bloco separado (heldout) é evidência**, e o
+bloco dev está no arquivo para que um leitor veja o quanto a divisão ajustada lisonjeia o ajuste.
+`--split dev` o imprime com uma linha dizendo isso. Não há padrão global, e um ponto sem nenhum
+caso dev rotulado é relatado como **não ajustado** em vez de receber o 0,8 distribuído como se
+tivesse sido medido.
 
-The fit is scored under the provider's own semantics: below the threshold, and for `unknown`
-or no answer at all, the deterministic answer is what is compared against the label, because
-that is what the harness would have done. Scoring an abstention as a miss would drive every fit
-to the lowest confidence in the set. The report carries, per point and per split: accuracy, the
-same rate for the deterministic answer alone as the baseline to beat, how many cases the
-provider could have changed at all (it may tighten an allow into an ask and never widen one),
-the confusion by label, agreement with the deterministic answer over the labelled cases, a
-calibration table over the confidence with its expected calibration error and a bootstrap
-interval drawn from hashed indices rather than a linear congruential generator, input and
-output tokens, cost per 1,000 decisions where a price was given, the returned model ids, and an
-`unusable` block counting unavailable calls, errors and abstentions — none of which is ever
-counted as a pass. The report holds no clock and no absolute path, and no input text, so two
-runs over one log are byte-identical and the file can be sent on.
+O ajuste é pontuado sob a própria semântica do provedor: abaixo do limiar, e para `unknown` ou
+nenhuma resposta, a resposta determinística é o que é comparado contra o rótulo, porque é isso que
+o harness teria feito. Pontuar uma abstenção como um erro empurraria todo ajuste para a confiança
+mais baixa do conjunto. O relatório carrega, por ponto e por divisão: acurácia, a mesma taxa para
+a resposta determinística sozinha como o alvo a bater, quantos casos o provedor poderia ter mudado
+(ele pode apertar um allow em um ask e nunca ampliar um), a confusão por rótulo, a concordância com
+a resposta determinística sobre os casos rotulados, uma tabela de calibração sobre a confiança com
+seu erro de calibração esperado e um intervalo de bootstrap tirado de índices com hash em vez de um
+gerador congruencial linear, tokens de entrada e saída, custo por 1.000 decisões onde um preço foi
+dado, os ids de modelo retornados, e um bloco `unusable` contando chamadas indisponíveis, erros e
+abstenções — nenhum dos quais nunca é contado como uma aprovação. O relatório não tem relógio nem
+caminho absoluto, e nenhum texto de entrada, então duas execuções sobre um log são idênticas byte a
+byte e o arquivo pode ser enviado adiante.
 
-What the labels do **not** prove is in the report's own `caveats`, and is the first thing to
-read. `grade-bash` logs a row only where the harness said `ask` or `deny`, so the set is the
-prompts and never the commands allowed through without one; `ran` is a user approving something
-they were asked about, which is evidence the prompt was unnecessary and not proof; `not_run`
-does not separate a refusal from an interrupted turn. A flip rate over `--repeat` passes is
-zero by construction under `--replay`, because a recorded response cannot disagree with itself,
-and latency under `--replay` is the runner's and is reported as unmeasured rather than as a
-number whose name claims the service produced it.
+O que os rótulos **não** provam está no próprio bloco `caveats` do relatório, e é a primeira coisa
+a ler. `grade-bash` registra uma linha só onde o harness disse `ask` ou `deny`, então o conjunto é
+os prompts e nunca os comandos permitidos sem um; `ran` é um usuário aprovando algo sobre o qual
+foi perguntado, que é evidência de que o prompt era desnecessário e não prova; `not_run` não
+separa uma recusa de um turno interrompido. Uma taxa de inversão sobre passagens de `--repeat` é
+zero por construção sob `--replay`, porque uma resposta gravada não pode discordar de si mesma, e a
+latência sob `--replay` é a do executor e é relatada como não medida em vez de como um número cujo
+nome alega que o serviço a produziu.
 
-Ordinary runs need `--replay` and open no socket at all, which is also why a replay ignores the
-kill switch: the switch gates requests and a replay makes none. `--replay` and `--live` together
-are refused rather than silently ordered. `--live` needs `--max-requests`; `--budget-usd` needs
-`--usd-per-mtok` beside it, because no price for this provider is published here and a dollar
-ceiling nobody can convert is not a ceiling; and a live run with an empty
-`governance.jev.state_fields` is refused as pointless, since every request would carry the same
-four base fields and differ in nothing. A live run sends under the user's own allowlist, so an
-evaluation cannot send a field a hook is not allowed to send.
+Execuções comuns precisam de `--replay` e não abrem nenhum socket, o que também é por que uma
+reprodução ignora o interruptor de emergência: o interruptor controla requisições e uma reprodução
+não faz nenhuma. `--replay` e `--live` juntos são recusados em vez de silenciosamente ordenados.
+`--live` precisa de `--max-requests`; `--budget-usd` precisa de `--usd-per-mtok` ao lado, porque
+nenhum preço para este provedor é publicado aqui e um teto em dólar que ninguém consegue converter
+não é um teto; e uma execução ao vivo com um `governance.jev.state_fields` vazio é recusada como
+sem sentido, já que toda requisição carregaria os mesmos quatro campos base e não diferiria em
+nada. Uma execução ao vivo envia sob a própria lista de permissões do usuário, então uma avaliação
+não consegue enviar um campo que um hook não tem permissão de enviar.
 
-`governance.provider` selects one; the default is `none`. `citizen decide --action <class>
-[--grade N] [--counterparty <slug>] [--json]` prints the decision for the current repository and
-the policy files it read, each marked present or absent; `citizen doctor` lists the same files
-under the governance provider.
+`governance.provider` seleciona um; o padrão é `none`. `citizen decide --action <class>
+[--grade N] [--counterparty <slug>] [--json]` imprime a decisão para o repositório atual e os
+arquivos de política que leu, cada um marcado presente ou ausente; `citizen doctor` lista os mesmos
+arquivos sob o provedor de governança.
 
-### How command grading consults the provider
+### Como a classificação de comando consulta o provedor
 
-`grade-bash` consults the selected provider for every Bash command the autonomy stance lets
-through, and only when `governance.provider` is not `none`. Under `none` it imports nothing and
-its output is exactly what the stance alone gives.
+`grade-bash` consulta o provedor selecionado para todo comando Bash que a postura autonomy deixa
+passar, e só quando `governance.provider` não é `none`. Sob `none` ele não importa nada e sua
+saída é exatamente o que a postura sozinha dá.
 
-- **Classification.** Each simple command in the line is classified: `git push` is
-  `coding.git_push`, `git commit` is `coding.git_commit`, `gh pr merge` is `coding.pr_merge`, a
-  deploy verb the grader knows (its `deploy` family, `vercel deploy`, `netlify deploy`,
-  `cdk deploy`) is `coding.deploy`, and anything else is `coding.shell_exec`. Wrappers, runners,
-  `sudo` and a shell's `-c` text are looked through as the grader looks through them. A
-  read-only command, grade 0, is not put to the provider, since no level asks at grade 0.
-- **Counterparty.** Each command's counterparty is the repository and branch of the directory it
-  runs in: a `git -C <dir>` moves it for that command, and a `cd <dir>` or `pushd <dir>` earlier
-  in the line moves it for the commands after it, substitutions included. The repository policy
-  read is that repository's own `.agent-harness/governance.json`. A directory is trusted only when
-  every change before the command is a literal path; after `cd -`, `cd "$X"`, `popd`, a `cd` in a
-  subshell, substitution, pipeline or background job, `env -C` or `--git-dir`, the counterparty
-  is `repo:unknown/local`, which no pair names, so the class default governs.
-- **Tighten-only.** The provider is asked with the command's grade, and the strictest answer
-  across the segments stands. It is never asked about a command the stance already gates, so it
-  can add a prompt and never remove one. An `ask` is an ask in a prompting mode and, in `auto` and
-  `bypassPermissions`, a deny through the same channel the grader uses: an approval code in
-  `auto`, which the user's `approve <code>` reply lets through once, and the confirm marker in
-  `bypassPermissions`. A provider `deny` is a deny in every mode. The reason names the class, the
-  counterparty, the level and the rule or file that supplied it.
-- **Fail closed.** A configured provider that cannot answer — an unknown provider name, a policy
-  file that raises `PolicyError`, any other exception — makes the command ask, naming the error.
-  It never falls back to allow.
-- **Policy files.** An agent write to the user-level `governance.json` or to any
-  `.agent-harness/governance.json` is a level-1 action: always asked about. A Bash command that is
-  not read-only and names either file, or writes one through a redirect, `tee`, `sed -i`,
-  `cp`, `mv` or a similar path writer, asks; a `Write`, `Edit`, `MultiEdit`, `NotebookEdit` or
-  `apply_patch` to one asks too, and in `auto` mode is refused with an approval code covering that
-  exact edit once. The user's `config.json` is guarded the same way, by Bash write target and by
-  file tool, and so is any `harness config set governance...` command: the configuration selects
-  the provider, so without the guard an agent could switch governance off instead of editing a
-  policy.
-- **Rows.** Each decision the hook asks for is one `governance` row in `decisions.jsonl`, owned by
-  `hooks/grade-bash`, whose `input` records the action class, counterparty, level, grade, outcome
-  and provider, and never the command text. `telemetry.decisions: false` stops them with the rest.
+- **Classificação.** Cada comando simples na linha é classificado: `git push` é
+  `coding.git_push`, `git commit` é `coding.git_commit`, `gh pr merge` é `coding.pr_merge`, um
+  verbo de deploy que o classificador conhece (sua família `deploy`, `vercel deploy`,
+  `netlify deploy`, `cdk deploy`) é `coding.deploy`, e qualquer outra coisa é `coding.shell_exec`.
+  Wrappers, executores, `sudo` e o texto `-c` de um shell são vistos através, como o classificador
+  os vê através. Um comando somente-leitura, classe 0, não é colocado no provedor, já que nenhum
+  nível pergunta na classe 0.
+- **Contraparte.** A contraparte de cada comando é o repositório e a branch do diretório em que
+  roda: um `git -C <dir>` a move para esse comando, e um `cd <dir>` ou `pushd <dir>` mais cedo na
+  linha a move para os comandos depois dele, substituições incluídas. A política de repositório
+  lida é o próprio `.agent-harness/governance.json` desse repositório. Um diretório só é
+  confiável quando toda mudança antes do comando é um caminho literal; depois de `cd -`,
+  `cd "$X"`, `popd`, um `cd` em um subshell, substituição, pipeline ou job em segundo plano,
+  `env -C` ou `--git-dir`, a contraparte é `repo:unknown/local`, que nenhum par nomeia, então o
+  padrão da classe governa.
+- **Só aperta.** O provedor é consultado com a classe do comando, e a resposta mais restrita entre
+  os segmentos prevalece. Ele nunca é consultado sobre um comando que a postura já controla, então
+  só pode adicionar um prompt e nunca remover um. Um `ask` é um ask em um modo de prompt e, em
+  `auto` e `bypassPermissions`, um deny através do mesmo canal que o classificador usa: um código
+  de aprovação em `auto`, que a resposta `approve <code>` do usuário deixa passar uma vez, e o
+  marcador de confirmação em `bypassPermissions`. Um `deny` do provedor é um deny em todo modo. O
+  motivo nomeia a classe, a contraparte, o nível e a regra ou arquivo que o forneceu.
+- **Falha fechado.** Um provedor configurado que não consegue responder — um nome de provedor
+  desconhecido, um arquivo de política que levanta `PolicyError`, qualquer outra exceção — faz o
+  comando perguntar, nomeando o erro. Nunca recorre a permitir.
+- **Arquivos de política.** Uma escrita de agente no `governance.json` em nível de usuário ou em
+  qualquer `.agent-harness/governance.json` é uma ação de nível 1: sempre perguntada. Um comando
+  Bash que não é somente-leitura e nomeia qualquer um dos dois arquivos, ou escreve um através de
+  um redirecionamento, `tee`, `sed -i`, `cp`, `mv` ou um escritor de caminho semelhante, pergunta;
+  um `Write`, `Edit`, `MultiEdit`, `NotebookEdit` ou `apply_patch` em um deles também pergunta, e
+  em modo `auto` é recusado com um código de aprovação cobrindo exatamente essa edição uma vez. O
+  `config.json` do usuário é guardado da mesma forma, por alvo de escrita de Bash e por ferramenta
+  de arquivo, e o mesmo vale para qualquer comando `harness config set governance...`: a
+  configuração seleciona o provedor, então sem a guarda um agente poderia desligar a governança em
+  vez de editar uma política.
+- **Linhas.** Cada decisão que o hook pede é uma linha `governance` em `decisions.jsonl`, possuída
+  por `hooks/grade-bash`, cujo `input` registra a classe de ação, contraparte, nível, classe,
+  resultado e provedor, e nunca o texto do comando. `telemetry.decisions: false` para essas junto
+  com o resto.
 
-Session start checks a declared integration's configuration without installing it. Installation
-remains explicit. See [task continuation](task-continuation.md), the [BMad integration](bmad.md),
-[installation ownership](runtime-installation.md),
-and the compatibility catalog for qualification evidence.
+O início de sessão verifica a configuração de uma integração declarada sem instalá-la. A
+instalação continua explícita. Veja [continuação de tarefa](task-continuation.md), a
+[integração com o BMad](bmad.md), [posse da instalação](runtime-installation.md), e o catálogo de
+compatibilidade para evidência de qualificação.

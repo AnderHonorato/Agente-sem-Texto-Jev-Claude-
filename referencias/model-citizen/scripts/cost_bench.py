@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Measure what the harness costs against Claude Code with no harness at all.
+"""Mede quanto o harness custa em comparação ao Claude Code sem harness nenhum.
 
-`static` counts, without calling a model, what the harness adds to every session. A bare session
-loads none of the files counted, so the total is the harness's standing overhead. Tokens are an
-estimate from characters (`CHARS_PER_TOKEN`), good for a trend between versions and not for
-billing; dollars come from `policy/prices.json`. Codex is not counted: its instructions are
-rendered at sync time.
+`static` conta, sem chamar um modelo, o que o harness adiciona a toda sessão. Uma sessão nua não
+carrega nenhum dos arquivos contados, então o total é o custo fixo permanente do harness. Tokens
+são uma estimativa a partir de caracteres (`CHARS_PER_TOKEN`), boa para uma tendência entre
+versões e não para cobrança; dólares vêm de `policy/prices.json`. O Codex não é contado: suas
+instruções são renderizadas no momento do sync.
 
-`replay` runs pinned tasks headlessly against a bare profile and against the harness, either the
-installed one or a pinned git ref of this repository synced into a config directory of its own, one
-history row per `--tag`. It reads cost from the CLI's own JSON result and scores each run with a
-held-back check. It calls a model and spends real usage. Reading and limits: docs/benchmarks.md.
+`replay` roda tarefas fixadas sem interface contra um perfil nu e contra o harness, seja o
+instalado ou uma referência git fixada deste repositório sincronizada num diretório de
+configuração próprio, uma linha de histórico por `--tag`. Ele lê o custo do próprio resultado JSON
+da CLI e pontua cada execução com uma verificação reservada. Ele chama um modelo e gasta uso real.
+Leitura e limites: docs/benchmarks.md.
 """
 import argparse
 import contextlib

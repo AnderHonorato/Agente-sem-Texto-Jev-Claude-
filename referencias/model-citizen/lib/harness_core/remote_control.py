@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: MIT
-"""Launch agents that keep a Claude Code Remote Control server running per configured folder.
+"""Lança agentes que mantêm um servidor Claude Code Remote Control rodando por pasta configurada.
 
-One server serves one folder, so the `remote_control.folders` list in the user configuration
-becomes one launchd agent each. The harness never accepts a folder's workspace-trust dialog on
-the user's behalf: an untrusted folder is reported and skipped, because the server refuses it
-and launchd would restart the refusal forever.
+Um servidor serve uma pasta, então a lista `remote_control.folders` na configuração do usuário
+vira um agente launchd para cada uma. O harness nunca aceita o diálogo de confiança de workspace
+de uma pasta em nome do usuário: uma pasta não confiável é reportada e pulada, porque o servidor
+a recusa e o launchd reiniciaria a recusa para sempre.
 """
 import hashlib
 import json
@@ -19,21 +19,23 @@ LABEL_PREFIX = "com.agent-harness.remote-control."
 SPAWN_MODES = ("same-dir", "worktree", "session")
 PERMISSION_MODES = ("acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan")
 DEFAULTS = {"folders": [], "spawn": "worktree", "permission_mode": "default", "keep_awake": False}
-# A `folders` entry is a path, or an object naming a path plus what differs for that one host.
+# Uma entrada de `folders` é um caminho, ou um objeto nomeando um caminho mais o que difere para
+# aquele host específico.
 FOLDER_KEYS = ("path", "spawn", "env")
 SYSTEM_PATH = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
-# Every host's sessions inherit this. Without it, Claude Code 2.1.280 gives a session a host
-# starts no upload route, so a file the agent sends with SendUserFile reaches the app as "not
-# delivered" and cannot be opened there; with it set, the file is uploaded with the signed-in
-# account. The variable is undocumented. A folder's own `env` wins, so "" turns it off there.
+# As sessões de todo host herdam isto. Sem isso, o Claude Code 2.1.280 dá a uma sessão que um
+# host inicia nenhuma rota de upload, então um arquivo que o agente envia com SendUserFile chega
+# ao app como "not delivered" e não pode ser aberto lá; com isso definido, o arquivo é enviado
+# com a conta logada. A variável não é documentada. O próprio `env` de uma pasta vence, então ""
+# a desliga ali.
 HOST_ENV = {"CLAUDE_CODE_BRIEF_UPLOAD": "1"}
-# A server that cannot register (folder served from a terminal, no network) exits at once;
-# launchd's ten-second default would hammer the registration endpoint.
+# Um servidor que não consegue se registrar (pasta servida de um terminal, sem rede) sai na hora;
+# o padrão de dez segundos do launchd bombardearia o endpoint de registro.
 THROTTLE_SECONDS = 60
 
 
 def settings(cfg):
-    """The `remote_control` block over its defaults, validated; folders resolved and de-duplicated."""
+    """O bloco `remote_control` sobre seus padrões, validado; pastas resolvidas e sem duplicatas."""
     block = cfg.get("remote_control") or {}
     if not isinstance(block, dict):
         raise ValueError("remote_control must be an object")

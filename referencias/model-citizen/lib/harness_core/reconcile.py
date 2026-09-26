@@ -239,8 +239,9 @@ class Store:
             self._write(path, rendered, record)
 
     def json(self, path, desired, owned_paths, hook_lists=()):
-        """Apply owned fields. An owned path also in `hook_lists` holds a hook event's list, of
-        which the harness owns only its own entries; `desired` must already carry the user's."""
+        """Aplica campos possuídos. Um caminho possuído que também está em `hook_lists` guarda a
+        lista de um evento de hook, da qual o harness só possui suas próprias entradas; `desired`
+        já precisa carregar as do usuário."""
         path = Path(path)
         if path.is_symlink():
             self.conflicts.append(str(path) + ": configuration symlink is not managed")
@@ -266,11 +267,11 @@ class Store:
             self._write(path, json.dumps(document, indent=2) + "\n", record)
 
     def retire(self, path):
-        """Undo one generated file the harness no longer supplies; True when it is gone.
+        """Desfaz um arquivo gerado que o harness não fornece mais; True quando se foi.
 
-        `uninstall`'s rule for a single path, because a role that is deleted or renamed would
-        otherwise leave its definition on every machine forever. Content the user changed is
-        preserved and reported, and a file that had a prior life is returned to it.
+        A regra de `uninstall` para um único caminho, porque um papel que é excluído ou renomeado
+        de outra forma deixaria sua definição em toda máquina para sempre. Conteúdo que o usuário
+        mudou é preservado e reportado, e um arquivo que tinha uma vida anterior é devolvido a ela.
         """
         path = Path(path)
         record = self.data["files"].get(str(path))

@@ -5,35 +5,39 @@ argument-hint: [what is finishing, and "archive" if it should archive without as
 
 # Close out
 
-What is finishing: {{arguments}}
+O que está terminando: {{arguments}}
 
-**Sweep before you change anything.** A close-out that opens with a merge has already skipped the
-question it exists to ask. Outside a repository steps 3 and 5 do not apply; say so.
+**Varra antes de mudar qualquer coisa.** Um close-out que abre com uma mesclagem já pulou a
+pergunta que existe para fazer. Fora de um repositório, os passos 3 e 5 não se aplicam; diga isso.
 
-1. **Name what is still open.** Uncommitted and untracked files in every checkout this session
-   touched, `citizen worktree audit`, the pull requests this session opened and the state of their
-   checks, background work still running, and the decisions you parked for the user. Report that
-   list first; an empty sweep is a result, so say it and move on.
-2. **Batch the follow-ups, then ask once.** One line each, title and why, for what this session
-   found and did not do; never quietly fix one here instead. Ask for one explicit go-ahead naming
-   them, the pull requests step 3 would merge, and any step 4 would open and then merge. Act
-   only on what it approves.
-3. **Land what is ready** with the `land` workflow, never by inlining its steps: the merge proof
-   and its refusals are the point of it. Step 2's go-ahead is the one it asks for. Anything not
-   green, not approved, or not yours to merge stays open and goes in the report.
-4. **File the approved follow-ups**; step 2's go-ahead covers filing them and landing what they
-   write. When filing writes tracked files, such as an issue map or a story file, run it in a new
-   worktree off the updated default branch, put what it wrote in its own pull request under the
-   repository's pull request rules, and land that with the `land` workflow once checks pass.
-5. **Hand off** with the `handoff` workflow, and only when work in this repository continues past
-   this session. A finished piece of work needs no progress file.
-6. **Tell the sessions that depend on this one**, where the client can list and message them: a
-   branch one was waiting on, a file one holds open, a conclusion that reverses its premise.
-   Sharing a group or a repository is not a dependency; where the client cannot, use the handoff.
-7. **Archive, or stop.** Archive when the invocation already asked for it, provided
-   every pull request step 4 opened has merged; otherwise end on the checklist and wait.
-   Never clear or compact first: archiving ends the session, so both only burn the context you
-   still need. Clearing belongs to carrying on in the same session, the opposite of this workflow.
+1. **Nomeie o que ainda está em aberto.** Arquivos não commitados e não rastreados em todo
+   checkout que esta sessão tocou, `citizen worktree audit`, os pull requests que esta sessão
+   abriu e o estado de seus checks, trabalho de fundo ainda rodando, e as decisões que você
+   estacionou para o usuário. Relate essa lista primeiro; uma varredura vazia é um resultado,
+   então diga isso e siga em frente.
+2. **Agrupe os follow-ups, depois pergunte uma vez.** Uma linha cada, título e por quê, para o
+   que esta sessão encontrou e não fez; nunca conserte um silenciosamente aqui em vez disso. Peça
+   por um sinal verde explícito nomeando-os, os pull requests que o passo 3 mesclaria, e qualquer
+   coisa que o passo 4 abriria e depois mesclaria. Aja apenas sobre o que ele aprovar.
+3. **Finalize o que está pronto** com o workflow `land`, nunca colocando seus passos inline: a
+   prova de mesclagem e suas recusas são o ponto dele. O sinal verde do passo 2 é o que ele pede.
+   Qualquer coisa não verde, não aprovada, ou não sua para mesclar fica em aberto e vai no
+   relatório.
+4. **Registre os follow-ups aprovados**; o sinal verde do passo 2 cobre registrá-los e finalizar
+   o que eles escrevem. Quando o registro escreve arquivos rastreados, como um mapa de issues ou
+   um arquivo de história, rode-o numa worktree nova a partir do branch padrão atualizado, coloque
+   o que ele escreveu em seu próprio pull request sob as regras de pull request do repositório, e
+   finalize isso com o workflow `land` uma vez que os checks passem.
+5. **Faça o handoff** com o workflow `handoff`, e apenas quando o trabalho neste repositório
+   continua além desta sessão. Um trabalho terminado não precisa de arquivo de progresso.
+6. **Avise as sessões que dependem desta**, onde o cliente pode listá-las e enviar mensagem a
+   elas: um branch que uma esperava, um arquivo que uma mantém aberto, uma conclusão que reverte
+   sua premissa. Compartilhar um grupo ou um repositório não é uma dependência; onde o cliente não
+   pode, use o handoff.
+7. **Arquive, ou pare.** Arquive quando a invocação já pediu por isso, desde que todo pull request
+   que o passo 4 abriu tenha sido mesclado; caso contrário termine na checklist e espere. Nunca dê
+   clear ou compact antes: arquivar encerra a sessão, então ambos só queimam o contexto que você
+   ainda precisa. Dar clear pertence a continuar na mesma sessão, o oposto deste workflow.
 
-Log the close-out before the archive call, which ends the turn, and report what landed, what you
-filed, whom you told, and what you are leaving open.
+Registre o close-out antes da chamada de arquivamento, que encerra o turno, e relate o que foi
+finalizado, o que você registrou, a quem você avisou, e o que você está deixando em aberto.

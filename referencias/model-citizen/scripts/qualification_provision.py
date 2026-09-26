@@ -96,13 +96,14 @@ def clone(out, commit):
 
 
 def exclude_marker(target):
-    """Keep the marker out of the clone's status, so the runner inside the clone accepts it.
+    """Mantém o marcador fora do status do clone, para que o runner dentro do clone o aceite.
 
-    The runner refuses a checkout with any `git status --porcelain` output, and a round drives
-    the runner from this clone. The exclusion is the clone's own `.git/info/exclude`, never a
-    tracked `.gitignore`: the clone must stay byte-identical to the commit under qualification.
-    Fixing it here rather than in the runner reaches every round at once, since the runner that
-    executes is the frozen commit's, while this script runs from the operator's checkout.
+    O runner recusa um checkout com qualquer saída de `git status --porcelain`, e uma rodada
+    conduz o runner a partir deste clone. A exclusão é o próprio `.git/info/exclude` do clone,
+    nunca um `.gitignore` rastreado: o clone precisa continuar byte-idêntico ao commit sob
+    qualificação. Corrigir isso aqui em vez de no runner alcança toda rodada de uma vez, já que o
+    runner que executa é o do commit congelado, enquanto este script roda a partir do checkout do
+    operador.
     """
     exclude = Path(git("rev-parse", "--git-path", "info/exclude", repo=target).stdout.strip())
     if not exclude.is_absolute():
@@ -116,11 +117,11 @@ def exclude_marker(target):
 
 
 def bmad_install_args(target):
-    """The optional suite's install command from docs/bmad.md, with `target` as the framework root.
+    """O comando de instalação da suíte opcional de docs/bmad.md, com `target` como raiz do framework.
 
-    It must stay that command flag for flag. Without `--shims` the legacy review skill names some
-    workflows still invoke are absent, and `harness integration apply bmad` reports drift on the
-    provisioned root.
+    Precisa continuar esse comando, flag por flag. Sem `--shims` os nomes de skill de revisão
+    legados que alguns workflows ainda invocam ficam ausentes, e `harness integration apply bmad`
+    relata desvio na raiz provisionada.
     """
     return ["npx", "--yes", BMAD_INSTALLER, "install", "--directory", str(target),
             "--modules", BMAD_MODULES, "--tools", "claude-code,codex",
@@ -128,13 +129,13 @@ def bmad_install_args(target):
 
 
 def bmad(out):
-    """A BMad framework checkout for the optional integration suite, from the pinned installer.
+    """Um checkout do framework BMad para a suíte de integração opcional, a partir do instalador fixado.
 
-    No required case reads it: `framework-spawn-routing` builds its recipe from the integration
-    descriptor and runs no framework workflow. The checkout is for the native review suite
-    docs/releasing.md asks for once per minor release, which an operator runs by hand. It is the
-    only step here that reaches the network, so it is opt-in, and an installer this script cannot
-    find is a reported gap rather than a failed provision.
+    Nenhum caso obrigatório o lê: `framework-spawn-routing` constrói sua receita a partir do
+    descritor de integração e não roda nenhum workflow de framework. O checkout é para a suíte de
+    revisão nativa que docs/releasing.md pede uma vez por lançamento minor, que um operador roda
+    manualmente. É o único passo aqui que alcança a rede, então é opt-in, e um instalador que este
+    script não consegue encontrar é uma lacuna relatada, não um provisionamento que falhou.
     """
     target = out / BMAD
     target.mkdir(parents=True, exist_ok=True)
@@ -167,16 +168,17 @@ def provision(out, commit, want_bmad):
 
 
 def environment(report):
-    """The one variable a round exports, so no case reaches the network to find a checkout."""
+    """A única variável que uma rodada exporta, para que nenhum caso alcance a rede para achar um checkout."""
     return {BMAD_ENV: report["bmad"]} if report.get("bmad") else {}
 
 
 def inside_this_repository(path):
-    """Whether `path` resolves inside any checkout or worktree of this repository.
+    """Se `path` resolve para dentro de qualquer checkout ou worktree deste repositório.
 
-    A round directory there would be removed by a clean tree check, or worse be committed. The
-    test is the git object store both paths share, so a sibling worktree of this repository is
-    refused exactly as the checkout itself is, and an unrelated repository elsewhere is not.
+    Um diretório de rodada ali seria removido por uma verificação de árvore limpa, ou pior, seria
+    commitado. O teste é o object store git que os dois caminhos compartilham, então um worktree
+    irmão deste repositório é recusado exatamente como o próprio checkout é, e um repositório não
+    relacionado em outro lugar não é.
     """
     mine = git("rev-parse", "--git-common-dir").stdout.strip()
     if not mine:
@@ -194,13 +196,13 @@ def inside_this_repository(path):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, required=True,
-                        help="round directory, outside this checkout")
-    parser.add_argument("--commit", help="commit to qualify (default: HEAD of this checkout)")
+                        help="diretório da rodada, fora deste checkout")
+    parser.add_argument("--commit", help="commit a qualificar (padrão: HEAD deste checkout)")
     parser.add_argument("--bmad", action="store_true",
-                        help="install the pinned BMad framework checkout for the optional integration "
-                             "suite; the only network step")
+                        help="instala o checkout fixado do framework BMad para a suíte de integração "
+                             "opcional; o único passo de rede")
     parser.add_argument("--print-env", action="store_true",
-                        help="print the exports a round needs, one per line, and provision nothing")
+                        help="imprime os exports que uma rodada precisa, um por linha, e não provisiona nada")
     args = parser.parse_args(argv)
     out = args.out.expanduser().resolve()
     if inside_this_repository(out):

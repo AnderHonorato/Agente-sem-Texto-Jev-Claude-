@@ -5,41 +5,46 @@ argument-hint: <plan path or issue number>
 
 # Build
 
-What to build: {{arguments}}
+O que construir: {{arguments}}
 
-**Check first, before spawning anything.** This command needs a git repository, a remote you can
-push to, and `gh` logged in. No repository: say so and offer to make the change in place, with
-tests, and no worktree or pull request. A repository but no remote or no `gh`: run steps 1 to 4,
-stop at the local commit, and report the branch as ready to push.
+**Verifique primeiro, antes de gerar qualquer coisa.** Este comando precisa de um repositório
+git, um remote no qual você possa dar push, e o `gh` autenticado. Sem repositório: diga isso e
+ofereça fazer a mudança no local, com testes, e sem worktree ou pull request. Um repositório mas
+sem remote ou sem `gh`: rode os passos 1 a 4, pare no commit local, e relate o branch como pronto
+para push.
 
-1. **Work from the plan path or the issue number you were given**, and say which in your first
-   message. Never search for a plan: `/plan` renames the approved file and hands over its path,
-   and a plan found by date is as likely to be last week's. With neither a path nor an issue,
-   ask for one. Give the builder the absolute plan path and tell it to copy the file into its
-   worktree and commit it — a worktree carries no untracked file, and the plan belongs in the PR.
-2. **Spawn the `builder` agent** with the plan or issue text, the repository path, the base
-   branch, and the attribution trailer your tool supplies. Its definition already carries the
-   standing brief — a worktree off the base branch per `worktree-per-agent`, the repository's own
-   instructions read first, tests with every change, the repository's gate, one local Conventional
-   Commit — so retype none of it. Give it the scope instead: the files it may touch and the ones
-   it must leave alone.
-3. **Run the gate yourself** in the worktree it names, with the repository's own commands. Never
-   take an agent's word for a verifier; you read the exit status, not its account of the run. Red
-   means you fix it or hand the finding back, never that you push anyway.
-4. **Check the commit** before it leaves the machine: a Conventional Commit title, a body ending
-   in `Closes #N` and the attribution trailer, and nothing in the diff that fails to trace to the
+1. **Trabalhe a partir do caminho do plano ou do número da issue que lhe foi dado**, e diga qual
+   deles na sua primeira mensagem. Nunca procure por um plano: `/plan` renomeia o arquivo aprovado
+   e entrega seu caminho, e um plano encontrado por data tem a mesma chance de ser da semana
+   passada. Sem um caminho nem uma issue, peça um. Dê ao builder o caminho absoluto do plano e
+   diga a ele para copiar o arquivo para dentro da sua worktree e commitá-lo — uma worktree não
+   carrega nenhum arquivo não rastreado, e o plano pertence ao PR.
+2. **Gere o agente `builder`** com o texto do plano ou da issue, o caminho do repositório, o
+   branch base, e o trailer de atribuição que sua ferramenta fornece. A definição dele já carrega
+   o briefing permanente — uma worktree a partir do branch base conforme `worktree-per-agent`, as
+   próprias instruções do repositório lidas primeiro, testes com toda mudança, o gate do
+   repositório, um Conventional Commit local — então não redigite nada disso. Dê a ele o escopo em
+   vez disso: os arquivos que pode tocar e os que deve deixar em paz.
+3. **Rode o gate você mesmo** na worktree que ele nomeia, com os próprios comandos do repositório.
+   Nunca aceite a palavra de um agente para um verificador; você lê o código de saída, não o
+   relato dele sobre a execução. Vermelho significa que você conserta ou devolve o achado, nunca
+   que você dá push de qualquer forma.
+4. **Verifique o commit** antes que ele saia da máquina: um título Conventional Commit, um corpo
+   terminando em `Closes #N` e o trailer de atribuição, e nada no diff que não se rastreie até a
    issue.
-5. **Push the branch and open the pull request** with `gh pr create`, based on the default
-   branch, never pushing to that branch directly. Body: a few bullets on what and why, `Closes
-   #N`, and the generated-with line your tool supplies.
-6. **Answer the review bot**, where the repository runs one: a `.coderabbit.yaml`, a
-   `greptile.json`, or a bot that reviewed earlier pull requests. Wait up to ten minutes for its
-   first review of this pull request, and say so if none arrives. Then take each unresolved bot
-   thread as a finding: fix it in the worktree, rerun the gate and push, or reply with the reason it
-   does not apply. Then resolve the thread (GraphQL `reviewThreads`, then `resolveReviewThread`).
-   After pushing a fix, ask for one more review, such as `@coderabbitai review`, and wait again. Two
-   rounds at most; report whatever remains. A human's thread is never yours to resolve.
+5. **Dê push no branch e abra o pull request** com `gh pr create`, baseado no branch padrão,
+   nunca dando push direto para aquele branch. Corpo: alguns marcadores sobre o quê e o porquê,
+   `Closes #N`, e a linha generated-with que sua ferramenta fornece.
+6. **Responda ao bot de revisão**, onde o repositório roda um: um `.coderabbit.yaml`, um
+   `greptile.json`, ou um bot que revisou pull requests anteriores. Espere até dez minutos pela
+   primeira revisão dele neste pull request, e diga isso se nenhuma chegar. Depois trate toda
+   thread não resolvida do bot como um achado: conserte-o na worktree, rerode o gate e dê push,
+   ou responda com a razão pela qual não se aplica. Depois resolva a thread (GraphQL
+   `reviewThreads`, depois `resolveReviewThread`). Depois de dar push numa correção, peça mais uma
+   revisão, como `@coderabbitai review`, e espere de novo. No máximo duas rodadas; relate o que
+   sobrar. Uma thread de um humano nunca é sua para resolver.
 
-Report the outcome in one sentence, with the pull request URL when one was opened, then at most
-five bullets: bot threads answered or still open, a decision taken for the reader, a step left
-unfinished, a skipped test. Give the gate result in one line, and any failing output in full.
+Relate o resultado em uma frase, com a URL do pull request quando um foi aberto, depois no
+máximo cinco marcadores: threads de bot respondidas ou ainda abertas, uma decisão tomada em nome
+do leitor, um passo deixado inacabado, um teste pulado. Dê o resultado do gate em uma linha, e
+qualquer saída de falha por completo.

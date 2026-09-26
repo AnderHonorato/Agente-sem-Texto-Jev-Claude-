@@ -636,7 +636,7 @@ def _strip_subs(cmd, depth):
             if end is None:
                 return None
             inner = cmd[i + 2:end]
-            if not inner.startswith("("):  # a plain '(' opener is arithmetic $(( )), no command
+            if not inner.startswith("("):  # um abridor '(' puro é aritmética $(( )), sem comando
                 if not command_ok(inner, depth + 1):
                     return None
             out.append(_PLACEHOLDER)
@@ -660,8 +660,8 @@ def _strip_subs(cmd, depth):
 
 
 def _strip_comment(line):
-    """`line` without its trailing bash comment: an unquoted `#` at the start of a
-    word. Substitutions are already placeholders, so only quotes need tracking."""
+    """`line` sem seu comentário bash final: um `#` sem aspas no início de uma
+    palavra. Substituições já são placeholders, então só aspas precisam ser rastreadas."""
     sq = dq = False
     i = 0
     n = len(line)
@@ -687,14 +687,14 @@ def _strip_comment(line):
 
 
 def _header_ok(tokens):
-    """A `for NAME [in WORDS]` / `select NAME ...` header runs no command; its words
-    are data. Accept the well-formed shapes; reject C-style `for (( ))` and `case`."""
+    """Um cabeçalho `for NAME [in WORDS]` / `select NAME ...` não roda comando algum; suas
+    palavras são dados. Aceita as formas bem formadas; rejeita `for (( ))` estilo C e `case`."""
     kw = tokens[0]
     if kw in ("for", "select"):
         if len(tokens) < 2 or not NAME_RE.match(tokens[1]):
             return False
         return len(tokens) == 2 or tokens[2] == "in"
-    return False  # `case` headers are not decomposed here; fail closed
+    return False  # cabeçalhos `case` não são decompostos aqui; falha fechado
 
 
 def command_ok(cmd, depth=0):
@@ -703,10 +703,10 @@ def command_ok(cmd, depth=0):
     cmd = _strip_subs(cmd, depth)
     if cmd is None:
         return False
-    # A newline separates commands for bash but is whitespace to `tokenize`, so each
-    # line loses its comment and the lines are joined with `;`. `tokenize` knows no
-    # comments: a `#` inside a word is part of the word, as in bash. A backslash
-    # continuation is not modelled and falls through.
+    # Uma quebra de linha separa comandos para o bash mas é espaço em branco para
+    # `tokenize`, então cada linha perde seu comentário e as linhas são unidas com `;`.
+    # `tokenize` não conhece comentários: um `#` dentro de uma palavra é parte da
+    # palavra, como no bash. Uma continuação com barra invertida não é modelada e cai no fluxo normal.
     if re.search(r"\\\r?\n", cmd):
         return False
     cmd = cmd.replace("\r\n", "\n").replace("\r", "\n")
@@ -723,7 +723,7 @@ def command_ok(cmd, depth=0):
                 segments.append(cur)
                 cur = []
             continue
-        if not cur:  # command position: reserved words are structural here only
+        if not cur:  # posição de comando: palavras reservadas são estruturais só aqui
             if t in WORD_DROP:
                 continue
             if t in WORD_COND or t in WORD_HEADER:

@@ -319,9 +319,9 @@ def unreachable_seconds(log_text):
 
 
 def removed_worktrees(log_text):
-    """`(stamp, path)` for every session worktree the give-up cleanup deleted.
+    """`(stamp, path)` para cada worktree de sessão que a limpeza de desistência apagou.
 
-    A `kept worktree … · uncommitted changes` line is not one: that checkout still exists.
+    Uma linha `kept worktree … · uncommitted changes` não é uma dessas: aquele checkout ainda existe.
     """
     out = []
     for line in (log_text or "").splitlines():
@@ -332,15 +332,15 @@ def removed_worktrees(log_text):
 
 
 def gave_up(log_text):
-    """Whether the log's last give-up is more recent than its last registration."""
+    """Se a última desistência do log é mais recente que seu último registro."""
     return bool(GAVE_UP.search(log_text or ""))
 
 
 def pointer_is_current(existing, wanted, path, now=None):
-    """Whether the file already says what this run would write, and is young enough to be read.
+    """Se o arquivo já diz o que esta execução escreveria, e é novo o bastante para ser lido.
 
-    Freshness is the file's mtime, not a field, so an unchanged but expiring pointer still
-    needs rewriting.
+    A frescor é o mtime do arquivo, não um campo, então um ponteiro inalterado mas expirando
+    ainda precisa ser reescrito.
     """
     if existing != wanted:
         return False
@@ -352,7 +352,7 @@ def pointer_is_current(existing, wanted, path, now=None):
 
 
 def heal_plist(harness_bin, home, log_dir, claude_bin=None):
-    """A launchd agent that runs `harness remote-control heal --once` on an interval."""
+    """Um agente launchd que roda `harness remote-control heal --once` num intervalo."""
     path = [str(Path(claude_bin).parent)] if claude_bin else []
     path += [p for p in SYSTEM_PATH if p not in path]
     return {
@@ -371,17 +371,17 @@ def render_heal(harness_bin, home, log_dir, claude_bin=None):
     return plistlib.dumps(heal_plist(harness_bin, home, log_dir, claude_bin), sort_keys=True)
 
 
-# --------------------------------------------------------------------------- supervisor state
+# --------------------------------------------------------------------------- estado do supervisor
 
 STATE_NAME = "supervisor-state.json"
 
 
 def read_state(path):
-    """What the supervisor already did:
+    """O que o supervisor já fez:
     `{"stopped": {label: pid}, "recreated": [key], "reconnected": {session: epoch}}`.
 
-    A missing or unreadable file is an empty state, so the worst a lost file costs is one
-    repeated SIGTERM to a host that is failing anyway.
+    Um arquivo ausente ou ilegível é um estado vazio, então o pior que um arquivo perdido custa é
+    um SIGTERM repetido para um host que já está falhando de qualquer forma.
     """
     try:
         value = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -397,10 +397,10 @@ def read_state(path):
 
 
 def stop_is_due(elapsed, label, pid, state):
-    """Whether this host should be stopped now, and has not been stopped already.
+    """Se este host deve ser parado agora, e ainda não foi parado.
 
-    The guard is the pid: launchd's relaunch is a new process, so the next outage stops the new
-    host once and this one never twice.
+    A proteção é o pid: o relançamento do launchd é um processo novo, então a próxima
+    interrupção para o novo host uma vez e esse nunca duas.
     """
     return elapsed >= STOP_AT_SECONDS and state["stopped"].get(label) != pid
 

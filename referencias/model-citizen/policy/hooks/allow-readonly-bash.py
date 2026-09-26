@@ -60,11 +60,11 @@ FLAGGED = {
     "hostname": (("--file",), "F"),
     "xxd": ((), ""),
 }
-# Operands beyond this count name an output file (`xxd in out`) or set state (`hostname x`).
+# Operandos além dessa contagem nomeiam um arquivo de saída (`xxd in out`) ou definem estado (`hostname x`).
 POSITIONAL_MAX = {"xxd": 1, "hostname": 0}
 
-# Commands read-only only when the arguments match the given regex
-# (matched against the argument string after the program name).
+# Comandos somente leitura só quando os argumentos combinam com o regex dado
+# (comparado contra a string de argumento depois do nome do programa).
 PREFIXED = [
     ("gh", r"^(auth status|repo view|repo list|pr view|pr list|pr diff|pr checks|pr status|"
            r"issue view|issue list|run list|run view|release list|release view|label list|"
@@ -83,9 +83,9 @@ PREFIXED = [
     ("aws", r"^sts get-caller-identity(\s|$)"),
 ]
 
-# Variables that change which program runs or what it executes: assigning one, even
-# without `export`, is a way to steer an approved command. `PAGER=cat` is the one
-# idiom worth keeping.
+# Variáveis que mudam qual programa roda ou o que ele executa: atribuir a uma, mesmo
+# sem `export`, é uma forma de direcionar um comando aprovado. `PAGER=cat` é o único
+# idioma que vale a pena manter.
 DANGEROUS_ENV = re.compile(
     r"^(PATH|LD_|DYLD_|GIT_|PAGER|LESS|EDITOR|VISUAL|NODE_OPTIONS|PYTHON|PERL|RUBY|BASH_ENV|"
     r"ENV$|IFS|CDPATH|GLOBIGNORE|HOME|SHELL|TMPDIR|PS4|PROMPT_COMMAND|AWKPATH|AWKLIBPATH|"
@@ -94,11 +94,11 @@ DANGEROUS_ENV = re.compile(
 )
 PAGER_OK = re.compile(r"^(PAGER|GIT_PAGER)=(cat)?$")
 
-# A program named by absolute path is approved only from these directories; a
-# repository can ship a `bin/cat` of its own.
+# Um programa nomeado por caminho absoluto só é aprovado a partir desses diretórios; um
+# repositório pode trazer um `bin/cat` próprio.
 SAFE_BIN_DIRS = {"/bin", "/usr/bin", "/usr/local/bin", "/opt/homebrew/bin", "/sbin", "/usr/sbin"}
 
-# git subcommands that are read-only with any arguments.
+# Subcomandos git que são somente leitura com quaisquer argumentos.
 GIT_ANY = {
     "status", "log", "diff", "show", "rev-parse", "ls-files", "ls-tree", "check-ignore",
     "blame", "describe", "shortlog", "cat-file", "rev-list", "name-rev", "merge-base",
@@ -108,19 +108,19 @@ GIT_ANY = {
 
 GIT_ARGS_WRITE = re.compile(r"^(--output|--open-files-in-pager|-O)")
 
-# awk: shell escapes, file output, script files and extension loading.
+# awk: escapes de shell, saída para arquivo, arquivos de script e carregamento de extensão.
 AWK_FORBIDDEN = re.compile(r"system\s*\(|getline|[|>]|@load|@include|^-[filE]|^--(file|include|load|exec)")
 
 FIND_FORBIDDEN = {"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprint0", "-fprintf", "-fls"}
 NEVER = {"sudo", "eval", "exec", "bash", "sh", "zsh", "xargs", "source", "."}
 
-# Metacharacters that separate commands wherever they appear.
+# Metacaracteres que separam comandos onde quer que apareçam.
 ALWAYS_DELIM = {";", "&&", "||", "|", "|&", "&", "(", ")", ";;"}
-# Reserved words are structural only in command position (see command_ok). As an
-# argument, e.g. `grep -q done`, the same word is ordinary data.
-#   WORD_DROP    separate commands but carry none to check.
-#   WORD_COND    introduce a condition command whose remainder must be checked.
-#   WORD_HEADER  introduce a loop/case header whose words are data, not commands.
+# Palavras reservadas são estruturais só em posição de comando (veja command_ok). Como um
+# argumento, ex. `grep -q done`, a mesma palavra é dado comum.
+#   WORD_DROP    separa comandos mas não carrega nenhum para checar.
+#   WORD_COND    introduz um comando de condição cujo restante precisa ser checado.
+#   WORD_HEADER  introduz um cabeçalho de loop/case cujas palavras são dados, não comandos.
 WORD_DROP = {"do", "done", "then", "fi", "else", "esac", "{", "}"}
 WORD_COND = {"while", "until", "if", "elif"}
 WORD_HEADER = {"for", "select", "case"}
